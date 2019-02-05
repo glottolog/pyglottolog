@@ -35,7 +35,7 @@ def store(details_, fname):  # pragma: no cover
 
 def get_soup(path):  # pragma: no cover
     print('... fetch {0}'.format(path))
-    return BeautifulSoup(requests.get(BASE_URL + path).content, "html5lib")
+    return BeautifulSoup(requests.get(BASE_URL + path).content, 'html.parser')
 
 
 def details(path):  # pragma: no cover

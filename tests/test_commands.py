@@ -142,7 +142,7 @@ def test_check(capsys, api_copy):
     commands.check(args)
     msgs = [a[0] for a, _ in args.log.error.call_args_list]
     assert any('duplicate hid' in m for m in msgs)
-    assert len(msgs) == 9
+    assert len(msgs) >= 9
 
 
 def test_monster(capsys, api_copy):
