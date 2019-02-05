@@ -8,5 +8,6 @@ cache: pip
 before_cache: rm -f $HOME/.cache/pip/log/debug.log
 install: pip install -e .[test]
 script: pytest
+after_success: codecov
 git:
   depth: 3
