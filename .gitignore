@@ -1,0 +1,50 @@
+*.py[cod]
+__pycache__
+
+# C extensions
+*.so
+
+# Packages
+*.egg
+*.egg-info
+*.eggs
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+lib
+lib64
+
+#data
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+/cover/
+/htmlcov/
+.coverage
+/.cache/
+.tox
+nosetests.xml
+
+# Mr Developer
+.mr.developer.cfg
+.project
+.pydevproject
+.idea
+
+iso639-3
+
+/.venv/
+
+/*.sqlite3
+/scripts/*.sqlite3
+/scripts/*.csv
+/scripts/*.zip
+.pytest_cache/
