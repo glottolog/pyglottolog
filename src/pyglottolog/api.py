@@ -7,10 +7,13 @@ import os
 import contextlib
 from collections import OrderedDict
 
+import pycldf.util
+from csvw import TableGroup, Column
 from clldutils.path import Path, as_posix, walk, git_describe
 from clldutils.misc import lazyproperty
 from clldutils.declenum import EnumSymbol
 from clldutils.apilib import API
+from clldutils.jsonlib import load
 import pycountry
 from termcolor import colored
 
@@ -168,6 +171,63 @@ class Glottolog(API):
             if lang.hid:
                 res[lang.hid] = ma
         return res
+
+    def write_languoids_table(self, outdir, version=None):
+        version = version or self.describe()
+        out = outdir / 'glottolog-languoids-{0}.csv'.format(version)
+        md = outdir / (out.name + '-metadata.json')
+        tg = TableGroup.fromvalue({
+            "@context": "http://www.w3.org/ns/csvw",
+            "dc:version": version,
+            "dc:": "Harald Hammarström, Robert Forkel & Martin Haspelmath. "
+                   "clld/glottolog: Glottolog database (Version {0}) [Data set]. "
+                   "Zenodo. http://doi.org/10.5281/zenodo.596479".format(version),
+            "tables": [
+                load(pycldf.util.pkg_path('components', 'LanguageTable-metadata.json'))
+            ]})
+        tg.tables[0].url = out.name
+        for col in [
+            dict(name='Classification', separator='/'),
+            dict(name='Family_Glottocode'),
+            dict(name='Family_Name'),
+            dict(name='Language_Glottocode'),
+            dict(name='Language_Name'),
+            dict(name='Level', datatype=dict(base='string', format='family|language|dialect')),
+            dict(name='Status'),
+        ]:
+            tg.tables[0].tableSchema.columns.append(Column.fromvalue(col))
+
+        langs = []
+        for lang in self.languoids():
+            lid, lname = None, None
+            if lang.level == languoids.Level.language:
+                lid, lname = lang.id, lang.name
+            elif lang.level == languoids.Level.dialect:
+                for lname, lid, level in reversed(lang.lineage):
+                    if level == languoids.Level.language:
+                        break
+                else:  # pragma: no cover
+                    raise ValueError
+            langs.append(dict(
+                ID=lang.id,
+                Name=lang.name,
+                Macroarea=lang.macroareas[0] if lang.macroareas else None,
+                Latitude=lang.latitude,
+                Longitude=lang.longitude,
+                Glottocode=lang.id,
+                ISO639P3code=lang.iso,
+                Classification=[c[1] for c in lang.lineage],
+                Language_Glottocode=lid,
+                Language_Name=lname,
+                Family_Name=lang.lineage[0][0] if lang.lineage else None,
+                Family_Glottocode=lang.lineage[0][1] if lang.lineage else None,
+                Level=lang.level.name,
+                Status=lang.endangerment.description if lang.endangerment else None,
+            ))
+
+        tg.to_file(md)
+        tg.tables[0].write(langs, fname=out)
+        return md, out
 
 
 def _ascii_node(n, level, last, maxlevel, prefix):

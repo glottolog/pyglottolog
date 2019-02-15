@@ -11,9 +11,6 @@ from json import dumps
 from string import Template
 
 from termcolor import colored
-from csvw import TableGroup, Column
-import pycldf.util
-from clldutils.jsonlib import load
 from clldutils.clilib import command, ParserError
 from clldutils.misc import slug
 from clldutils.markup import Table
@@ -40,62 +37,10 @@ def languoids(args):
     parser.add_argument(
         '--version', help='Version string if it cannot be inferred', default=args.repos.describe())
     xargs = parser.parse_args(args.args)
-
-    out = xargs.output / 'glottolog-languoids-{0}.csv'.format(xargs.version)
-    md = xargs.output / (out.name + '-metadata.json')
-    tg = TableGroup.fromvalue({
-        "@context": "http://www.w3.org/ns/csvw",
-        "dc:version": xargs.version,
-        "dc:": "Harald Hammarström, Robert Forkel & Martin Haspelmath. "
-               "clld/glottolog: Glottolog database (Version {0}) [Data set]. "
-               "Zenodo. http://doi.org/10.5281/zenodo.596479".format(xargs.version),
-        "tables": [
-            load(pycldf.util.pkg_path('components', 'LanguageTable-metadata.json'))
-    ]})
-    tg.tables[0].url = out.name
-    for col in [
-        dict(name='Classification', separator='/'),
-        dict(name='Family_Glottocode'),
-        dict(name='Family_Name'),
-        dict(name='Language_Glottocode'),
-        dict(name='Language_Name'),
-        dict(name='Level', datatype=dict(base='string', format='family|language|dialect')),
-        dict(name='Status'),
-    ]:
-        tg.tables[0].tableSchema.columns.append(Column.fromvalue(col))
-
-    langs = []
-    for lang in args.repos.languoids():
-        lid, lname = None, None
-        if lang.level == Level.language:
-            lid, lname = lang.id, lang.name
-        elif lang.level == Level.dialect:
-            for lname, lid, level in reversed(lang.lineage):
-                if level == Level.language:
-                    break
-            else:  # pragma: no cover
-                raise ValueError
-        langs.append(dict(
-            ID=lang.id,
-            Name=lang.name,
-            Macroarea=lang.macroareas[0] if lang.macroareas else None,
-            Latitude=lang.latitude,
-            Longitude=lang.longitude,
-            Glottocode=lang.id,
-            ISO639P3code=lang.iso,
-            Classification=[c[1] for c in lang.lineage],
-            Language_Glottocode=lid,
-            Language_Name=lname,
-            Family_Name=lang.lineage[0][0] if lang.lineage else None,
-            Family_Glottocode=lang.lineage[0][1] if lang.lineage else None,
-            Level=lang.level.name,
-            Status=lang.endangerment.description if lang.endangerment else None,
-        ))
-
-    tg.to_file(md)
-    print('Metadata: {0}'.format(md))
-    tg.tables[0].write(langs, fname=out)
-    print('Data: {0}'.format(out))
+    res = args.repos.write_languoids_table(xargs.output, xargs.version)
+    print('Lagnuoids table written to')
+    for p in res:
+        print('{0}'.format(p))
 
 
 @command()
