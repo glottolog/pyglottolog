@@ -93,6 +93,13 @@ def test_tree(capsys, api):
     assert 'dialect' not in out
 
 
+def test_languoids(capsys, api, tmpdir):
+    commands.languoids(_args(api, '--output={0}'.format(tmpdir), '--version=1.5'))
+    out, _ = capsys.readouterr()
+    assert '-metadata.json' in out
+    assert tmpdir.join('glottolog-languoids-1.5.csv').ensure()
+
+
 def test_newick(capsys, api):
     commands.newick(_args(api, 'abcd1235'))
     assert 'language' in capsys.readouterr()[0]

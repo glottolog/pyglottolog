@@ -93,4 +93,27 @@ optional arguments:
 Use 'glottolog help <cmd>' to get help about individual commands.
 ```
 
+Note: The location of your local clone or export of the Glottolog data should
+be passed as `--repos=PATH/TO/glottolog`.
 
+
+### Extracting languoid data
+
+Glottolog data is often integrated with other data or incorporated as reference
+data in tools, e.g. as [LanguageTable](https://github.com/cldf/cldf/tree/master/components/languages)
+in a [CLDF](https://cldf.clld.org) dataset.
+
+To make this easier, `pyglottolog` provides the `languoids` subcommand, which
+dumps basic languoid data into a CSVW file with accompanying metadata:
+
+```bash
+glottolog --repos=PATH/TO/glottolog languoids [--output=OUTDIR] [--version=VERSION]
+```
+
+This will create a CSVW package, i.e. 
+- a CSV table `glottolog-languoids-VERSION.csv`
+- and a JSON description `glottolog-languoids-VERSION.csv-metadata.json`
+
+where `VERSION` is the result of running `git describe` on the data repository,
+or the version string passed as`--version=VERSION` in case you are running the command
+on an export of the repository or a download from ZENODO.

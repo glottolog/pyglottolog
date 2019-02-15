@@ -8,8 +8,9 @@ import contextlib
 from collections import OrderedDict
 
 from clldutils.path import Path, as_posix, walk, git_describe
-from clldutils.misc import UnicodeMixin, lazyproperty
+from clldutils.misc import lazyproperty
 from clldutils.declenum import EnumSymbol
+from clldutils.apilib import API
 import pycountry
 from termcolor import colored
 
@@ -23,7 +24,7 @@ __all__ = ['Glottolog']
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 
 
-class Glottolog(UnicodeMixin):
+class Glottolog(API):
     """API to access Glottolog data"""
 
     countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
@@ -36,6 +37,9 @@ class Glottolog(UnicodeMixin):
 
     def __unicode__(self):
         return '<Glottolog repos {0} at {1}>'.format(git_describe(self.repos), self.repos)
+
+    def describe(self):
+        return git_describe(self.repos)
 
     def build_path(self, *comps):
         build_dir = self.repos.joinpath('build')

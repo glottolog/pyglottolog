@@ -15,7 +15,7 @@ The basic invocation looks like
 from __future__ import unicode_literals, print_function
 import sys
 
-from clldutils.clilib import ArgumentParserWithLogging
+from clldutils.clilib import ArgumentParserWithLogging, ParserError
 
 from .api import Glottolog
 from . import commands
@@ -23,12 +23,18 @@ assert commands
 
 
 def main():  # pragma: no cover
+    def glottolog(p):
+        try:
+            return Glottolog(p)
+        except:
+            return None
+
     parser = ArgumentParserWithLogging('pyglottolog')
     parser.add_argument(
         '--repos',
         help="path to glottolog data repository",
-        type=Glottolog,
-        default=Glottolog())
+        type=glottolog,
+        default=glottolog('.'))
     sys.exit(parser.main())
 
 
