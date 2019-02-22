@@ -200,6 +200,12 @@ class Languoid(UnicodeMixin):
         # read from disc.
         return [nodes[d.name] for d in self.dir.iterdir() if d.is_dir()]
 
+    def descendants_from_nodemap(self, nodes, level=None):
+        return [
+            n for n in nodes.values() if
+            n.lineage and self.id in [li[1] for li in n.lineage] and
+            ((level is None) or n.level == level)]
+
     @property
     def children(self):
         return [Languoid.from_dir(d) for d in self.dir.iterdir() if d.is_dir()]

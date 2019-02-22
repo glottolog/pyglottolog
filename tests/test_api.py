@@ -25,6 +25,14 @@ def test_languoid(api):
     assert api.languoid('abc').name == 'language'
 
 
+def test_descendants_from_nodemap(api):
+    nodemap = {n.id: n for n in api.languoids()}
+    l = api.languoid('abcd1234')
+    assert len(l.descendants_from_nodemap(nodemap)) == 2
+    assert len(l.descendants_from_nodemap(nodemap, level=languoids.Level.language)) == 1
+    assert len(l.descendants_from_nodemap(nodemap, level=languoids.Level.dialect)) == 1
+
+
 def test_languoids(api):
     assert len(list(api.languoids())) == 5
     assert len(list(api.languoids(maxlevel=languoids.Level.family))) == 1
