@@ -324,6 +324,8 @@ def newick(args):
     parser.add_argument('root', nargs='?', default=None, help='root node')
     parser.add_argument('--template', help='node label template', default=None)
     xargs = parser.parse_args(args.args)
+    if xargs.root and not args.repos.languoid(xargs.root):
+        raise ParserError('Invalid root node {0}'.format(xargs.root))
     sprint(args.repos.newick_tree(xargs.root, template=xargs.template))
 
 
