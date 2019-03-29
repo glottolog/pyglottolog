@@ -69,12 +69,12 @@ class Retirement(object):
     cr = attr.ib(default=None)
 
     @classmethod
-    def iter(cls, cache_dir=None, log=None):
+    def iter(cls, table=None, cache_dir=None, log=None):
         content = read_url(
             'sites/iso639-3/files/downloads/iso-639-3_Retirements.tab',
             cache_dir=cache_dir,
             log=log)
-        for d in dsv.reader(content.splitlines(), dicts=True, delimiter='\t'):
+        for d in table or dsv.reader(content.splitlines(), dicts=True, delimiter='\t'):
             yield cls(**d)
 
 
@@ -225,9 +225,9 @@ def code_details(code, cache_dir=None, log=None):
     return res
 
 
-def get_retirements(max_year=None, cache_dir=None, log=None):
+def get_retirements(table=None, max_year=None, cache_dir=None, log=None):
     # retired iso_codes
-    rets = list(Retirement.iter(cache_dir=cache_dir, log=log))
+    rets = list(Retirement.iter(table=table, cache_dir=cache_dir, log=log))
 
     # latest adopted change request affecting each iso_code
     crs = (
@@ -269,9 +269,10 @@ def retirements(api, log, max_year=None):
     ]
     log.info('read languoid info')
     iso2lang = {l.iso: l for l in api.languoids() if l.iso}
-    log.info('retrieve retirement info')
+    log.info('retrieve retirement info {0}'.format(api.iso))
     with api.cache_dir(CACHE_DIR) as cache_dir:
-        rets = get_retirements(cache_dir=cache_dir, log=log, max_year=max_year)
+        rets = get_retirements(
+            table=api.iso._tables['Retirements'], cache_dir=cache_dir, log=log, max_year=max_year)
     for r in rets:
         lang = iso2lang.get(r.Id)
         if lang is None:
