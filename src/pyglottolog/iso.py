@@ -241,6 +241,10 @@ def get_retirements(table=None, max_year=None, cache_dir=None, log=None):
     for ret in rets:
         ret.cr = crs.get(ret.Id)
 
+    # lcq seeems to be listed as retired by accident.
+    # See https://github.com/clld/pyglottolog/issues/1
+    rets = [ret for ret in rets if ret.Id != 'lcq']
+
     # fill Change_To from Ret_Remedy for splits and make it a list for others
     assert all(bool(r.Change_To) == (r.Ret_Reason not in ('split', 'non-existent')) for r in rets)
     assert all(bool(r.Ret_Remedy) == (r.Ret_Reason == 'split') for r in rets)
