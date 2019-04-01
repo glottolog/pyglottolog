@@ -39,6 +39,7 @@ setup(
         'markdown',
         'bs4',
         'requests',
+        'nameparser',
     ],
     extras_require={
         'dev': ['tox>=2.9', 'flake8', 'pep8-naming', 'wheel', 'twine'],
