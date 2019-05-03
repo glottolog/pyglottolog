@@ -622,6 +622,23 @@ def langindex(args):
 
 
 @command()
+def update_sources(args):
+    """Update the [sources] section in languoid info files according to `lgcode` fields in bibfiles.
+    """
+    langs = args.repos.languoids_by_code()
+    sources = defaultdict(set)
+    for bib in args.repos.bibfiles:
+        for entry in bib.iterentries():
+            for lang in entry.languoids(langs)[0]:
+                sources[lang.id].add('{0}:{1}'.format(bib.id, entry.key))
+
+    for gc, refs in sources.items():
+        if refs != set(r.key for r in langs[gc].sources):
+            langs[gc].sources = [Reference(key=ref) for ref in sorted(refs)]
+            langs[gc].write_info()
+
+
+@command()
 def tree2lff(args):
     """Create lff.txt and dff.txt from the current languoid tree.
 
