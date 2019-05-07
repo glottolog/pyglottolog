@@ -107,13 +107,13 @@ class Glottolog(API):
                     if lang.level <= maxlevel:
                         yield lang
 
-    def languoids_by_code(self):
+    def languoids_by_code(self, nodes=None):
         """
         Returns a `dict` mapping the three major language code schemes
         (Glottocode, ISO code, and Harald's NOCODE_s) to Languoid objects.
         """
         res = {}
-        for lang in self.languoids():
+        for lang in (self.languoids() if nodes is None else nodes.values()):
             res[lang.id] = lang
             if lang.hid:
                 res[lang.hid] = lang
@@ -124,11 +124,13 @@ class Glottolog(API):
     def ascii_tree(self, start, maxlevel=None):
         _ascii_node(self.languoid(start), 0, True, maxlevel, '')
 
-    def newick_tree(self, start=None, template=None):
+    def newick_tree(self, start=None, template=None, nodes=None):
         template = template or languoids.Languoid._newick_default_template
         if start:
-            return self.languoid(start).newick_node(template=template).newick + ';'
-        nodes = OrderedDict((l.id, l) for l in self.languoids())
+            return self.languoid(start).newick_node(
+                template=template, nodes=nodes).newick + ';'
+        if nodes is None:
+            nodes = OrderedDict((l.id, l) for l in self.languoids())
         trees = []
         for lang in nodes.values():
             if not lang.lineage and not lang.category.startswith('Pseudo '):

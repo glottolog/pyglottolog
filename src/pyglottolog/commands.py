@@ -11,7 +11,7 @@ from json import dumps
 from string import Template
 
 from termcolor import colored
-from clldutils.clilib import command, ParserError, confirm
+from clldutils.clilib import command, ParserError
 from clldutils.misc import slug
 from clldutils.markup import Table
 from clldutils.path import Path, write_text, read_text, git_describe
@@ -24,7 +24,7 @@ from . import lff
 from .monster import compile
 from .references import evobib
 from .util import message, sprint
-from .metadata import prepare_release, EDITORS
+from .metadata import prepare_release
 
 
 @command()

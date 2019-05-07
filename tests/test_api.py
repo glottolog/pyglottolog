@@ -38,12 +38,15 @@ def test_languoids(api):
     assert len(list(api.languoids(maxlevel=languoids.Level.family))) == 1
     assert len(list(api.languoids(maxlevel=languoids.Level.language))) == 3
     assert len(api.languoids_by_code()) == 8
+    assert api.languoids_by_code(nodes={}) == {}
     assert 'NOCODE_Family-name' in api.languoids_by_code()
 
 
 def test_newick_tree(api):
     assert api.newick_tree(start='abcd1235') == \
-           "('dialect [abcd1236]':1)'language [abcd1235][abc]-l-':1;"
+        "('dialect [abcd1236]':1)'language [abcd1235][abc]-l-':1;"
+    assert api.newick_tree(start='abcd1235') == \
+        api.newick_tree(start='abcd1235', nodes={l.id: l for l in api.languoids()})
     assert api.newick_tree(start='abcd1235', template='{l.id}') == "(abcd1236:1)abcd1235:1;"
     assert set(api.newick_tree().split('\n')) == {
         "(('isolate {dialect} [dial1234]':1)'isolate [isol1234]-l-':1)'isolate [isol1234]':1;",
