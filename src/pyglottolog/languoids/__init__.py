@@ -2,7 +2,7 @@
 
 from __future__ import unicode_literals
 
-from .languoid import Languoid
+from .languoid import Languoid, PseudoFamilies, SPOKEN_L1_LANGUAGE
 from .models import (
     Glottocode, Glottocodes,
     Level, Macroarea, Country, Reference,
@@ -11,7 +11,7 @@ from .models import (
 )
 
 __all__ = [
-    'Languoid',
+    'Languoid', 'PseudoFamilies', 'SPOKEN_L1_LANGUAGE',
     'Glottocode', 'Glottocodes',
     'Level', 'Macroarea', 'Country', 'Reference',
     'ClassificationComment', 'EndangermentStatus',

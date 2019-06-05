@@ -34,10 +34,10 @@ def test_descendants_from_nodemap(api):
 
 
 def test_languoids(api):
-    assert len(list(api.languoids())) == 5
-    assert len(list(api.languoids(maxlevel=languoids.Level.family))) == 1
-    assert len(list(api.languoids(maxlevel=languoids.Level.language))) == 3
-    assert len(api.languoids_by_code()) == 8
+    assert len(list(api.languoids())) == 7
+    assert len(list(api.languoids(maxlevel=languoids.Level.family))) == 2
+    assert len(list(api.languoids(maxlevel=languoids.Level.language))) == 5
+    assert len(api.languoids_by_code()) == 10
     assert api.languoids_by_code(nodes={}) == {}
     assert 'NOCODE_Family-name' in api.languoids_by_code()
 

@@ -64,7 +64,7 @@ def prepare_release(repos, version):
     for v, year, editors in read_editors(repos):
         if v == version:
             break
-    else:
+    else:  # pragma: no cover
         raise ValueError('Add version to CONTRIBUTORS.md first!')
 
     citation = """\

@@ -3,12 +3,12 @@
 from __future__ import unicode_literals
 
 import os
-from collections import defaultdict
 import functools
 
 from clldutils.misc import UnicodeMixin
 from clldutils.path import Path
 from clldutils.inifile import INI
+from clldutils.declenum import DeclEnum
 from newick import Node
 
 from .models import (
@@ -17,9 +17,21 @@ from .models import (
     EthnologueComment, ISORetirement,
 )
 
-__all__ = ['Languoid']
+__all__ = ['Languoid', 'SPOKEN_L1_LANGUAGE', 'PseudoFamilies']
 
 INFO_FILENAME = 'md.ini'
+SPOKEN_L1_LANGUAGE = 'Spoken L1 Language'
+
+
+class PseudoFamilies(DeclEnum):
+    bookkeeping = 'book1242', 'Bookkeeping'
+    unattested = 'unat1236', 'Unattested'
+    unclassifiable = 'uncl1493', 'Unclassifiable'
+    sign_language = 'sign1238', 'Sign Language'
+    artificial_language = 'arti1236', 'Artificial Language'
+    speech_register = 'spee1234', 'Speech Register'
+    pidgin = 'pidg1258', 'Pidgin'
+    mixed_language = 'mixe1287', 'Mixed Language'
 
 
 @functools.total_ordering
@@ -170,24 +182,16 @@ class Languoid(UnicodeMixin):
     @property
     def category(self):
         fid = self.lineage[0][1] if self.lineage else None
-        category_map = defaultdict(
-            lambda: 'Spoken L1 Language',
-            **{
-                'book1242': 'Bookkeeping',
-                'unat1236': 'Unattested',
-                'uncl1493': 'Unclassifiable',
-                'sign1238': 'Sign Language',
-                'arti1236': 'Artificial Language',
-                'spee1234': 'Speech Register',
-                'pidg1258': 'Pidgin',
-                'mixe1287': 'Mixed Language',
-            })
         if self.level == Level.language:
-            return category_map[fid]
+            try:
+                return PseudoFamilies.get(fid).description
+            except ValueError:
+                return SPOKEN_L1_LANGUAGE
         cat = self.level.name.capitalize()
+        pseudo = set(p.value for p in PseudoFamilies)
         if self.level == Level.family:
             if self.id.startswith('unun9') or \
-                    self.id in category_map or fid in category_map:
+                    self.id in pseudo or fid in pseudo:
                 cat = 'Pseudo ' + cat
         return cat
 

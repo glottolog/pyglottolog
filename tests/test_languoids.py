@@ -4,7 +4,7 @@ import pytest
 
 from pyglottolog.languoids import (Languoid, EndangermentStatus,
     Glottocodes, Glottocode, Level, Country, Reference, Macroarea,
-    ClassificationComment, EthnologueComment)
+    ClassificationComment, EthnologueComment, PseudoFamilies, SPOKEN_L1_LANGUAGE)
 
 
 def test_legacy_imports():
@@ -120,6 +120,27 @@ def test_Level(api):
     assert Level.language == api.languoid('abcd1235').level
     with pytest.raises(ValueError):
         Level.get('abcde')
+
+
+def test_Category(api):
+    assert api.languoid('book1243').category == PseudoFamilies.bookkeeping.description
+    assert api.languoid('abcd1235').category == SPOKEN_L1_LANGUAGE
+    assert api.languoid('dial1234').category == 'Dialect'
+
+
+def test_sources(api):
+    assert api.languoid('book1242').sources == []
+    with pytest.raises(AssertionError):
+        api.languoid('book1242').sources = [1]
+    api.languoid('book1242').sources = [Reference('key')]
+
+
+def test_ethnologue_comment(api):
+    assert api.languoid('book1243').ethnologue_comment.comment_type == 'missing'
+
+
+def test_classification_comment(api):
+    assert api.languoid('abcd1234').classification_comment
 
 
 def test_Languoid_sorting(api):

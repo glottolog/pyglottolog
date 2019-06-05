@@ -163,21 +163,15 @@ class Country(UnicodeMixin):
 
     @classmethod
     def from_name(cls, name):
-        try:
-            res = pycountry.countries.get(name=name)
-            if res:
-                return cls(id=res.alpha_2, name=res.name)
-        except KeyError:
-            pass
+        res = pycountry.countries.get(name=name)
+        if res:
+            return cls(id=res.alpha_2, name=res.name)
 
     @classmethod
     def from_id(cls, id_):
-        try:
-            res = pycountry.countries.get(alpha_2=id_)
-            if res:
-                return cls(id=res.alpha_2, name=res.name)
-        except KeyError:
-            pass
+        res = pycountry.countries.get(alpha_2=id_)
+        if res:
+            return cls(id=res.alpha_2, name=res.name)
 
     @classmethod
     def from_text(cls, text):

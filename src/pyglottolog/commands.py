@@ -19,7 +19,7 @@ from clldutils.path import Path, write_text, read_text, git_describe
 
 import pyglottolog
 import pyglottolog.iso
-from .languoids import Languoid, Level, Reference
+from .languoids import Languoid, Level, Reference, PseudoFamilies
 from . import fts
 from . import lff
 from .monster import compile
@@ -478,16 +478,23 @@ def check(args):
                     error(isocode,
                           'duplicate: {0}, {1}'.format(iso_in_gl[lang.iso].id, lang.id))
                 iso_in_gl[lang.iso] = lang
-                if isocode.is_retired and lang.category != 'Bookkeeping':
+                fid = lang.lineage[0][1] if lang.lineage else None
+                if isocode.is_retired and \
+                        fid not in [PseudoFamilies.bookkeeping.value,
+                                    PseudoFamilies.unattested.value]:
                     if isocode.type == 'Retirement/split':
                         iso_splits.append(lang)
                     else:
-                        msg = repr(isocode)
-                        level = info
-                        if len(isocode.change_to) == 1:
-                            level = warn
-                            msg += ' changed to [%s]' % isocode.change_to[0].code
-                        level(lang, msg)
+                        if isocode.type == 'Retirement/merge' and lang.level == Level.dialect:
+                            # See https://github.com/clld/pyglottolog/issues/2
+                            pass
+                        else:
+                            msg = repr(isocode)
+                            level = info
+                            if len(isocode.change_to) == 1:
+                                level = warn
+                                msg += ' changed to [%s]' % isocode.change_to[0].code
+                            level(lang, msg)
 
         if lang.hid is not None:
             if lang.hid in hid:
@@ -539,7 +546,7 @@ def check(args):
                 # at most one of the languoids is not a dialect, just warn
                 method = warn
             if len([1 for n in gcs
-                    if (not n.lineage) or (n.lineage[0][1] != 'book1242')]) <= 1:
+                    if (not n.lineage) or (n.lineage[0][1] != PseudoFamilies.bookkeeping.value)]) <= 1:
                 # at most one of the languoids is not in bookkeping, just warn
                 method = warn
             method(name, 'duplicate name: {0}'.format(', '.join(sorted(
