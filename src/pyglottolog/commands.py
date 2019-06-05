@@ -9,6 +9,7 @@ import argparse
 import subprocess
 from json import dumps
 from string import Template
+import functools
 
 from termcolor import colored
 from clldutils.clilib import command, ParserError
@@ -27,7 +28,17 @@ from .util import message, sprint
 from .metadata import prepare_release
 
 
+def assert_repos(func):
+    @functools.wraps(func)
+    def wrapper(args, **kw):
+        if args.repos is None:
+            raise ParserError('Invalid Glottolog data directory specified as --repos')
+        return func(args, **kw)
+    return wrapper
+
+
 @command()
+@assert_repos
 def release(args):
     """
     Write release info to .zenodo.json, CITATION.md and CONTRIBUTORS.md
@@ -36,9 +47,10 @@ def release(args):
 
 
 @command()
+@assert_repos
 def languoids(args):
     """
-    glottolog languoids [--output=OUTDIR] [--version=VERSION]
+    glottolog --repos=. languoids [--output=OUTDIR] [--version=VERSION]
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -53,9 +65,10 @@ def languoids(args):
 
 
 @command()
+@assert_repos
 def htmlmap(args, min_langs_for_legend_item=10):
     """
-    glottolog htmlmap [OUTDIR]
+    glottolog --repos=. htmlmap [OUTDIR]
     """
     nodes = {n.id: n for n in args.repos.languoids()}
     legend = Counter()
@@ -128,6 +141,7 @@ def htmlmap(args, min_langs_for_legend_item=10):
 
 
 @command()
+@assert_repos
 def iso2codes(args):
     """
     Map ISO codes to the list of all Glottolog languages and dialects subsumed "under" it.
@@ -162,23 +176,27 @@ def iso2codes(args):
 
 
 @command('evobib')
+@assert_repos
 def _evobib(args):
     evobib.download(args.repos.bibfiles['evobib.bib'], args.log)
 
 
 @command()
+@assert_repos
 def roundtrip(args):
     """Load/save the bibfile with the given name."""
     args.repos.bibfiles[args.args[0]].roundtrip()
 
 
 @command()
+@assert_repos
 def bibfiles_db(args):
     """(Re-)create bibfiles sqlite3 database in the current directory."""
     args.repos.bibfiles.to_sqlite(rebuild=True)
 
 
 @command()
+@assert_repos
 def copy_benjamins(args, name='benjamins.bib'):  # pragma: no cover
     """
     glottolog copy_benjamins /path/to/benjamins/benjamins.bib
@@ -187,12 +205,14 @@ def copy_benjamins(args, name='benjamins.bib'):  # pragma: no cover
 
 
 @command()
+@assert_repos
 def isobib(args):  # pragma: no cover
     """Update iso6393.bib - the file of references for ISO 639-3 change requests."""
     pyglottolog.iso.bibtex(args.repos, args.log)
 
 
 @command()
+@assert_repos
 def isoretirements(args):  # pragma: no cover
     """Update retirement info in language info files."""
     pyglottolog.iso.retirements(args.repos, args.log)
@@ -208,10 +228,11 @@ def existing_lang(args):
 
 
 @command()
+@assert_repos
 def show(args):
     """Display details of a Glottolog object.
 
-    glottolog show <GLOTTOCODE>|<ISO-CODE>|<BIBTEXKEY>
+    glottolog --repos=. show <GLOTTOCODE>|<ISO-CODE>|<BIBTEXKEY>
     """
     if args.args and ':' in args.args[0]:
         if args.args[0].startswith('**'):
@@ -250,10 +271,11 @@ def show(args):
 
 
 @command()
+@assert_repos
 def edit(args):
     """Open a languoid's INI file in a text editor.
 
-    glottolog edit <GLOTTOCODE>|<ISO-CODE>
+    glottolog --repos=. edit <GLOTTOCODE>|<ISO-CODE>
     """
     lang = existing_lang(args)
     if sys.platform.startswith('os2'):  # pragma: no cover
@@ -270,10 +292,11 @@ def edit(args):
 
 
 @command()
+@assert_repos
 def create(args):
     """Create a new languoid directory for a languoid specified by name and level.
 
-    glottolog create <parent> <name> <level>
+    glottolog --repos=. create <parent> <name> <level>
     """
     assert args.args[2] in ['family', 'language', 'dialect']
     parent = args.repos.languoid(args.args[0]) or None
@@ -289,6 +312,7 @@ def create(args):
 
 
 @command()
+@assert_repos
 def bib(args):
     """Compile the monster bibfile from the BibTeX files listed in references/BIBFILES.ini
 
@@ -298,10 +322,11 @@ def bib(args):
 
 
 @command()
+@assert_repos
 def tree(args):
     """Print the classification tree starting at a specific languoid.
 
-    glottolog tree <GLOTTOCODE>|<ISO-CODE> [MAXLEVEL]
+    glottolog --repos=. tree <GLOTTOCODE>|<ISO-CODE> [MAXLEVEL]
 
     MAXLEVEL [family|language|dialect] will limit the displayed children.
     """
@@ -318,7 +343,7 @@ def tree(args):
 @command(usage="""
 Print the classification tree starting at a specific languoid in Newick format.
 
-    glottolog newick [--template="{{l.id}}"] [<GLOTTOCODE>|<ISO-CODE>]
+    glottolog --repos=. newick [--template="{{l.id}}"] [<GLOTTOCODE>|<ISO-CODE>]
 
 The --template option can be used to control the node labels in the Newick string.
 Values for this option must be valid python format strings expecting a single
@@ -328,6 +353,7 @@ e.g. "{{l.id}}" for the Glottocode of a Languoid, the following custom format sp
 can be used:
 {0}""".format(
     '\n'.join('    l:{0}\t{1[1]}'.format(k, v) for k, v in Languoid._format_specs.items())))
+@assert_repos
 def newick(args):
     parser = argparse.ArgumentParser(prog='newick')
     parser.add_argument('root', nargs='?', default=None, help='root node')
@@ -339,6 +365,7 @@ def newick(args):
 
 
 @command()
+@assert_repos
 def index(args):
     """Create an index page listing and linking to all languoids of a specified level.
 
@@ -374,6 +401,7 @@ def index(args):
 
 
 @command()
+@assert_repos
 def check(args):
     """Check the glottolog data for consistency.
 
@@ -531,6 +559,7 @@ def check(args):
 
 
 @command()
+@assert_repos
 def metadata(args):
     """List all metadata fields used in languoid INI files and their frequency.
 
@@ -553,10 +582,11 @@ def metadata(args):
 
 
 @command()
+@assert_repos
 def refsearch(args):
     """Search Glottolog references
 
-    glottolog refsearch "QUERY"
+    glottolog --repos=. refsearch "QUERY"
 
     E.g.:
     - glottolog refsearch "Izi provider:hh"
@@ -571,10 +601,11 @@ def refsearch(args):
 
 
 @command()
+@assert_repos
 def refindex(args):
     """Index all bib files for use with `glottolog refsearch`.
 
-    glottolog refindex
+    glottolog --repos=. refindex
 
     This will take about 15 minutes and create an index of about 450 MB.
     """
@@ -582,10 +613,11 @@ def refindex(args):
 
 
 @command()
+@assert_repos
 def langsearch(args):
     """Search Glottolog languoids
 
-    glottolog langsearch "QUERY"
+    glottolog --repos=. langsearch "QUERY"
     """
     def highlight(text):
         res, i = '', 0
@@ -611,10 +643,11 @@ def langsearch(args):
 
 
 @command()
+@assert_repos
 def langindex(args):
     """Index all bib files for use with `glottolog langsearch`.
 
-    glottolog langindex
+    glottolog --repos=. langindex
 
     This will take a couple of minutes and create an index of about 60 MB.
     """
@@ -622,6 +655,7 @@ def langindex(args):
 
 
 @command()
+@assert_repos
 def update_sources(args):
     """Update the [sources] section in languoid info files according to `lgcode` fields in bibfiles.
     """
@@ -639,6 +673,7 @@ def update_sources(args):
 
 
 @command()
+@assert_repos
 def tree2lff(args):
     """Create lff.txt and dff.txt from the current languoid tree.
 
@@ -648,6 +683,7 @@ def tree2lff(args):
 
 
 @command()
+@assert_repos
 def lff2tree(args):
     """Recreate tree from lff.txt and dff.txt
 

@@ -33,10 +33,13 @@ class Glottolog(API):
     countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
 
     def __init__(self, repos='.'):
-        self.repos = Path(repos).resolve()
+        API.__init__(self, repos=repos)
+        self.repos = self.repos.resolve()
         self.tree = self.repos / 'languoids' / 'tree'
         if not self.tree.exists():
             raise ValueError('repos dir %s missing tree dir: %s' % (self.repos, self.tree))
+        if not self.repos.joinpath('references').exists():
+            raise ValueError('repos dir %s missing references subdir' % (self.repos,))
 
     def __unicode__(self):
         return '<Glottolog repos {0} at {1}>'.format(git_describe(self.repos), self.repos)
@@ -173,6 +176,12 @@ class Glottolog(API):
             if lang.hid:
                 res[lang.hid] = ma
         return res
+
+    def write_cldf(self):
+        """
+        Create a CLDF StructureDataset
+        """
+        pass
 
     def write_languoids_table(self, outdir, version=None):
         version = version or self.describe()
