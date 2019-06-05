@@ -24,7 +24,7 @@ setup(
     install_requires=[
         'six>=1.9',
         'csvw',
-        'clldutils>=2.5.2',
+        'clldutils>=2.8.0',
         'pycldf',
         'sqlalchemy',
         'tqdm',
