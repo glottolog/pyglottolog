@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 import re
 import os
 import contextlib
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 import pycldf.util
 from csvw import TableGroup, Column
@@ -16,6 +16,7 @@ from clldutils.apilib import API
 from clldutils.jsonlib import load
 import pycountry
 from termcolor import colored
+from tqdm import tqdm
 
 from . import util
 from . import languoids
@@ -149,6 +150,17 @@ class Glottolog(API):
     @lazyproperty
     def bibfiles(self):
         return references.BibFiles.from_path(self.references_path())
+
+    def refs_by_languoid(self, nodes=None):
+        all = {}
+        languoids_by_code = self.languoids_by_code(nodes or {l.id: l for l in self.languoids()})
+        res = defaultdict(list)
+        for bib in tqdm(self.bibfiles):
+            for entry in bib.iterentries():
+                all[entry.id] = entry
+                for lang in entry.languoids(languoids_by_code)[0]:
+                    res[lang.id].append(entry)
+        return res, all
 
     @lazyproperty
     def hhtypes(self):

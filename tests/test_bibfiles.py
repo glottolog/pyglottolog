@@ -65,6 +65,70 @@ def test_Entry_lgcodes():
     assert Entry.lgcodes(None) == []
 
 
+@pytest.mark.parametrize(
+    'smaller,bigger',
+    [
+        # Better doctype wins:
+        (dict(hhtype='grammar_sketch'), dict(hhtype='grammar')),
+        # More pages wins:
+        (dict(hhtype='grammar', pages='120'), dict(hhtype='grammar', pages='340')),
+        # More recent year wins:
+        (dict(hhtype='grammar', year='1900'), dict(hhtype='grammar', year='2000')),
+        (dict(hhtype='grammar', year='2000'), dict(hhtype='grammar', year='1800[2010]')),
+        # Page number is divided by number of described languages:
+        (
+            dict(hhtype='grammar', pages='200', lgcode='[abc],[cde],[efg]'),
+            dict(hhtype='grammar', pages='100')),
+    ]
+)
+def test_Entry_weight(smaller, bigger, mocker):
+    a = Entry('x', 'misc', smaller, mocker.Mock())
+    b = Entry('x', 'misc', bigger, mocker.Mock())
+    assert a < b
+    assert a != b
+
+
+def test_Entry_weight_with_api(api, mocker):
+    assert Entry('x', 'misc', dict(hhtype='grammar'), mocker.Mock(), api) > \
+           Entry('x', 'misc', dict(hhtype='other'), mocker.Mock(), api)
+
+
+@pytest.mark.parametrize(
+    'fields,expected',
+    [
+        (dict(hhtype='grammar', pages='400'), 'long_grammar'),
+        (dict(hhtype='grammar'), 'grammar'),
+        (dict(hhtype='grammar_sketch'), 'grammar_sketch'),
+        (dict(hhtype='phonology'), 'phonology_or_text'),
+        (dict(hhtype='wordlist'), 'wordlist_or_less'),
+        (dict(hhtype='xyz'), 'wordlist_or_less'),
+    ]
+)
+def test_Entry_med(fields, expected, mocker):
+    from pyglottolog.references import SimplifiedDoctype
+    e = Entry('x', 'misc', fields, mocker.Mock())
+    assert e.med == SimplifiedDoctype.get(expected)
+
+
+@pytest.mark.parametrize(
+    'fields,expected',
+    [
+        (dict(numberofpages='123'), 123),
+        (dict(numberofpages='x123'), None),
+        (dict(pages='xvii'), 17),
+        (dict(pages='x+23'), 33),
+        (dict(pages='125-9pp.'), 5),
+        (dict(pages='125-100'), 26),
+        (dict(pages='123456'), None),
+        (dict(pages='x+123456'), None),
+        (dict(pages='123456-423457'), None),
+    ]
+)
+def test_Entry_pages_int(fields, expected):
+    e = Entry('x', 'misc', fields, None)
+    assert e.pages_int == expected
+
+
 @pytest.fixture
 def entry():
     return Entry('x', 'misc', {'hhtype': 'grammar (computerized assignment from "xyz")'}, None)

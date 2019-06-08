@@ -22,6 +22,7 @@ import pyglottolog.iso
 from .languoids import Languoid, Level, Reference, PseudoFamilies
 from . import fts
 from . import lff
+from . import cldf
 from .monster import compile
 from .references import evobib
 from .util import message, sprint
@@ -173,6 +174,12 @@ def iso2codes(args):
         writer.writerow(['iso', 'glottocodes'])
         for gc, (iso, gcs) in res.items():
             writer.writerow([iso, ';'.join([gc] + list(gcs))])
+
+
+@command('cldf')
+@assert_repos
+def _cldf(args):
+    cldf.cldf(args.repos, Path(args.args[0]), args.log)
 
 
 @command('evobib')

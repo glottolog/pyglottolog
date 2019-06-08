@@ -89,6 +89,10 @@ def test_ClassificationComment(mocker):
     log = mocker.Mock()
     cc.check(mocker.Mock(), ['bib:key'], log)
     assert not log.error.called
+    cc = ClassificationComment(sub='A comment about **bib:key**:10-12', subrefs=['**bib:key**:20'])
+    refs = cc.merged_refs('sub')
+    assert len(refs) == 1
+    assert refs[0].pages == '10-12;20'
 
 
 def test_EthnologueComment(mocker):

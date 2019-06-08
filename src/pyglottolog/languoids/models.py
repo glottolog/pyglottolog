@@ -2,14 +2,14 @@
 
 from __future__ import unicode_literals, print_function, division
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import re
 
 from six import text_type
 import attr
 import markdown
 import pycountry
-from clldutils.misc import slug, UnicodeMixin
+from clldutils.misc import slug, UnicodeMixin, nfilter
 from clldutils import jsonlib
 from clldutils.declenum import DeclEnum
 
@@ -214,7 +214,24 @@ class ClassificationComment(object):
     family = attr.ib(default=None)
     familyrefs = attr.ib(default=attr.Factory(list), converter=Reference.from_list)
 
+    def merged_refs(self, type):
+        assert type in ['sub', 'family']
+        res = defaultdict(set)
+        for m in Reference.pattern.finditer(getattr(self, type) or ''):
+            res[m.group('key')].add(m.group('pages'))
+        for ref in getattr(self, type + 'refs'):
+            res[ref.key].add(ref.pages)
+        return [
+            Reference(key=key, pages=';'.join(sorted(nfilter(pages))) or None)
+            for key, pages in res.items()]
+
     def check(self, lang, keys, log):
+        for attrib in ['subrefs', 'familyrefs']:
+            for ref in getattr(self, attrib):
+                if ref.key not in keys:
+                    log.error(message(
+                        lang, 'classification {0}: invalid bibkey: {1}'.format(attrib, ref.key)))
+
         for attrib in ['sub', 'family']:
             comment = getattr(self, attrib)
             if comment:

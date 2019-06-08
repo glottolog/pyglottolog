@@ -6,23 +6,56 @@ import re
 import collections
 import unicodedata
 import datetime
+import math
+import functools
 
 from six import string_types
 
 import attr
 
-from clldutils.misc import UnicodeMixin
+from clldutils.misc import UnicodeMixin, lazyproperty
 from clldutils.path import memorymapped, Path
 from clldutils.source import Source
 from clldutils.text import split_text
 from clldutils.inifile import INI
+from clldutils.declenum import DeclEnum
 
 from . import bibtex
+from . import util
 from .bibfiles_db import Database
 
 __all__ = ['BibFiles', 'BibFile', 'Entry']
 
 BIBFILES = 'bibfiles.sqlite3'
+DOCTYPES = collections.OrderedDict((k, k) for k in [
+    'grammar',
+    'grammar_sketch',
+    'dictionary',
+    'specific_feature',
+    'phonology',
+    'text',
+    'new_testament',
+    'wordlist',
+    'comparative',
+    'minimal',
+    'socling',
+    'dialectology',
+    'overview',
+    'ethnographic',
+    'bibliographical',
+    'unknown',
+])
+PREF_YEAR_PATTERN = re.compile('\[(?P<year>(1|2)[0-9]{3})(\-[0-9]+)?\]')
+YEAR_PATTERN = re.compile('(?P<year>(1|2)[0-9]{3})')
+
+
+class SimplifiedDoctype(DeclEnum):
+    long_grammar = 0, 'Grammar with more than 300 pages'
+    grammar = 1, 'Grammar with less than 300 pages'
+    grammar_sketch = 2, 'Grammar sketch'
+    phonology_or_text = 3, 'New Testament, Text, Phonology, (typological) Study Of A Specific ' \
+                           'Feature or Dictionary'
+    wordlist_or_less = 4, 'Wordlist or less'
 
 
 class BibFiles(list):
@@ -144,7 +177,7 @@ class BibFile(UnicodeMixin):
                 new += 1
             entries[key] = (type_, fields)
         self.save(entries)
-        if log:
+        if log:  # pragma: no cover
             log.info('{0} new entries'.format(new))
 
     def load(self, preserve_order=None):
@@ -189,13 +222,15 @@ class BibFile(UnicodeMixin):
         print(table)
 
 
-@attr.s
+@functools.total_ordering
+@attr.s(cmp=False)
 class Entry(UnicodeMixin):
 
     key = attr.ib()
     type = attr.ib()
     fields = attr.ib()
     bib = attr.ib()
+    api = attr.ib(default=None)
 
     # FIXME: add method to apply triggers!
 
@@ -204,10 +239,83 @@ class Entry(UnicodeMixin):
     recomma = re.compile("[,/]\s?")
     lgcode_pattern = re.compile(lgcode_regex + "$")
 
+    def __eq__(self, other):
+        return self.weight == other.weight
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __lt__(self, other):
+        return self.weight < other.weight
+
+    @property
+    def _defined_doctypes(self):
+        return collections.OrderedDict((hht.id, hht.id) for hht in self.api.hhtypes) \
+            if self.api else DOCTYPES
+
+    @lazyproperty
+    def weight(self):
+        doctypes = self._defined_doctypes
+        index = len(doctypes)
+        doctype = None
+
+        for _doctype in self.doctypes(doctypes)[0]:
+            index = list(doctypes.values()).index(_doctype)
+            doctype = getattr(_doctype, 'id', _doctype)
+            break
+
+        # the number of pages is divided by number of doctypes times number of described languages
+        pages = int(math.ceil(
+            float(self.pages_int or 0) /
+            ((len(self.doctypes(doctypes)[0]) or 1) *
+             (len(self.lgcodes(self.fields.get('lgcode', ''))) or 1))))
+
+        if doctype == 'grammar' and pages >= 300:
+            index = -1
+
+        return -index, pages, self.year_int or 0, self.id
+
+    @lazyproperty
+    def med(self):
+        doctypes = list(self._defined_doctypes.keys())
+        index = -self.weight[0]
+        if index == -1:
+            return SimplifiedDoctype.long_grammar
+        if 'dictionary' in doctypes and index < doctypes.index('dictionary'):
+            return SimplifiedDoctype.get(doctypes[index])
+        if 'wordlist' in doctypes and index < doctypes.index('wordlist'):
+            return SimplifiedDoctype.phonology_or_text
+        return SimplifiedDoctype.wordlist_or_less
+
+    @lazyproperty
+    def year_int(self):
+        if self.fields.get('year'):
+            # prefer years in brackets over the first 4-digit number.
+            match = PREF_YEAR_PATTERN.search(self.fields.get('year'))
+            if match:
+                return int(match.group('year'))
+            match = YEAR_PATTERN.search(self.fields.get('year'))
+            if match:
+                return int(match.group('year'))
+
+    @lazyproperty
+    def pages_int(self):
+        if self.fields.get('numberofpages'):
+            try:
+                pages = int(self.fields.get('numberofpages').strip())
+                if pages < util.MAX_PAGE:
+                    return pages
+            except ValueError:
+                pass
+
+        if self.fields.get('pages'):
+            return util.compute_pages(self.fields['pages'])[2]
+
     def __unicode__(self):
         """
         :return: BibTeX representation of the entry.
         """
+        from pycldf import sources
         res = "@%s{%s" % (self.type, self.key)
         for k, v in bibtex.fieldorder.itersorted(self.fields):
             res += ',\n    %s = {%s}' % (k, v.strip() if hasattr(v, 'strip') else v)
@@ -253,10 +361,17 @@ class Entry(UnicodeMixin):
         return res, self.parse_ca(self.fields.get('lgcode'))
 
     def doctypes(self, hhtypes):
-        res = []
+        """
+        Ordered doctypes assigned to this entry.
+
+        :param hhtypes: `OrderedDict` mapping doctype names to doctypes
+        :return: `list` of values of `hhtypes` which apply to the entry, ordered by occurrence in\
+        `hhtypes`.
+        """
+        res = set()
         if 'hhtype' in self.fields:
             for ss in split_text(self.fields['hhtype'], separators=',;'):
                 ss = ss.split('(')[0].strip()
                 if ss in hhtypes:
-                    res.append(hhtypes[ss])
-        return res, self.parse_ca(self.fields.get('hhtype'))
+                    res.add(ss)
+        return [v for k, v in hhtypes.items() if k in res], self.parse_ca(self.fields.get('hhtype'))
