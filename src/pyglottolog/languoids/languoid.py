@@ -13,7 +13,7 @@ from newick import Node
 
 from .models import (
     Glottocode, Level, Country, Macroarea, Reference,
-    EndangermentStatus, ClassificationComment,
+    EndangermentStatus, Endangerment, ClassificationComment,
     EthnologueComment, ISORetirement,
 )
 
@@ -279,6 +279,11 @@ class Languoid(UnicodeMixin):
     @endangerment.setter
     def endangerment(self, value):
         self._set('status', EndangermentStatus.get(value).name, section='endangerment')
+
+    @property
+    def endangerment_info(self):
+        if 'endangerment' in self.cfg:
+            return Endangerment(**self.cfg['endangerment'])
 
     @property
     def classification_comment(self):

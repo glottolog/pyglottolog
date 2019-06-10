@@ -12,6 +12,7 @@ import pycountry
 from clldutils.misc import slug, UnicodeMixin, nfilter
 from clldutils import jsonlib
 from clldutils.declenum import DeclEnum
+from dateutil import parser
 
 from ..util import message
 
@@ -21,9 +22,18 @@ __all__ = [
     'Level', 'Country', 'Macroarea',
     'ClassificationComment',
     'ISORetirement',
-    'EndangermentStatus',
+    'EndangermentStatus', 'Endangerment',
     'EthnologueComment',
 ]
+
+ENDANGERMENT_SOURCES = {
+    'E20': "hh:h:Ethnologue:20",
+    'E21': "hh:h:Ethnologue:21",
+    'E22': "hh:h:Ethnologue:22",
+    'ElCat': "hh:hel:Campbell:ElCat",
+    'Glottolog': None,
+    'UNESCO': "hh:hel:Moseley:Atlas:2010"
+}
 
 
 class Glottocodes(object):
@@ -276,6 +286,18 @@ class EndangermentStatus(DeclEnum):
             if li.name == item or li.value == item or li.description == item:
                 return li
         raise ValueError(item)
+
+
+@attr.s
+class Endangerment(object):
+    status = attr.ib(converter=lambda v: EndangermentStatus.get(v))
+    source = attr.ib(validator=attr.validators.in_(list(ENDANGERMENT_SOURCES.keys())))
+    comment = attr.ib()
+    date = attr.ib(converter=parser.parse)
+
+    @property
+    def source_id(self):
+        return ENDANGERMENT_SOURCES.get(self.source)
 
 
 def valid_ethnologue_versions(inst, attr, value):

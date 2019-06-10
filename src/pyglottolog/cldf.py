@@ -109,6 +109,12 @@ def cldf(api, outdir, log):
                 e = refs[ref.key]
                 ds.add_sources(Source(e.type, ref.key, _check_id=False, **e.fields), _check_id=False)
 
+        aes_info = l.endangerment_info
+        aes_src = aes_info.source_id if aes_info else None
+        if aes_src:
+            e = refs[aes_src]
+            ds.add_sources(Source(e.type, aes_src, _check_id=False, **e.fields), _check_id=False)
+
         data['ValueTable'].extend([
             value(
                 l.id,
@@ -134,6 +140,8 @@ def cldf(api, outdir, log):
                 l.id,
                 'aes',
                 l.endangerment.description if l.endangerment else None,
+                Comment=aes_info.comment if aes_info else None,
+                Source=[aes_src] if aes_src else [],
                 Code_ID='aes-{0}'.format(l.endangerment.name) if l.endangerment else None),
             value(
                 l.id,
