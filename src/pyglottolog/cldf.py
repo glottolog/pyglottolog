@@ -1,7 +1,9 @@
 import collections
 
 from pycldf import StructureDataset, Source
+from pycldf.dataset import GitRepository
 
+import pyglottolog
 from pyglottolog.languoids import Level, PseudoFamilies, EndangermentStatus
 from pyglottolog.references import SimplifiedDoctype
 
@@ -17,6 +19,10 @@ def value(lid, pid, value, **kw):
     return res
 
 
+def repos(name, **kw):
+    return GitRepository('https://github.com/glottolog/{0}'.format(name), **kw)
+
+
 def cldf(api, outdir, log):
     if not outdir.exists():
         outdir.mkdir()
@@ -24,6 +30,10 @@ def cldf(api, outdir, log):
         if p.suffix in ['.bib', '.csv', '.json']:
             p.unlink()
     ds = StructureDataset.in_dir(outdir)
+    ds.add_provenance(
+        wasDerivedFrom=repos('glottolog', clone=api.repos),
+        wasGeneratedBy=repos('pyglottolog', version=pyglottolog.__version__),
+    )
     ds.add_component('ParameterTable', {'name': 'type', 'default': None})
     ds.add_component('CodeTable', 'numerical_value')
     ds.add_columns('ValueTable', 'codeReference')
@@ -100,18 +110,18 @@ def cldf(api, outdir, log):
         ))
         med = sorted(refs_by_languoid[l.id], reverse=True)[0] if l.id in refs_by_languoid else None
         if med:
-            ds.add_sources(Source(med.type, med.id, _check_id=False, **med.fields), _check_id=False)
+            ds.add_sources(Source(med.type, med.id, _check_id=False, **med.fields))
         clf = l.classification_comment
         if clf:
             for ref in clf.merged_refs('family') + clf.merged_refs('sub'):
                 e = refs[ref.key]
-                ds.add_sources(Source(e.type, ref.key, _check_id=False, **e.fields), _check_id=False)
+                ds.add_sources(Source(e.type, ref.key, _check_id=False, **e.fields))
 
         aes_info = l.endangerment_info
         aes_src = aes_info.source_id if aes_info else None
         if aes_src:
             e = refs[aes_src]
-            ds.add_sources(Source(e.type, aes_src, _check_id=False, **e.fields), _check_id=False)
+            ds.add_sources(Source(e.type, aes_src, _check_id=False, **e.fields))
 
         data['ValueTable'].extend([
             value(

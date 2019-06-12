@@ -75,7 +75,7 @@ Jena: Max Planck Institute for the Science of Human History.
 """.format(' & '.join('{0.last}, {0.first}'.format(HumanName(e)) for e in editors), year, version)
     dump(
         {
-            "title": "clld/glottolog: Glottolog database {0}".format(version),
+            "title": "glottolog/glottolog: Glottolog database {0}".format(version),
             "description": to_html(citation),
             "license": {"id": "CC-BY-4.0"},
             "keywords": ["linguistics"],
