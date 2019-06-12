@@ -124,6 +124,10 @@ def test_bibfiles_db(api_copy):
     commands.bibfiles_db(_args(api_copy))
 
 
+def test_cldf(api_copy, tmpdir):
+    commands._cldf(_args(api_copy, str(tmpdir)))
+
+
 def test_check(capsys, api_copy):
     commands.check(_args(api_copy, 'refs'))
 

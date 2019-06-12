@@ -83,9 +83,7 @@ def cldf(api, outdir, log):
                     return lid
 
     def format_ref(ref):
-        if ref.pages:
-            return '{0}[{1}]'.format(ref.key, ref.pages.replace(';', ','))
-        return ref.key
+        return '{0}[{1}]'.format(ref.key, ref.pages.replace(';', ',')) if ref.pages else ref.key
 
     for l in languoids.values():
         data['LanguageTable'].append(dict(
