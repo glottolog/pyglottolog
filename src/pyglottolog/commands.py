@@ -213,6 +213,37 @@ def copy_benjamins(args, name='benjamins.bib'):  # pragma: no cover
 
 @command()
 @assert_repos
+def elcat_diff(args):
+    from pyglottolog.links.endangeredlanguages import read
+
+    in_gl = {l.iso for l in args.repos.languoids() if l.iso}
+    for l in read():
+        if not l.iso:
+            args.log.info('no ISO code for {0.name} [{0.id}]'.format(l))
+        elif l.iso not in in_gl:
+            args.log.warn('ISO code {0.iso} for {0.name} [{0.id}] not in Glottolog'.format(l))
+
+
+@command()
+@assert_repos
+def elcat(args):
+    from pyglottolog.links.endangeredlanguages import read, BASE_URL
+
+    elcat_langs = {l.iso: l for l in read()}
+    for l in args.repos.languoids():
+        if l.iso and l.iso in elcat_langs:
+            elcat_lang = elcat_langs[l.iso]
+            links = [li for li in l.links if not li.startswith(BASE_URL)]
+            l.links = links + [elcat_lang.url]
+            names = set(chain(*l.names.values()))
+            for name in [elcat_lang.name] + elcat_lang.also_known_as:
+                if name not in names:
+                    l.add_name(name, 'ElCat')
+            l.write_info()
+
+
+@command()
+@assert_repos
 def isobib(args):  # pragma: no cover
     """Update iso6393.bib - the file of references for ISO 639-3 change requests."""
     pyglottolog.iso.bibtex(args.repos, args.log)

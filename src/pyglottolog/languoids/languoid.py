@@ -313,6 +313,18 @@ class Languoid(UnicodeMixin):
         self._set('macroareas', ['{0}'.format(ma) for ma in value])
 
     @property
+    def links(self):
+        return self.cfg.getlist(self.section_core, 'links')
+
+    @links.setter
+    def links(self, value):
+        assert isinstance(value, list) and all(isinstance(s, str) for s in value)
+        self._set('links', sorted(value))
+
+    def add_link(self, url):
+        self.links = sorted(self.links + [url])
+
+    @property
     def countries(self):
         return [Country.from_text(n)
                 for n in self.cfg.getlist(self.section_core, 'countries')]
