@@ -226,20 +226,17 @@ def elcat_diff(args):
 
 @command()
 @assert_repos
-def elcat(args):
-    from pyglottolog.links.endangeredlanguages import read, BASE_URL
+def update_links(args):
+    from pyglottolog.links import endangeredlanguages, wikidata
 
-    elcat_langs = {l.iso: l for l in read()}
-    for l in args.repos.languoids():
-        if l.iso and l.iso in elcat_langs:
-            elcat_lang = elcat_langs[l.iso]
-            links = [li for li in l.links if not li.startswith(BASE_URL)]
-            l.links = links + [elcat_lang.url]
-            names = set(chain(*l.names.values()))
-            for name in [elcat_lang.name] + elcat_lang.also_known_as:
-                if name not in names:
-                    l.add_name(name, 'ElCat')
-            l.write_info()
+    langs = args.repos.languoids()
+    for mod in [
+        endangeredlanguages,
+        wikidata,
+    ]:
+        if (not args.args) or (mod.__name__.split('.')[-1] in args.args):
+            for l in mod.iterupdated(langs):
+                l.write_info()
 
 
 @command()

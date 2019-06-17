@@ -10,6 +10,7 @@ from clldutils.path import Path
 from clldutils.inifile import INI
 from clldutils.declenum import DeclEnum
 from newick import Node
+from purl import URL
 
 from .models import (
     Glottocode, Level, Country, Macroarea, Reference,
@@ -323,6 +324,12 @@ class Languoid(UnicodeMixin):
 
     def add_link(self, url):
         self.links = sorted(self.links + [url])
+
+    def update_link(self, domain, url):
+        if url not in self.links:
+            self.links = [li for li in self.links if URL(li).domain() != domain] + [url]
+            return True
+        return False
 
     @property
     def countries(self):

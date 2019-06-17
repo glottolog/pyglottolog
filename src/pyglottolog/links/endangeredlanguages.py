@@ -1,6 +1,7 @@
 # coding: utf8
 from __future__ import unicode_literals, print_function, division
 import re
+import itertools
 
 import requests
 import attr
@@ -51,3 +52,20 @@ class ElCatLanguage(object):
 
 def read():
     return [ElCatLanguage(*row) for row in reader(requests.get(CSV_URL).text.split('\n')) if row]
+
+
+def iterupdated(languoids):
+    elcat_langs = {l.iso: l for l in read()}
+    for l in languoids:
+        changed = False
+        if l.iso and l.iso in elcat_langs:
+            elcat_lang = elcat_langs[l.iso]
+            if l.update_link('endangeredlanguages.com', elcat_lang.url):
+                changed = True
+            names = set(itertools.chain(*l.names.values()))
+            for name in [elcat_lang.name] + elcat_lang.also_known_as:
+                if name not in names:
+                    l.add_name(name, 'ElCat')
+                    changed = True
+        if changed:
+            yield l
