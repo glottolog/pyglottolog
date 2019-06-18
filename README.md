@@ -7,7 +7,7 @@ Programmatic access to [Glottolog data](https://github.com/clld/glottolog).
 [![PyPI](https://img.shields.io/pypi/v/pyglottolog.svg)](https://pypi.org/project/pyglottolog)
 
 
-### Install
+## Install
 
 To install `pyglottolog` you need a python installation on your system, running python 2.7 or >3.4. Run
 ```
@@ -37,7 +37,7 @@ All functionality is mediated through an instance of `pyglottolog.api.Glottolog`
 <Glottolog repos v0.2-259-g27ac0ef at /.../glottolog>
 ```
 
-#### Accessing languoid data
+### Accessing languoid data
 ```python
 >>> api.languoid('stan1295')
 <Language stan1295>
@@ -45,7 +45,7 @@ All functionality is mediated through an instance of `pyglottolog.api.Glottolog`
 German [stan1295]
 ```
 
-#### Accessing reference data
+### Accessing reference data
 ```python
 >>> print(api.bibfiles['hh.bib']['s:Karang:Tati-Harzani'])
 @book{s:Karang:Tati-Harzani,
@@ -61,6 +61,33 @@ German [stan1295]
     lgcode = {Harzani [hrz]},
     macro_area = {Eurasia}
 }
+```
+
+### Performance considerations
+
+Reading the data for Glottolog's almost 25,000 languoids from the same number of files in individual
+directories isn't particularly quick. So on average computers running
+```python
+>>> list(Glottolog().languoids())
+```
+would take around 15 seconds.
+
+Due to this, care should be taken not to read languoid data from disk repeatedly. In particular
+"N+1"-type problems should be avoided, where one would read all languoid into memory and then look
+up attributes on each languoid, thereby triggering new reads from disk. This may easily happen,
+since attributes such as `Languoid.family` are implemented as
+[properties](https://docs.python.org/3/howto/descriptor.html#properties), which traverse the
+directory tree and read information from disk at **access** time.
+
+To make it possible to avoid such problems, many of these properties can be substituted with a call
+to a similar method of `Languoid`, which accepts a "node map" (i.e. a `dict` mapping `Languoid.id` 
+to `Languoid` objects) as parameter, e.g. `Languoid.ancestors_from_nodemap` or
+`Languoid.descendants_from_nodemap`. Typical usage would look as follows:
+```python
+>>> languoids = {l.id: l for l in Glottolog().languoids()}
+>>> for l in languoids.values():
+...    if not l.ancestors_from_nodemap(languoids):
+...        print('top-level {0}: {1}'.format(l.level, l.name))
 ```
 
 
