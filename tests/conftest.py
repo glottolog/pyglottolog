@@ -9,6 +9,15 @@ import pyglottolog
 TESTS_DIR = path.Path(__file__).parent
 
 
+@pytest.fixture
+def elcat(mocker):
+    class EL(object):
+        def get(self, *args, **kw):
+            return mocker.Mock(text='1,abc,Name,,,,,,,,,,"10,20.02 ;"')
+
+    mocker.patch('pyglottolog.links.endangeredlanguages.requests', EL())
+
+
 @pytest.fixture(scope='session')
 def repos_path():
     return TESTS_DIR / 'repos'

@@ -2,8 +2,6 @@ from __future__ import unicode_literals
 
 import pytest
 
-from pyglottolog import languoids
-
 
 def test_legacy_import():
     from pyglottolog import api
@@ -14,6 +12,12 @@ def test_legacy_import():
 def test_glottolog_invalid_repos(tmpdir):
     from pyglottolog import Glottolog
     with pytest.raises(ValueError, match=r'missing tree dir'):
+        Glottolog(str(tmpdir))
+
+    tmpdir.join('languoids').mkdir()
+    tmpdir.join('languoids', 'tree').mkdir()
+
+    with pytest.raises(ValueError, match=r'missing references subdir'):
         Glottolog(str(tmpdir))
 
 
@@ -29,14 +33,14 @@ def test_descendants_from_nodemap(api):
     nodemap = {n.id: n for n in api.languoids()}
     l = api.languoid('abcd1234')
     assert len(l.descendants_from_nodemap(nodemap)) == 2
-    assert len(l.descendants_from_nodemap(nodemap, level=languoids.Level.language)) == 1
-    assert len(l.descendants_from_nodemap(nodemap, level=languoids.Level.dialect)) == 1
+    assert len(l.descendants_from_nodemap(nodemap, level=api.languoid_levels.language)) == 1
+    assert len(l.descendants_from_nodemap(nodemap, level=api.languoid_levels.dialect)) == 1
 
 
 def test_languoids(api):
     assert len(list(api.languoids())) == 7
-    assert len(list(api.languoids(maxlevel=languoids.Level.family))) == 2
-    assert len(list(api.languoids(maxlevel=languoids.Level.language))) == 5
+    assert len(list(api.languoids(maxlevel=api.languoid_levels.family))) == 2
+    assert len(list(api.languoids(maxlevel=api.languoid_levels.language))) == 5
     assert len(api.languoids_by_code()) == 10
     assert api.languoids_by_code(nodes={}) == {}
     assert 'NOCODE_Family-name' in api.languoids_by_code()
@@ -55,7 +59,7 @@ def test_newick_tree(api):
 
 
 def test_hhtypes(api):
-    assert len(api.hhtypes) == 2
+    assert len(api.hhtypes) == 16
 
 
 def test_load_triggers(api):

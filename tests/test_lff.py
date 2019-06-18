@@ -5,7 +5,6 @@ import pytest
 from clldutils.path import walk
 
 from pyglottolog.lff import read_lff, rmtree, lff2tree, tree2lff
-from pyglottolog.languoids import Level
 
 
 def test_rmtree(tmpdir):
@@ -50,8 +49,8 @@ Abkhazian [abkh1244] abk
 
     lff2tree(api_copy)
     assert api_copy.languoid('abkh1242').iso == 'aaa'
-    assert api_copy.languoid('ashk1247').level == Level.dialect
-    assert api_copy.languoid('abaz1241').level == Level.language
+    assert api_copy.languoid('ashk1247').level == api_copy.languoid_levels.dialect
+    assert api_copy.languoid('abaz1241').level == api_copy.languoid_levels.language
     assert api_copy.languoid('abaz1241').hid == 'abq'
 
     _set_lff(api_copy, 'lff.txt', lfftext.replace('Abkhaz-Abaza', 'Abkhaz-Abazzza'))
@@ -92,7 +91,7 @@ Kabardian [kaba1278]
 """)
 
     lff2tree(api_copy)
-    assert api_copy.languoid('abaz1241').level == Level.family
+    assert api_copy.languoid('abaz1241').level == api_copy.languoid_levels.family
     # Now we test two things:
     # - aaa has been removed as ISO code from abkh1242
     # - aaa has been attached as ISO code to a newly created language
@@ -180,7 +179,7 @@ None [xyzz1234]; Other [-isolate-]
         lff2tree(api_copy)
 
 
-def test_read_lff_error(tmpdir, mocker):
+def test_read_lff_error(tmpdir, mocker, api_copy):
     lff = tmpdir / 'lff.txt'
     lff.write_text("""
 Name [ac1234]; Name2 [abcd1235]
@@ -188,4 +187,9 @@ Name [ac1234]; Name2 [abcd1235]
 """, encoding='utf-8')
 
     with pytest.raises(ValueError):
-        list(read_lff(None, mocker.Mock(), {}, Level.language, str(lff)))
+        list(read_lff(
+            mocker.Mock(languoid_levels=api_copy.languoid_levels),
+            mocker.Mock(),
+            {},
+            api_copy.languoid_levels.language,
+            str(lff)))

@@ -348,9 +348,9 @@ def markconservative(m, trigs, ref, hht, outfn, verbose=True, rank=None):
     no_status = defaultdict(set)
     for (lg, (stat, wits)) in lsafter.items():
         if not ls.get(lg):
-            srctrickles = [mafter[k][1]['srctrickle'] for k in wits]
+            srctrickles = [mafter[k][1].get('srctrickle') for k in wits]
             for t in srctrickles:
-                if not t.startswith('iso6393'):
+                if t and not t.startswith('iso6393'):
                     no_status[lg].add(t)
             continue
         if hht[stat] > hht[ls[lg]]:

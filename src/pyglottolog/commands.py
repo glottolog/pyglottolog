@@ -19,7 +19,7 @@ from clldutils.path import Path, write_text, read_text, git_describe
 
 import pyglottolog
 import pyglottolog.iso
-from .languoids import Languoid, Level, Reference, PseudoFamilies
+from .languoids import Languoid, Reference
 from . import fts
 from . import lff
 from . import cldf
@@ -27,6 +27,7 @@ from .monster import compile
 from .references import evobib
 from .util import message, sprint
 from .metadata import prepare_release
+from .links import endangeredlanguages, wikidata
 
 
 def assert_repos(func):
@@ -76,7 +77,7 @@ def htmlmap(args, min_langs_for_legend_item=10):
 
     langs = []
     for n in nodes.values():
-        if n.level == Level.language and n.latitude != None:
+        if n.level == args.repos.languoid_levels.language and n.latitude != None:
             fid = n.lineage[0][1] if n.lineage else n.id
             if (not nodes[fid].category.startswith('Pseudo')) or fid == n.id:
                 langs.append((n, fid))
@@ -107,7 +108,7 @@ def htmlmap(args, min_langs_for_legend_item=10):
         return \
             '<span style="background-color: #{0}; border: 1px solid black;">'\
             '&nbsp;&nbsp;&nbsp;</span> '\
-            '<a href="http://glottolog.org/resource/languoid/id/{1}">{2}</a> ({3})'.format(
+            '<a href="https://glottolog.org/resource/languoid/id/{1}">{2}</a> ({3})'.format(
                 color_map[fid], fid, nodes[fid].name, c)
 
     geojson = {
@@ -157,7 +158,7 @@ def iso2codes(args):
             res[node.id] = (node.iso, set())
 
     for node in nodes:
-        if node.level == Level.family or node.id in res:
+        if node.level == args.repos.languoid_levels.family or node.id in res:
             continue
         for nid in res:
             matched = False
@@ -184,7 +185,7 @@ def _cldf(args):
 
 @command('evobib')
 @assert_repos
-def _evobib(args):
+def _evobib(args):  # pragma: no cover
     evobib.download(args.repos.bibfiles['evobib.bib'], args.log)
 
 
@@ -213,7 +214,7 @@ def copy_benjamins(args, name='benjamins.bib'):  # pragma: no cover
 
 @command()
 @assert_repos
-def elcat_diff(args):
+def elcat_diff(args):  # pragma: no cover
     from pyglottolog.links.endangeredlanguages import read
 
     in_gl = {l.iso for l in args.repos.languoids() if l.iso}
@@ -227,9 +228,8 @@ def elcat_diff(args):
 @command()
 @assert_repos
 def update_links(args):
-    from pyglottolog.links import endangeredlanguages, wikidata
-
     langs = args.repos.languoids()
+    updated = []
     for mod in [
         endangeredlanguages,
         wikidata,
@@ -237,6 +237,8 @@ def update_links(args):
         if (not args.args) or (mod.__name__.split('.')[-1] in args.args):
             for l in mod.iterupdated(langs):
                 l.write_info()
+                updated.append(l.id)
+    print('{0} languoids updated'.format(len(updated)))
 
 
 @command()
@@ -340,7 +342,7 @@ def create(args):
         outdir,
         args.args[1],
         args.repos.glottocodes.new(args.args[1]),
-        getattr(Level, args.args[2]),
+        args.args[2],
         **dict(prop.split('=') for prop in args.args[3:]))
 
     print("Info written to %s" % lang.write_info(outdir=outdir))
@@ -371,7 +373,8 @@ def tree(args):
         try:
             maxlevel = int(args.args[1])
         except Exception:
-            maxlevel = getattr(Level, args.args[1], None)
+            maxlevel = args.repos.languoid_levels[args.args[1]] \
+                if args.args[1] in args.repos.languoid_levels else None
     args.repos.ascii_tree(start, maxlevel=maxlevel)
 
 
@@ -430,7 +433,7 @@ def index(args):
                     fp.write('- [%s](%s)\n' % (label, langs[label]))
 
     langs = list(args.repos.languoids())
-    for level in Level:
+    for level in args.repos.languoid_levels.values():
         if not args.args or args.args[0] == level.name:
             make_index(level, [l for l in langs if l.level == level], args.repos)
 
@@ -460,14 +463,23 @@ def check(args):
     if what not in ['all', 'tree']:
         return
 
-    hhkeys = args.repos.bibfiles['hh.bib'].keys()
+    refkeys = set()
+    for bibfile in args.repos.bibfiles:
+        refkeys = refkeys.union(bibfile.keys())
+
     iso = args.repos.iso
-    args.log.info('checking ISO codes against %s' % iso)
-    args.log.info('checking tree at %s' % args.repos)
+    info(iso, 'checking ISO codes')
+    info(args.repos, 'checking tree')
     by_level = Counter()
     by_category = Counter()
     iso_in_gl, languoids, iso_splits, hid = {}, {}, [], {}
     names = defaultdict(set)
+
+    for attr in args.repos.__config__:
+        for obj in getattr(args.repos, attr).values():
+            ref_id = getattr(obj, 'reference_id', None)
+            if ref_id and ref_id not in refkeys:
+                error(obj, 'missing reference: {0}'.format(ref_id))
 
     for lang in args.repos.languoids():
         # duplicate glottocodes:
@@ -491,17 +503,17 @@ def check(args):
 
         if 'sources' in lang.cfg:
             for ref in Reference.from_list(lang.cfg.getlist('sources', 'glottolog')):
-                if ref.provider == 'hh' and ref.key not in hhkeys:
+                if ref.key not in refkeys:
                     error(lang, 'missing source: {0}'.format(ref))
 
         for attr in ['classification_comment', 'ethnologue_comment']:
             obj = getattr(lang, attr)
             if obj:
-                obj.check(lang, hhkeys, args.log)
+                obj.check(lang, refkeys, args.log)
 
         names[lang.name].add(lang)
         by_level.update([lang.level.name])
-        if lang.level == Level.language:
+        if lang.level == args.repos.languoid_levels.language:
             by_category.update([lang.category])
 
         if iso and lang.iso:
@@ -510,17 +522,20 @@ def check(args):
             else:
                 isocode = iso[lang.iso]
                 if lang.iso in iso_in_gl:
-                    error(isocode,
-                          'duplicate: {0}, {1}'.format(iso_in_gl[lang.iso].id, lang.id))
+                    error(
+                        isocode,
+                        'duplicate: {0}, {1}'.format(
+                            iso_in_gl[lang.iso].id, lang.id))  # pragma: no cover
                 iso_in_gl[lang.iso] = lang
                 fid = lang.lineage[0][1] if lang.lineage else None
                 if isocode.is_retired and \
-                        fid not in [PseudoFamilies.bookkeeping.value,
-                                    PseudoFamilies.unattested.value]:
+                        fid not in [args.repos.language_types.bookkeeping.pseudo_family_id,
+                                    args.repos.language_types.unattested.pseudo_family_id]:
                     if isocode.type == 'Retirement/split':
                         iso_splits.append(lang)
                     else:
-                        if isocode.type == 'Retirement/merge' and lang.level == Level.dialect:
+                        if isocode.type == 'Retirement/merge' \
+                                and lang.level == args.repos.languoid_levels.dialect:
                             # See https://github.com/clld/pyglottolog/issues/2
                             pass
                         else:
@@ -544,15 +559,15 @@ def check(args):
         for attr in ['level', 'name']:
             if not getattr(lang, attr):
                 error(lang, 'missing %s' % attr)
-        if lang.level == Level.language:
+        if lang.level == args.repos.languoid_levels.language:
             parent = ancestors[-1] if ancestors else None
-            if parent and parent.level != Level.family:
+            if parent and parent.level != args.repos.languoid_levels.family:
                 error(lang, 'invalid nesting of language under {0}'.format(parent.level))
             for child in children:
-                if child.level != Level.dialect:
+                if child.level != args.repos.languoid_levels.dialect:
                     error(child,
                           'invalid nesting of {0} under language'.format(child.level))
-        elif lang.level == Level.family:
+        elif lang.level == args.repos.languoid_levels.family:
             for d in lang.dir.iterdir():
                 if d.is_dir():
                     break
@@ -577,11 +592,12 @@ def check(args):
         if len(gcs) > 1:
             # duplicate names:
             method = error
-            if len([1 for n in gcs if n.level != Level.dialect]) <= 1:
+            if len([1 for n in gcs if n.level != args.repos.languoid_levels.dialect]) <= 1:
                 # at most one of the languoids is not a dialect, just warn
                 method = warn
             if len([1 for n in gcs
-                    if (not n.lineage) or (n.lineage[0][1] != PseudoFamilies.bookkeeping.value)]) <= 1:
+                    if (not n.lineage) or
+                       (n.lineage[0][1] != args.repos.language_types.bookkeeping.pseudo_family_id)]) <= 1:
                 # at most one of the languoids is not in bookkeping, just warn
                 method = warn
             method(name, 'duplicate name: {0}'.format(', '.join(sorted(
@@ -702,6 +718,7 @@ def update_sources(args):
     """Update the [sources] section in languoid info files according to `lgcode` fields in bibfiles.
     """
     langs = args.repos.languoids_by_code()
+    updated = []
     sources = defaultdict(set)
     for bib in args.repos.bibfiles:
         for entry in bib.iterentries():
@@ -712,6 +729,8 @@ def update_sources(args):
         if refs != set(r.key for r in langs[gc].sources):
             langs[gc].sources = [Reference(key=ref) for ref in sorted(refs)]
             langs[gc].write_info()
+            updated.append(gc)
+    print('{0} languoids updated'.format(len(updated)))
 
 
 @command()

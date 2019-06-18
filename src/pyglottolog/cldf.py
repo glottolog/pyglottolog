@@ -4,8 +4,6 @@ from pycldf import StructureDataset, Source
 from pycldf.dataset import GitRepository
 
 import pyglottolog
-from pyglottolog.languoids import Level, PseudoFamilies, EndangermentStatus
-from pyglottolog.references import SimplifiedDoctype
 
 
 def value(lid, pid, value, **kw):
@@ -54,42 +52,42 @@ def cldf(api, outdir, log):
         dict(ID='aes', Name='Agglomerated Endangerment Status', type='sequential'),
         dict(ID='med', Name='Most Extensive Description', type='sequential'),
     ])
-    for level in Level:
+    for level in api.languoid_levels.values():
         data['CodeTable'].append(dict(
             ID='level-{0}'.format(level.name),
             Parameter_ID='level',
             Name=level.name,
             Description=level.description,
-            numerical_value=level.value))
+            numerical_value=level.ordinal))
         data['CodeTable'].append(dict(
             ID='category-{0}'.format(level.name.capitalize()),
             Parameter_ID='category',
             Name=level.name.capitalize()))
-    for el in PseudoFamilies:
+    for el in sorted(api.language_types.values()):
         data['CodeTable'].append(dict(
-            ID='category-{0}'.format(el.description.replace(' ', '_')),
+            ID='category-{0}'.format(el.category.replace(' ', '_')),
             Parameter_ID='category',
-            Name=el.description))
-    for el in EndangermentStatus:
+            Name=el.category))
+    for el in sorted(api.aes_status.values()):
         data['CodeTable'].append(dict(
             ID='aes-{0}'.format(el.name),
             Parameter_ID='aes',
-            Name=el.description,
-            numerical_value=el.value))
-    for el in SimplifiedDoctype:
+            Name=el.name,
+            numerical_value=el.ordinal))
+    for el in sorted(api.med_types.values()):
         data['CodeTable'].append(dict(
-            ID='med-{0}'.format(el.name),
+            ID='med-{0}'.format(el.id),
             Parameter_ID='med',
             Name=el.name,
             Description=el.description,
-            numerical_value=el.value))
+            numerical_value=el.rank))
     languoids = collections.OrderedDict((l.id, l) for l in api.languoids())
     refs_by_languoid, refs = api.refs_by_languoid(languoids)
 
     def get_language_id(l):
-        if l.level == Level.dialect:
+        if l.level == api.languoid_levels.dialect:
             for _, lid, _ in reversed(l.lineage):
-                if languoids[lid].level == Level.language:
+                if languoids[lid].level == api.languoid_levels.language:
                     return lid
 
     def format_ref(ref):
@@ -103,7 +101,7 @@ def cldf(api, outdir, log):
             ISO639P3code=l.iso,
             Latitude=l.latitude,
             Longitude=l.longitude,
-            Macroarea=[ma.value for ma in l.macroareas],
+            Macroarea=[ma.name for ma in l.macroareas],
             Countries=[c.id for c in l.countries],
             Family_ID=l.lineage[0][1] if l.lineage else None,
             Language_ID=get_language_id(l),
@@ -117,8 +115,7 @@ def cldf(api, outdir, log):
                 e = refs[ref.key]
                 ds.add_sources(Source(e.type, ref.key, _check_id=False, **e.fields))
 
-        aes_info = l.endangerment_info
-        aes_src = aes_info.source_id if aes_info else None
+        aes_src = l.endangerment.source.reference_id if l.endangerment else None
         if aes_src:
             e = refs[aes_src]
             ds.add_sources(Source(e.type, aes_src, _check_id=False, **e.fields))
@@ -147,16 +144,16 @@ def cldf(api, outdir, log):
             value(
                 l.id,
                 'aes',
-                l.endangerment.description if l.endangerment else None,
-                Comment=aes_info.comment if aes_info else None,
+                l.endangerment.status.name if l.endangerment else None,
+                Comment=l.endangerment.comment if l.endangerment else None,
                 Source=[aes_src] if aes_src else [],
-                Code_ID='aes-{0}'.format(l.endangerment.name) if l.endangerment else None),
+                Code_ID='aes-{0}'.format(l.endangerment.status.name) if l.endangerment else None),
             value(
                 l.id,
                 'med',
-                med.med.name if med else None,
+                med.med_type.name if med else None,
                 Source=[med.id] if med else [],
-                Code_ID='med-{0}'.format(med.med.name) if med else None),
+                Code_ID='med-{0}'.format(med.med_type.id) if med else None),
         ])
 
     ds.write(outdir / 'cldf-metadata.json', **data)

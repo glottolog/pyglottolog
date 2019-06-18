@@ -25,6 +25,7 @@ setup(
         'six>=1.9',
         'csvw',
         'clldutils>=2.8.0',
+        'purl',
         'pycldf>=1.6.4',
         'sqlalchemy',
         'tqdm',

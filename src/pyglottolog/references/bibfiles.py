@@ -49,34 +49,25 @@ PREF_YEAR_PATTERN = re.compile('\[(?P<year>(1|2)[0-9]{3})(\-[0-9]+)?\]')
 YEAR_PATTERN = re.compile('(?P<year>(1|2)[0-9]{3})')
 
 
-class SimplifiedDoctype(DeclEnum):
-    long_grammar = 0, 'Grammar with more than 300 pages'
-    grammar = 1, 'Grammar with less than 300 pages'
-    grammar_sketch = 2, 'Grammar sketch'
-    phonology_or_text = 3, 'New Testament, Text, Phonology, (typological) Study Of A Specific ' \
-                           'Feature or Dictionary'
-    wordlist_or_less = 4, 'Wordlist or less'
-
-
 class BibFiles(list):
     """Ordered collection of `BibFile` objects accessible by filname or index."""
 
     @classmethod
-    def from_path(cls, path):
+    def from_path(cls, path, api=None):
         """BibTeX files from `<path>/bibtex/*.bib` if listed in `<path>/BIBFILES.ini`."""
         if not isinstance(path, Path):
             path = Path(path)
         ini = INI.from_file(path / 'BIBFILES.ini', interpolation=None)
-        return cls(cls._iterbibfiles(ini, path / 'bibtex'))
+        return cls(cls._iterbibfiles(ini, path / 'bibtex', api=api))
 
     @staticmethod
-    def _iterbibfiles(ini, bibtex_path):
+    def _iterbibfiles(ini, bibtex_path, api=None):
         for sec in ini.sections():
             if sec.endswith('.bib'):
                 fpath = bibtex_path / sec
                 if not fpath.exists():  # pragma: no cover
                     raise ValueError('invalid bibtex file referenced in BIBFILES.ini')
-                yield BibFile(fname=fpath, **ini[sec])
+                yield BibFile(fname=fpath, api=api, **ini[sec])
 
     def __init__(self, bibfiles):
         super(BibFiles, self).__init__(bibfiles)
@@ -117,6 +108,7 @@ class BibFile(UnicodeMixin):
         converter=lambda s: None if s is None or s.lower() == 'none' else s)
     priority = attr.ib(default=0, converter=int)
     url = attr.ib(default=None)
+    api = attr.ib(default=None)
 
     @property
     def id(self):
@@ -136,7 +128,7 @@ class BibFile(UnicodeMixin):
                     text = string[m.start():]
         if text:
             for k, (t, f) in bibtex.iterentries_from_text(text, encoding=self.encoding):
-                return Entry(k, t, f, self)
+                return Entry(k, t, f, self, self.api)
         raise KeyError(item)
 
     def visit(self, visitor=None):
@@ -156,7 +148,7 @@ class BibFile(UnicodeMixin):
 
     def iterentries(self):
         for k, (t, f) in bibtex.iterentries(filename=self.fname, encoding=self.encoding):
-            yield Entry(k, t, f, self)
+            yield Entry(k, t, f, self, self.api)
 
     def keys(self):
         return ['{0}:{1}'.format(self.id, e.key) for e in self.iterentries()]
@@ -276,16 +268,17 @@ class Entry(UnicodeMixin):
         return -index, pages, self.year_int or 0, self.id
 
     @lazyproperty
-    def med(self):
-        doctypes = list(self._defined_doctypes.keys())
-        index = -self.weight[0]
-        if index == -1:
-            return SimplifiedDoctype.long_grammar
-        if 'dictionary' in doctypes and index < doctypes.index('dictionary'):
-            return SimplifiedDoctype.get(doctypes[index])
-        if 'wordlist' in doctypes and index < doctypes.index('wordlist'):
-            return SimplifiedDoctype.phonology_or_text
-        return SimplifiedDoctype.wordlist_or_less
+    def med_type(self):
+        if self.api:
+            doctypes = list(self._defined_doctypes.keys())
+            index = -self.weight[0]
+            if index == -1:
+                return self.api.med_types.long_grammar
+            if 'dictionary' in doctypes and index < doctypes.index('dictionary'):
+                return self.api.med_types.get(doctypes[index])
+            if 'wordlist' in doctypes and index < doctypes.index('wordlist'):
+                return self.api.med_types.phonology_or_text
+            return self.api.med_types.wordlist_or_less
 
     @lazyproperty
     def year_int(self):

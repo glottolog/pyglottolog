@@ -11,29 +11,20 @@ import markdown
 import pycountry
 from clldutils.misc import slug, UnicodeMixin, nfilter
 from clldutils import jsonlib
-from clldutils.declenum import DeclEnum
 from dateutil import parser
 
 from ..util import message
+from ..config import AESSource, AES
 
 __all__ = [
     'Glottocode', 'Glottocodes',
     'Reference',
-    'Level', 'Country', 'Macroarea',
+    'Country',
     'ClassificationComment',
     'ISORetirement',
-    'EndangermentStatus', 'Endangerment',
+    'Endangerment',
     'EthnologueComment',
 ]
-
-ENDANGERMENT_SOURCES = {
-    'E20': "hh:h:Ethnologue:20",
-    'E21': "hh:h:Ethnologue:21",
-    'E22': "hh:h:Ethnologue:22",
-    'ElCat': "hh:hel:Campbell:ElCat",
-    'Glottolog': None,
-    'UNESCO': "hh:hel:Moseley:Atlas:2010"
-}
 
 
 class Glottocodes(object):
@@ -137,26 +128,6 @@ class Reference(UnicodeMixin):
         return res
 
 
-class Level(DeclEnum):
-    """
-    Glottolog distinguishes three levels of languoids:
-    - family: any sub-grouping of languoids above the language level
-    - language: defined as per\
-    http://glottolog.org/glottolog/glottologinformation#inclusionexclusionoflanguages
-    - dialect: any variety which is not a language
-
-    The Glottolog classification imposes the following rules on the nesting of languoids:
-    1. Dialects must not be top-level nodes of the classification.
-    2. Dialects must not have a family as parent.
-    3. Languages must either be isolates (i.e. top-level nodes) or have a family as
-       parent.
-    4. The levels of the languoids in a tree branch must be monotonically descending.
-    """
-    family = 1, 'sub-grouping of languoids above the language level'
-    language = 2, 'defined by mutual non-intellegibility'
-    dialect = 3, 'any variety which is not a language'
-
-
 @attr.s
 class Country(UnicodeMixin):
     """
@@ -189,32 +160,6 @@ class Country(UnicodeMixin):
         if match:
             return cls.from_id(match.group('code'))
         return cls.from_name(text)
-
-
-class Macroarea(DeclEnum):
-    """
-    Glottolog languoids can be related to a macroarea.
-    """
-    northamerica =\
-        'North America',\
-        'North and Middle America up to Panama. Includes Greenland.'
-    southamerica =\
-        'South America',\
-        'Everything South of Darién'
-    africa =\
-        'Africa',\
-        'The continent'
-    australia =\
-        'Australia',\
-        'The continent'
-    eurasia =\
-        'Eurasia',\
-        'The Eurasian landmass North of Sinai. Includes Japan and islands to the North' \
-        'of it. Does not include Insular South East Asia.'
-    pacific =\
-        'Papunesia',\
-        'All islands between Sumatra and the Americas, excluding islands off Australia' \
-        'and excluding Japan and islands to the North of it.'
 
 
 @attr.s
@@ -270,34 +215,12 @@ class ISORetirement(object):
         return attr.asdict(self)
 
 
-class EndangermentStatus(DeclEnum):
-    safe = 1, 'not endangered', '<= 6a (Vigorous)'
-    vulnerable = 2, 'threatened', '6b'
-    definite = 3, 'shifting', '7'
-    severe = 4, 'moribund', '8a'
-    critical = 5, 'nearly extinct', '8b'
-    extinct = 6, 'extinct', '10'
-
-    @classmethod
-    def get(cls, item):
-        if item in list(cls):
-            return item
-        for li in cls:
-            if li.name == item or li.value == item or li.description == item:
-                return li
-        raise ValueError(item)
-
-
 @attr.s
 class Endangerment(object):
-    status = attr.ib(converter=lambda v: EndangermentStatus.get(v))
-    source = attr.ib(validator=attr.validators.in_(list(ENDANGERMENT_SOURCES.keys())))
+    status = attr.ib(validator=attr.validators.instance_of(AES))
+    source = attr.ib(validator=attr.validators.instance_of(AESSource))
     comment = attr.ib()
     date = attr.ib(converter=parser.parse)
-
-    @property
-    def source_id(self):
-        return ENDANGERMENT_SOURCES.get(self.source)
 
 
 def valid_ethnologue_versions(inst, attr, value):

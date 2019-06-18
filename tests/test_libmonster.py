@@ -20,7 +20,7 @@ def test_markconcservative(tmpdir, hhtypes):
     res = markconservative(
         {1: ('article', {'title': 'grammar', 'lgcode': 'abc'})},
         hhtypes.triggers,
-        {1: ('article', {'title': 'other', 'hhtype': 'other', 'lgcode': 'abc'})},
+        {1: ('article', {'title': 'other', 'hhtype': 'wordlist', 'lgcode': 'abc'})},
         hhtypes,
         str(tmpdir / 'marks.txt'),
         verbose=False)

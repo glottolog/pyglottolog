@@ -11,7 +11,6 @@ import pycldf.util
 from csvw import TableGroup, Column
 from clldutils.path import Path, as_posix, walk, git_describe
 from clldutils.misc import lazyproperty
-from clldutils.declenum import EnumSymbol
 from clldutils.apilib import API
 from clldutils.jsonlib import load
 import pycountry
@@ -21,6 +20,7 @@ from tqdm import tqdm
 from . import util
 from . import languoids
 from . import references
+from . import config
 from .languoids import models
 
 __all__ = ['Glottolog']
@@ -32,6 +32,15 @@ class Glottolog(API):
     """API to access Glottolog data"""
 
     countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
+    __config__ = {
+        'aes_status': config.AES,
+        'aes_sources': config.AESSource,
+        'document_types': config.DocumentType,
+        'med_types': config.MEDType,
+        'macroareas': config.Macroarea,
+        'language_types': config.LanguageType,
+        'languoid_levels': config.LanguoidLevel,
+    }
 
     def __init__(self, repos='.'):
         API.__init__(self, repos=repos)
@@ -41,6 +50,9 @@ class Glottolog(API):
             raise ValueError('repos dir %s missing tree dir: %s' % (self.repos, self.tree))
         if not self.repos.joinpath('references').exists():
             raise ValueError('repos dir %s missing references subdir' % (self.repos,))
+        for name, cls in self.__config__.items():
+            fname = self.repos / 'config' / (name + '.ini')
+            setattr(self, name, config.Config.from_ini(fname, object_class=cls))
 
     def __unicode__(self):
         return '<Glottolog repos {0} at {1}>'.format(git_describe(self.repos), self.repos)
@@ -89,15 +101,16 @@ class Glottolog(API):
 
         if ISO_CODE_PATTERN.match(id_):
             for d in walk(self.tree, mode='dirs'):
-                l_ = languoids.Languoid.from_dir(d)
+                l_ = languoids.Languoid.from_dir(d, _api=self)
                 if l_.iso_code == id_:
                     return l_
         else:
             for d in walk(self.tree, mode='dirs'):
                 if d.name == id_:
-                    return languoids.Languoid.from_dir(d)
+                    return languoids.Languoid.from_dir(d, _api=self)
 
-    def languoids(self, ids=None, maxlevel=models.Level.dialect):
+    def languoids(self, ids=None, maxlevel=None):
+        maxlevel = self.languoid_levels.get(maxlevel or 'dialect')
         nodes = {}
 
         for dirpath, dirnames, filenames in os.walk(as_posix(self.tree)):
@@ -107,7 +120,7 @@ class Glottolog(API):
 
             for dirname in dirnames:
                 if ids is None or dirname in ids:
-                    lang = languoids.Languoid.from_dir(dp.joinpath(dirname), nodes=nodes)
+                    lang = languoids.Languoid.from_dir(dp.joinpath(dirname), nodes=nodes, _api=self)
                     if lang.level <= maxlevel:
                         yield lang
 
@@ -126,7 +139,13 @@ class Glottolog(API):
         return res
 
     def ascii_tree(self, start, maxlevel=None):
-        _ascii_node(self.languoid(start), 0, True, maxlevel, '')
+        _ascii_node(
+            self.languoid(start),
+            0,
+            True,
+            self.languoid_levels.get(maxlevel, maxlevel) if maxlevel else None,
+            '',
+            self.languoid_levels)
 
     def newick_tree(self, start=None, template=None, nodes=None):
         template = template or languoids.Languoid._newick_default_template
@@ -139,17 +158,17 @@ class Glottolog(API):
         for lang in nodes.values():
             if not lang.lineage and not lang.category.startswith('Pseudo '):
                 ns = lang.newick_node(nodes=nodes, template=template).newick
-                if lang.level == models.Level.language:
+                if lang.level == self.languoid_levels.language:
                     # An isolate: we wrap it in a pseudo-family with the same name and ID.
                     fam = languoids.Languoid.from_name_id_level(
-                        lang.dir.parent, lang.name, lang.id, 'family')
+                        lang.dir.parent, lang.name, lang.id, 'family', _api=self)
                     ns = '({0}){1}:1'.format(ns, template.format(l=fam))
                 trees.append('{0};'.format(ns))
         return '\n'.join(trees)
 
     @lazyproperty
     def bibfiles(self):
-        return references.BibFiles.from_path(self.references_path())
+        return references.BibFiles.from_path(self.references_path(), api=self)
 
     def refs_by_languoid(self, nodes=None):
         all = {}
@@ -181,19 +200,13 @@ class Glottolog(API):
     def macroarea_map(self):
         res = {}
         for lang in self.languoids():
-            ma = lang.macroareas[0].value if lang.macroareas else ''
+            ma = lang.macroareas[0].name if lang.macroareas else ''
             res[lang.id] = ma
             if lang.iso:
                 res[lang.iso] = ma
             if lang.hid:
                 res[lang.hid] = ma
         return res
-
-    def write_cldf(self):
-        """
-        Create a CLDF StructureDataset
-        """
-        pass
 
     def write_languoids_table(self, outdir, version=None):
         version = version or self.describe()
@@ -223,11 +236,11 @@ class Glottolog(API):
         langs = []
         for lang in self.languoids():
             lid, lname = None, None
-            if lang.level == languoids.Level.language:
+            if lang.level == self.languoid_levels.language:
                 lid, lname = lang.id, lang.name
-            elif lang.level == languoids.Level.dialect:
+            elif lang.level == self.languoid_levels.dialect:
                 for lname, lid, level in reversed(lang.lineage):
-                    if level == languoids.Level.language:
+                    if level == self.languoid_levels.language:
                         break
                 else:  # pragma: no cover
                     raise ValueError
@@ -245,7 +258,7 @@ class Glottolog(API):
                 Family_Name=lang.lineage[0][0] if lang.lineage else None,
                 Family_Glottocode=lang.lineage[0][1] if lang.lineage else None,
                 Level=lang.level.name,
-                Status=lang.endangerment.description if lang.endangerment else None,
+                Status=lang.endangerment.status.name if lang.endangerment else None,
             ))
 
         tg.to_file(md)
@@ -253,10 +266,11 @@ class Glottolog(API):
         return md, out
 
 
-def _ascii_node(n, level, last, maxlevel, prefix):
+def _ascii_node(n, level, last, maxlevel, prefix, levels):
+    nlevel = levels.get(n.level)
     if maxlevel:
-        if (isinstance(maxlevel, EnumSymbol) and n.level > maxlevel) or \
-                (not isinstance(maxlevel, EnumSymbol) and level > maxlevel):
+        if (isinstance(maxlevel, config.LanguoidLevel) and nlevel > maxlevel) or \
+                (not isinstance(maxlevel, config.LanguoidLevel) and level > maxlevel):
             return
     s = '\u2514' if last else '\u251c'
     s += '\u2500 '
@@ -269,8 +283,8 @@ def _ascii_node(n, level, last, maxlevel, prefix):
     nprefix = prefix + ('   ' if last else '\u2502  ')
 
     color = 'red' if not level else (
-        'green' if n.level == models.Level.language else (
-            'blue' if n.level == models.Level.dialect else None))
+        'green' if nlevel == levels.language else (
+            'blue' if nlevel == levels.dialect else None))
 
     util.sprint(
         '{0}{1}{2} [{3}]',
@@ -279,4 +293,4 @@ def _ascii_node(n, level, last, maxlevel, prefix):
         colored(n.name, color) if color else n.name,
         colored(n.id, color) if color else n.id)
     for i, c in enumerate(sorted(n.children, key=lambda nn: nn.name)):
-        _ascii_node(c, level + 1, i == len(n.children) - 1, maxlevel, nprefix)
+        _ascii_node(c, level + 1, i == len(n.children) - 1, maxlevel, nprefix, levels)

@@ -18,6 +18,6 @@ def test_HHTypes(hhtypes):
     for pref, t in pairwise(hhtypes):
         assert pref > t
 
-    assert len(hhtypes) == 2
+    assert len(hhtypes) == 16
     assert 'rank' in repr(hhtypes[0])
     assert hhtypes.parse('grammar') == ['grammar']

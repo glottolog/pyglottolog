@@ -1,9 +1,9 @@
 # pyglottolog
 
-Programmatic access to [Glottolog data](https://github.com/clld/glottolog).
+Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 
-[![Build Status](https://travis-ci.org/clld/pyglottolog.svg?branch=master)](https://travis-ci.org/clld/pyglottolog)
-[![codecov](https://codecov.io/gh/clld/pyglottolog/branch/master/graph/badge.svg)](https://codecov.io/gh/clld/pyglottolog)
+[![Build Status](https://travis-ci.org/clld/pyglottolog.svg?branch=master)](https://travis-ci.org/glottolog/pyglottolog)
+[![codecov](https://codecov.io/gh/clld/pyglottolog/branch/master/graph/badge.svg)](https://codecov.io/gh/glottolog/pyglottolog)
 [![PyPI](https://img.shields.io/pypi/v/pyglottolog.svg)](https://pypi.org/project/pyglottolog)
 
 
@@ -17,31 +17,35 @@ pip install pyglottolog
 This will also install the command line interface `glottolog`.
 
 **Note:** To make use of `pyglottolog` you also need a local copy of the
-[Glottolog data](https://github.com/clld/glottolog). This can be
-- a clone of the [clld/glottolog](https://github.com/clld/glottolog) repository or your fork of it,
-- an unzipped [released version of Glottolog](https://github.com/clld/glottolog/releases) from GitHub,
+[Glottolog data](https://github.com/glottolog/glottolog). This can be
+- a clone of the [glottolog/glottolog](https://github.com/clld/glottolog) repository or your fork of it,
+- an unzipped [released version of Glottolog](https://github.com/glottolog/glottolog/releases) from GitHub,
 - or an unzipped download of a [released version of Glottolog](https://doi.org/10.5281/zenodo.596479) from ZENODO.
 
 Make sure you remember where this local copy of the data is located - you always
 have to pass this location as argument when using `pyglottolog`.
-  
+
 
 ## Python API
 
-Glottolog data can also be accessed programmatically from within python programs.
-All functionality is mediated through an instance of `pyglottolog.api.Glottolog`, e.g.
+Using `pyglottolog`, Glottolog data can be accessed programmatically from within python programs.
+All functionality is mediated through an instance of `pyglottolog.Glottolog`, e.g.
 ```python
->>> from pyglottolog.api import Glottolog
->>> api = Glottolog('.')
->>> print(api)
+>>> from pyglottolog import Glottolog
+>>> glottolog = Glottolog('.')
+>>> print(glottolog)
 <Glottolog repos v0.2-259-g27ac0ef at /.../glottolog>
 ```
 
 ### Accessing languoid data
+
+The data in languoid info files in the `languoids/tree` subdirectory is mainly accessed through
+two methods:
+
 ```python
->>> api.languoid('stan1295')
+>>> glottolog.languoid('stan1295')
 <Language stan1295>
->>> print(api.languoid('stan1295'))
+>>> print(glottolog.languoid('stan1295'))
 German [stan1295]
 ```
 

@@ -104,10 +104,9 @@ def test_Entry_weight_with_api(api, mocker):
         (dict(hhtype='xyz'), 'wordlist_or_less'),
     ]
 )
-def test_Entry_med(fields, expected, mocker):
-    from pyglottolog.references import SimplifiedDoctype
-    e = Entry('x', 'misc', fields, mocker.Mock())
-    assert e.med == SimplifiedDoctype.get(expected)
+def test_Entry_med(fields, expected, mocker, api):
+    e = Entry('x', 'misc', fields, mocker.Mock(), api=api)
+    assert e.med_type == api.med_types.get(expected)
 
 
 @pytest.mark.parametrize(

@@ -7,9 +7,9 @@ import functools
 import itertools
 
 from clldutils.misc import lazyproperty
-from clldutils.inifile import INI
 
 from ..util import Trigger
+from ..config import get_ini
 
 __all__ = ['HHType', 'HHTypes']
 
@@ -43,7 +43,7 @@ class HHTypes(object):
     _respcomsemic = re.compile("[;,]\s?")
 
     def __init__(self, fpath):
-        ini = INI.from_file(fpath, interpolation=None)
+        ini = get_ini(fpath, interpolation=None)
         self._types = sorted([HHType(s, ini) for s in ini.sections()], reverse=True)
         self._type_by_id = {t.id: t for t in self._types}
 

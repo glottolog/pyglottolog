@@ -1,4 +1,4 @@
-# pyglotolog
+# pyglottolog
 
 from .api import Glottolog
 

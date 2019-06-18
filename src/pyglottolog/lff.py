@@ -7,7 +7,7 @@ import logging
 
 from clldutils.path import as_posix, move, readlines
 
-from .languoids import Languoid, Level, Glottocode
+from .languoids import Languoid, Glottocode
 
 ISOLATE_ID = '-isolate-'
 LINEAGE_SEP = ';'
@@ -52,9 +52,9 @@ def languoid(api, log, new, path, lname, glottocode, isocode, level):
                             lname, glottocode))
                     raise ValueError('invalid isolate line')
                 break
-            _level = Level.family
-            if level == Level.dialect:
-                _level = Level.language if i == 0 else Level.dialect
+            _level = api.languoid_levels.family
+            if level == api.languoid_levels.dialect:
+                _level = api.languoid_levels.language if i == 0 else api.languoid_levels.dialect
 
             if not id_:
                 id_ = new.get((name, _level))
@@ -64,7 +64,7 @@ def languoid(api, log, new, path, lname, glottocode, isocode, level):
             lineage.append((name, id_, _level, hid))
 
     lang = Languoid.from_name_id_level(
-        api.tree, lname, glottocode, level, lineage=[(r[0], r[1], r[2]) for r in lineage])
+        api.tree, lname, glottocode, level, lineage=[(r[0], r[1], r[2]) for r in lineage], _api=api)
     if (isocode in api.iso) or (isocode is None):
         lang.iso = isocode
     lang.hid = isocode
@@ -72,11 +72,10 @@ def languoid(api, log, new, path, lname, glottocode, isocode, level):
 
 
 def read_lff(api, log, new, level, fname=None):
-    assert level in [Level.language, Level.dialect]
+    assert level in [api.languoid_levels.language, api.languoid_levels.dialect]
     log.info('reading {0}s from {1}'.format(level.name, fname))
 
-    if fname is None:
-        fname = api.build_path('%sff.txt' % level.name[0])
+    fname = fname or api.build_path('%sff.txt' % level.name[0])
 
     path = None
     for line in readlines(fname):
@@ -117,7 +116,7 @@ def lang2tree(api, log, lang, lineage, out, old_tree):
                     group.add_name(group.name)
                     group.name = name
             else:
-                group = Languoid.from_name_id_level(api.tree, name, id_, level)
+                group = Languoid.from_name_id_level(api.tree, name, id_, level, _api=api)
 
             if hid != -1:
                 if (hid in api.iso or hid is None) and group.iso != hid:
@@ -194,11 +193,11 @@ def lff2tree(api, log=logging.getLogger(__name__)):
         languoids[l.id] = (l.name, l.level, l.iso or l.hid)
         return l
 
-    for lang, lineage in read_lff(api, log, new, Level.language, api.build_path('lff.txt')):
+    for lang, lineage in read_lff(api, log, new, api.languoid_levels.language, api.build_path('lff.txt')):
         languages[lang.id] = checked(lang, lineage)
         lang2tree(api, log, lang, lineage, out, old_tree)
 
-    for lang, lineage in read_lff(api, log, new, Level.dialect, api.build_path('dff.txt')):
+    for lang, lineage in read_lff(api, log, new, api.languoid_levels.dialect, api.build_path('dff.txt')):
         lang = checked(lang, lineage)
         if not lang.lineage or lang.lineage[0][1] not in languages:
             log.error('missing language in dff: {0[0]} [{0[1]}]'.format(lang.lineage[0]))
@@ -234,26 +233,26 @@ def format_language(l):
     return '    {0}'.format(format_comp(l))
 
 
-def format_classification(l, agg):
+def format_classification(api, l, agg):
     if not l.lineage:
         return format_comp(l, gc=ISOLATE_ID)
     comps = []
     for _, gc, _ in l.lineage:
         a = agg[gc]
-        if l.level == Level.language or \
-                (l.level == Level.dialect and a.level != Level.family):
+        if l.level == api.languoid_levels.language or \
+                (l.level == api.languoid_levels.dialect and a.level != api.languoid_levels.family):
             comps.append(format_comp(a))
     return (LINEAGE_SEP + ' ').join(comps)
 
 
 def tree2lff(api, log=logging.getLogger(__name__)):
-    languoids = {Level.dialect: defaultdict(list), Level.language: defaultdict(list)}
+    languoids = {api.languoid_levels.dialect: defaultdict(list), api.languoid_levels.language: defaultdict(list)}
 
     agg = {}
     for l in api.languoids():
         agg[l.id] = l
         if l.level in languoids:
-            languoids[l.level][format_classification(l, agg)].append(format_language(l))
+            languoids[l.level][format_classification(api, l, agg)].append(format_language(l))
 
     for level, languages in languoids.items():
         ff = api.build_path('%sff.txt' % level.name[0])
