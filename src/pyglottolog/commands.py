@@ -1,7 +1,6 @@
 # coding: utf8
 from __future__ import unicode_literals, print_function, division
 from collections import defaultdict, Counter
-from itertools import chain
 import os
 import sys
 import re
@@ -565,6 +564,7 @@ def check(args):
         for level, obj, msg in pyglottolog.iso.check_coverage(iso, iso_in_gl, iso_splits):
             dict(info=info, warn=warn)[level](obj, msg)  # pragma: no cover
 
+    bookkeeping_gc = args.repos.language_types.bookkeeping.pseudo_family_id
     for name, gcs in sorted(names.items()):
         if len(gcs) > 1:
             # duplicate names:
@@ -573,8 +573,7 @@ def check(args):
                 # at most one of the languoids is not a dialect, just warn
                 method = warn  # pragma: no cover
             if len([1 for n in gcs
-                    if (not n.lineage) or
-                       (n.lineage[0][1] != args.repos.language_types.bookkeeping.pseudo_family_id)]) <= 1:
+                    if (not n.lineage) or (n.lineage[0][1] != bookkeeping_gc)]) <= 1:
                 # at most one of the languoids is not in bookkeping, just warn
                 method = warn  # pragma: no cover
             method(name, 'duplicate name: {0}'.format(', '.join(sorted(

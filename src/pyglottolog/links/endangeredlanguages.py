@@ -19,8 +19,8 @@ def split(s, sep=';'):
 
 
 def parse_coords(s):
-    l = nfilter(ss.strip().replace(' ', '') for ss in re.split('[,;]', s))
-    return [Coordinate(l[i], l[i + 1]) for i in range(0, len(l), 2)]
+    cc = nfilter(ss.strip().replace(' ', '') for ss in re.split('[,;]', s))
+    return [Coordinate(cc[i], cc[i + 1]) for i in range(0, len(cc), 2)]
 
 
 @attr.s

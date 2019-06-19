@@ -140,7 +140,7 @@ class Languoid(UnicodeMixin):
 
     def newick_node(self, nodes=None, template=None):
         template = template or self._newick_default_template
-        n = Node(name=template.format(l=self), length='1')
+        n = Node(name=template.format(l=self), length='1')  # noqa: E741
         children = self.children if nodes is None else self.children_from_nodemap(nodes)
         for nn in sorted(children, key=lambda nn: nn.name):
             n.add_descendant(nn.newick_node(nodes=nodes, template=template))
@@ -291,7 +291,8 @@ class Languoid(UnicodeMixin):
     @property
     def macroareas(self):
         if self._api:
-            return [self._api.macroareas.get(n)
+            return [
+                self._api.macroareas.get(n)
                 for n in self.cfg.getlist(self.section_core, 'macroareas')]
         return []
 

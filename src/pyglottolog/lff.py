@@ -193,11 +193,13 @@ def lff2tree(api, log=logging.getLogger(__name__)):
         languoids[l.id] = (l.name, l.level, l.iso or l.hid)
         return l
 
-    for lang, lineage in read_lff(api, log, new, api.languoid_levels.language, api.build_path('lff.txt')):
+    for lang, lineage in read_lff(
+            api, log, new, api.languoid_levels.language, api.build_path('lff.txt')):
         languages[lang.id] = checked(lang, lineage)
         lang2tree(api, log, lang, lineage, out, old_tree)
 
-    for lang, lineage in read_lff(api, log, new, api.languoid_levels.dialect, api.build_path('dff.txt')):
+    for lang, lineage in read_lff(
+            api, log, new, api.languoid_levels.dialect, api.build_path('dff.txt')):
         lang = checked(lang, lineage)
         if not lang.lineage or lang.lineage[0][1] not in languages:
             log.error('missing language in dff: {0[0]} [{0[1]}]'.format(lang.lineage[0]))
@@ -246,7 +248,8 @@ def format_classification(api, l, agg):
 
 
 def tree2lff(api, log=logging.getLogger(__name__)):
-    languoids = {api.languoid_levels.dialect: defaultdict(list), api.languoid_levels.language: defaultdict(list)}
+    languoids = {api.languoid_levels.dialect: defaultdict(list),
+                 api.languoid_levels.language: defaultdict(list)}
 
     agg = {}
     for l in api.languoids():

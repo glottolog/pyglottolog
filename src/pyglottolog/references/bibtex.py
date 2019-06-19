@@ -7,7 +7,7 @@ import functools
 import collections
 import unicodedata
 
-from six import PY2, text_type
+from six import text_type
 
 from pybtex.database.input.bibtex import LowLevelParser, Parser, UndefinedMacro
 from pybtex.scanner import PybtexSyntaxError

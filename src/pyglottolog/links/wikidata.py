@@ -6,8 +6,8 @@ import requests
 
 SPARQL = """\
 prefix schema: <http://schema.org/>
-SELECT ?item ?glottocode ?wikipedia WHERE { 
-    ?item wdt:P1394 ?glottocode. 
+SELECT ?item ?glottocode ?wikipedia WHERE {
+    ?item wdt:P1394 ?glottocode.
     OPTIONAL {
         ?wikipedia schema:about ?item .
         ?wikipedia schema:inLanguage "en" .

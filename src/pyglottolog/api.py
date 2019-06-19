@@ -162,7 +162,7 @@ class Glottolog(API):
                     # An isolate: we wrap it in a pseudo-family with the same name and ID.
                     fam = languoids.Languoid.from_name_id_level(
                         lang.dir.parent, lang.name, lang.id, 'family', _api=self)
-                    ns = '({0}){1}:1'.format(ns, template.format(l=fam))
+                    ns = '({0}){1}:1'.format(ns, template.format(l=fam))  # noqa: E741
                 trees.append('{0};'.format(ns))
         return '\n'.join(trees)
 
@@ -218,9 +218,8 @@ class Glottolog(API):
             "dc:": "Harald Hammarström, Robert Forkel & Martin Haspelmath. "
                    "clld/glottolog: Glottolog database (Version {0}) [Data set]. "
                    "Zenodo. http://doi.org/10.5281/zenodo.596479".format(version),
-            "tables": [
-                load(pycldf.util.pkg_path('components', 'LanguageTable-metadata.json'))
-            ]})
+            "tables": [load(pycldf.util.pkg_path('components', 'LanguageTable-metadata.json'))],
+        })
         tg.tables[0].url = out.name
         for col in [
             dict(name='Classification', separator='/'),

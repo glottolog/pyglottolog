@@ -15,7 +15,7 @@ The basic invocation looks like
 from __future__ import unicode_literals, print_function
 import sys
 
-from clldutils.clilib import ArgumentParserWithLogging, ParserError
+from clldutils.clilib import ArgumentParserWithLogging
 
 from .api import Glottolog
 from . import commands
@@ -26,7 +26,7 @@ def main():  # pragma: no cover
     def glottolog(p):
         try:
             return Glottolog(p)
-        except:
+        except:  # noqa: E722
             return None
 
     parser = ArgumentParserWithLogging('pyglottolog')

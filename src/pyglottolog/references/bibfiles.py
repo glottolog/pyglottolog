@@ -18,7 +18,6 @@ from clldutils.path import memorymapped, Path
 from clldutils.source import Source
 from clldutils.text import split_text
 from clldutils.inifile import INI
-from clldutils.declenum import DeclEnum
 
 from . import bibtex
 from . import util
@@ -308,7 +307,6 @@ class Entry(UnicodeMixin):
         """
         :return: BibTeX representation of the entry.
         """
-        from pycldf import sources
         res = "@%s{%s" % (self.type, self.key)
         for k, v in bibtex.fieldorder.itersorted(self.fields):
             res += ',\n    %s = {%s}' % (k, v.strip() if hasattr(v, 'strip') else v)
