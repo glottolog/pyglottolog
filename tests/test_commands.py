@@ -33,7 +33,7 @@ def test_update_links(api_copy, capsys, elcat):
     out, _ = capsys.readouterr()
     assert '0 languoids updated' in out
 
-    commands.update_links(_args(api_copy, 'endangeredlanguages'))
+    commands.update_links(_args(api_copy, 'elcat'))
     out, _ = capsys.readouterr()
     assert '1 languoids updated' in out
 

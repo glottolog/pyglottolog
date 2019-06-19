@@ -26,7 +26,9 @@ from .monster import compile
 from .references import evobib
 from .util import message, sprint
 from .metadata import prepare_release
-from .links import endangeredlanguages, wikidata
+# Make sure we import all link providers:
+from .links import *
+from .links.util import LinkProvider
 
 
 def assert_repos(func):
@@ -227,16 +229,17 @@ def elcat_diff(args):  # pragma: no cover
 @command()
 @assert_repos
 def update_links(args):
-    langs = args.repos.languoids()
-    updated = []
-    for mod in [
-        endangeredlanguages,
-        wikidata,
-    ]:
-        if (not args.args) or (mod.__name__.split('.')[-1] in args.args):
-            for l in mod.iterupdated(langs):
+    langs = list(args.repos.languoids())
+    updated = set()
+    for cls in LinkProvider.__subclasses__():
+        name = cls.__name__.lower()
+        if (not args.args) or (name in args.args):
+            args.log.info('updating {0} links ...'.format(name))
+            i = 0
+            for i, l in enumerate(cls().iterupdated(langs), start=1):
                 l.write_info()
-                updated.append(l.id)
+                updated.add(l.id)
+            args.log.info('... {0} done'.format(i))
     print('{0} languoids updated'.format(len(updated)))
 
 

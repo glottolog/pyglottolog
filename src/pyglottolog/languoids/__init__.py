@@ -7,7 +7,7 @@ from .models import (
     Glottocode, Glottocodes,
     Country, Reference,
     ClassificationComment,
-    EthnologueComment, ISORetirement,
+    EthnologueComment, ISORetirement, Link,
 )
 
 __all__ = [
@@ -15,5 +15,5 @@ __all__ = [
     'Glottocode', 'Glottocodes',
     'Country', 'Reference',
     'ClassificationComment',
-    'EthnologueComment', 'ISORetirement',
+    'EthnologueComment', 'ISORetirement', 'Link',
 ]

@@ -4,13 +4,21 @@ import pytest
 
 from pyglottolog.languoids import (Languoid,
     Glottocodes, Glottocode, Country, Reference,
-    ClassificationComment, EthnologueComment)
+    ClassificationComment, EthnologueComment, Link)
 
 
 def test_legacy_imports():
     from pyglottolog import objects
     assert objects.Glottocode is Glottocode
     assert objects.Reference is Reference
+
+
+def test_Link():
+    assert Link.from_(dict(url='xyz')).label is None
+    assert Link.from_('[label](url)').url == 'url'
+
+    with pytest.raises(TypeError):
+        Link.from_(5)
 
 
 def test_Glottocodes(tmpdir):

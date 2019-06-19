@@ -13,7 +13,7 @@ from newick import Node
 from purl import URL
 
 from .models import (
-    Glottocode, Country, Reference, Endangerment,
+    Glottocode, Country, Reference, Endangerment, Link,
     ClassificationComment, EthnologueComment, ISORetirement,
 )
 
@@ -305,16 +305,17 @@ class Languoid(UnicodeMixin):
 
     @property
     def links(self):
-        return self.cfg.getlist(self.section_core, 'links')
+        return [Link.from_string(s) for s in self.cfg.getlist(self.section_core, 'links')]
 
     @links.setter
     def links(self, value):
-        assert isinstance(value, list) and all(isinstance(s, string_types) for s in value)
-        self._set('links', sorted(value))
+        assert isinstance(value, list)
+        self._set('links', [v.to_string() for v in sorted(Link.from_(v) for v in value)])
 
-    def update_link(self, domain, url):
-        if url not in self.links:
-            self.links = [li for li in self.links if URL(li).domain() != domain] + [url]
+    def update_links(self, domain, urls):
+        new = [li for li in self.links if li.domain != domain] + [Link.from_(u) for u in urls]
+        if set(new) != set(self.links):
+            self.links = new
             return True
         return False
 

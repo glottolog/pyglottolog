@@ -12,6 +12,7 @@ import pycountry
 from clldutils.misc import slug, UnicodeMixin, nfilter
 from clldutils import jsonlib
 from dateutil import parser
+import purl
 
 from ..util import message
 from ..config import AESSource, AES
@@ -24,7 +25,43 @@ __all__ = [
     'ISORetirement',
     'Endangerment',
     'EthnologueComment',
+    'Link',
 ]
+
+
+@attr.s(hash=True)
+class Link(object):
+    url = attr.ib()
+    label = attr.ib(default=None)
+
+    @property
+    def domain(self):
+        return purl.URL(self.url).domain()
+
+    @classmethod
+    def from_string(cls, s):
+        s = s.strip()
+        if s.startswith('['):
+            assert s.endswith(')') and '](' in s
+            return cls(*reversed(s[1:-1].split('](')))
+        return cls(s)
+
+    @classmethod
+    def from_(cls, obj):
+        if isinstance(obj, cls):
+            return obj
+        if isinstance(obj, str):
+            return cls.from_string(obj)
+        if isinstance(obj, (list, tuple)) and len(obj) == 2:
+            return cls(*obj)
+        if isinstance(obj, dict):
+            return cls(**obj)
+        raise TypeError()
+
+    def to_string(self):
+        if self.label:
+            return '[{0}]({1})'.format(self.label, self.url)
+        return self.url
 
 
 class Glottocodes(object):

@@ -15,6 +15,6 @@ def test_wikidata(mocker, api_copy):
 
     langs = {l.id: l for l in api_copy.languoids()}
     mocker.patch('pyglottolog.links.wikidata.requests', wd())
-    assert list(wikidata.iterupdated(langs.values()))
-    assert 'http://example.org' in langs['abcd1235'].links
-    assert not list(wikidata.iterupdated(langs.values()))
+    assert list(wikidata.Wikidata().iterupdated(langs.values()))
+    assert 'http://example.org' in [l.url for l in langs['abcd1235'].links]
+    assert not list(wikidata.Wikidata().iterupdated(langs.values()))

@@ -2,6 +2,8 @@
 from __future__ import unicode_literals, print_function, division
 import re
 import itertools
+import functools
+import collections
 
 import requests
 import attr
@@ -9,6 +11,8 @@ import attr
 from csvw.dsv import reader
 from clldutils.misc import nfilter
 from clldutils.attrlib import valid_range
+
+from .util import LinkProvider
 
 BASE_URL = "http://endangeredlanguages.com"
 CSV_URL = BASE_URL + "/userquery/download/"
@@ -32,7 +36,7 @@ class Coordinate(object):
 @attr.s
 class ElCatLanguage(object):
     id = attr.ib(converter=int)
-    iso = attr.ib()
+    isos = attr.ib(converter=functools.partial(split, sep=','))
     name = attr.ib()
     also_known_as = attr.ib(converter=split)
     status = attr.ib()
@@ -54,18 +58,27 @@ def read():
     return [ElCatLanguage(*row) for row in reader(requests.get(CSV_URL).text.split('\n')) if row]
 
 
-def iterupdated(languoids):
-    elcat_langs = {l.iso: l for l in read()}
-    for l in languoids:
-        changed = False
-        if l.iso and l.iso in elcat_langs:
-            elcat_lang = elcat_langs[l.iso]
-            if l.update_link('endangeredlanguages.com', elcat_lang.url):
-                changed = True
-            names = set(itertools.chain(*l.names.values()))
-            for name in [elcat_lang.name] + elcat_lang.also_known_as:
-                if name not in names:
-                    l.add_name(name, 'ElCat')
+class ElCat(LinkProvider):
+    def iterupdated(self, languoids):
+        elcat_langs = collections.defaultdict(list)
+        for l in read():
+            for iso in l.isos:
+                elcat_langs[iso].append(l)
+
+        for l in languoids:
+            changed = False
+            if l.iso in elcat_langs:
+                if l.update_links(
+                        'endangeredlanguages.com', [(l.url, l.name) for l in elcat_langs[l.iso]]):
                     changed = True
-        if changed:
-            yield l
+                names = set(itertools.chain(*l.names.values()))
+                for elcat_lang in elcat_langs[l.iso]:
+                    for name in [elcat_lang.name] + elcat_lang.also_known_as:
+                        if name not in names:
+                            names.add(name)
+                            l.add_name(name, 'ElCat')
+                            changed = True
+            else:
+                changed = l.update_links('endangeredlanguages.com', []) or changed
+            if changed:
+                yield l
