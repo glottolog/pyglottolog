@@ -4,6 +4,7 @@ import contextlib
 
 from six import BytesIO
 import pytest
+from clldutils.iso_639_3 import Code
 
 from pyglottolog import iso
 
@@ -211,6 +212,75 @@ def test_bibtex(api_copy, iso_data, mocker):
 
 def test_retirements(api_copy, iso_data, mocker):
     iso.retirements(api_copy, mocker.Mock(), max_year=2007)
+
+    mocker.patch(
+        'pyglottolog.iso.get_retirements',
+        mocker.Mock(return_value=[iso.Retirement(
+            Id='abc',
+            Ref_Name='n',
+            Ret_Reason='C',
+            Ret_Remedy='',
+            Change_To='xyz',
+            Effective='2019-01-01',
+            cr=mocker.Mock(Change_Request_Number='007')
+        )]))
+    iso.retirements(api_copy, mocker.Mock(), max_year=2007)
+
+
+def test_check_coverage(api_copy, mocker):
+    assert len(list(iso.check_coverage(api_copy.iso, {}, []))) == 1
+    api_copy.iso['aaa']._change_to = ['aaa']
+    assert len(list(iso.check_coverage(api_copy.iso, {}, [mocker.Mock(iso='aaa')]))) == 2
+
+
+def test_check_lang(api_copy, mocker):
+    res = iso.check_lang(
+        api_copy,
+        Code(
+            dict(
+                Id='abc',
+                Ret_Reason='S',
+                Change_To='xyz',
+                Ret_Remedy='x',
+                Ref_Name='l',
+                Effective='2019-01-01'),
+            'Retirements',
+            None),
+        api_copy.languoid('abcd1235'))
+    assert res is None
+
+    lang = api_copy.languoid('abcd1235')
+    res = iso.check_lang(
+        api_copy,
+        Code(
+            dict(
+                Id='abc',
+                Ret_Reason='M',
+                Change_To='xyz',
+                Ret_Remedy='x',
+                Ref_Name='l',
+                Effective='2019-01-01'),
+            'Retirements',
+            dict(xyz=mocker.Mock(is_retired=False))),
+        lang)
+    assert res[0] == 'warn'
+
+    lang.level = 'dialect'
+    res = iso.check_lang(
+        api_copy,
+        Code(
+            dict(
+                Id='abc',
+                Ret_Reason='M',
+                Change_To='xyz',
+                Ret_Remedy='x',
+                Ref_Name='l',
+                Effective='2019-01-01'),
+            'Retirements',
+            None),
+        lang)
+    assert res is None
+
 
 
 def test_code_details(iso_data):

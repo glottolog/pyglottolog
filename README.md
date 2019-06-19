@@ -95,6 +95,11 @@ to `Languoid` objects) as parameter, e.g. `Languoid.ancestors_from_nodemap` or
 ```
 
 
+### Accessing configuration data
+
+The `config`
+
+
 ## Command line interface
 
 Command line functionality is implemented via sub-commands of `glottolog`. The list of

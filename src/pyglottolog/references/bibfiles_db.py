@@ -34,7 +34,7 @@ class Database(object):
     """Bibfile collection parsed into an sqlite3 database."""
 
     @classmethod
-    def from_bibfiles(cls, bibfiles, filepath, rebuild=False, page_size=32768):
+    def from_bibfiles(cls, bibfiles, filepath, rebuild=False, page_size=32768, verbose=False):
         """If needed, (re)build the db from the bibfiles, hash, split/merge."""
         self = cls(filepath)
 
@@ -66,7 +66,7 @@ class Database(object):
             Entry.hashidstats(conn)
 
             with conn.begin():
-                assign_ids(conn)
+                assign_ids(conn, verbose=verbose)
 
         return self
 

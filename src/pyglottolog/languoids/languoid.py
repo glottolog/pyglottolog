@@ -311,9 +311,6 @@ class Languoid(UnicodeMixin):
         assert isinstance(value, list) and all(isinstance(s, string_types) for s in value)
         self._set('links', sorted(value))
 
-    def add_link(self, url):
-        self.links = sorted(self.links + [url])
-
     def update_link(self, domain, url):
         if url not in self.links:
             self.links = [li for li in self.links if URL(li).domain() != domain] + [url]

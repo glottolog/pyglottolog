@@ -112,6 +112,9 @@ def cldf(api, outdir, log):
         clf = l.classification_comment
         if clf:
             for ref in clf.merged_refs('family') + clf.merged_refs('sub'):
+                if ref.key not in refs:
+                    log.warning('missing reference in classification comment: {0}'.format(ref))
+                    continue
                 e = refs[ref.key]
                 ds.add_sources(Source(e.type, ref.key, _check_id=False, **e.fields))
 

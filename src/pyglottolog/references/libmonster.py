@@ -18,7 +18,7 @@ from .bibfiles import Entry
 from .bibtex_undiacritic import undiacritic
 from .roman import roman, romanint
 
-
+INF = float('inf')
 lgcodestr = Entry.lgcodes
 
 
@@ -159,8 +159,8 @@ bibord = {k: i for i, k in enumerate([
 ])}
 
 
-def bibord_iteritems(fields, sortkey=lambda f, inf=float('inf'): (bibord.get(f, inf), f)):
-    for f in sorted(fields, key=sortkey):
+def bibord_iteritems(fields):
+    for f in sorted(fields, key=lambda f: (bibord.get(f, INF), f)):
         yield f, fields[f]
 
 
@@ -331,8 +331,7 @@ def lstat(e, hht):
 
 def lstat_witness(e, hht):
     def statwit(xs):
-        if len(xs) == 0:
-            return None, []
+        assert xs
         [(typ, ks)] = grp2([(t, k) for [p, y, k, t] in xs[0]]).items()
         return typ, ks
     (lsd, lse) = sdlgs(e, hht)
@@ -392,7 +391,7 @@ def markall(e, trigs, verbose=True, rank=None):
             for t in triggers:
                 u[k][t.cls].append(t)
 
-    for k, t_by_c in u.items():
+    for k, t_by_c in sorted(u.items(), key=lambda i: i[0]):
         t, f = e[k]
         f2 = {a: b for a, b in f.items()}
         for (field, type_), triggers in sorted(t_by_c.items(), key=lambda i: len(i[1])):

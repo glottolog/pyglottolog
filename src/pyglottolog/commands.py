@@ -527,24 +527,11 @@ def check(args):
                         'duplicate: {0}, {1}'.format(
                             iso_in_gl[lang.iso].id, lang.id))  # pragma: no cover
                 iso_in_gl[lang.iso] = lang
-                fid = lang.lineage[0][1] if lang.lineage else None
-                if isocode.is_retired and \
-                        fid not in [args.repos.language_types.bookkeeping.pseudo_family_id,
-                                    args.repos.language_types.unattested.pseudo_family_id]:
-                    if isocode.type == 'Retirement/split':
-                        iso_splits.append(lang)
-                    else:
-                        if isocode.type == 'Retirement/merge' \
-                                and lang.level == args.repos.languoid_levels.dialect:
-                            # See https://github.com/clld/pyglottolog/issues/2
-                            pass
-                        else:
-                            msg = repr(isocode)
-                            level = info
-                            if len(isocode.change_to) == 1:
-                                level = warn
-                                msg += ' changed to [%s]' % isocode.change_to[0].code
-                            level(lang, msg)
+                isocheck = pyglottolog.iso.check_lang(
+                    args.repos, isocode, lang, iso_splits=iso_splits)
+                if isocheck:
+                    level, lang, msg = isocheck
+                    dict(info=info, warn=warn)[level](lang, msg)
 
         if lang.hid is not None:
             if lang.hid in hid:
@@ -558,13 +545,13 @@ def check(args):
             error(lang, 'unregistered glottocode')
         for attr in ['level', 'name']:
             if not getattr(lang, attr):
-                error(lang, 'missing %s' % attr)
+                error(lang, 'missing %s' % attr)  # pragma: no cover
         if lang.level == args.repos.languoid_levels.language:
             parent = ancestors[-1] if ancestors else None
-            if parent and parent.level != args.repos.languoid_levels.family:
+            if parent and parent.level != args.repos.languoid_levels.family:  # pragma: no cover
                 error(lang, 'invalid nesting of language under {0}'.format(parent.level))
             for child in children:
-                if child.level != args.repos.languoid_levels.dialect:
+                if child.level != args.repos.languoid_levels.dialect:  # pragma: no cover
                     error(child,
                           'invalid nesting of {0} under language'.format(child.level))
         elif lang.level == args.repos.languoid_levels.family:
@@ -572,21 +559,11 @@ def check(args):
                 if d.is_dir():
                     break
             else:
-                error(lang, 'family without children')
+                error(lang, 'family without children')  # pragma: no cover
 
     if iso:
-        changed_to = set(chain(*[code.change_to for code in iso.retirements]))
-        for code in sorted(iso.languages):
-            if code.type == 'Individual/Living':
-                if code not in changed_to:
-                    if code.code not in iso_in_gl:
-                        info(repr(code), 'missing')
-        for lang in iso_splits:
-            isocode = iso[lang.iso]
-            missing = [s.code for s in isocode.change_to if s.code not in iso_in_gl]
-            if missing:
-                warn(lang, '{0} missing new codes: {1}'.format(
-                    repr(isocode), ', '.join(missing)))
+        for level, obj, msg in pyglottolog.iso.check_coverage(iso, iso_in_gl, iso_splits):
+            dict(info=info, warn=warn)[level](obj, msg)  # pragma: no cover
 
     for name, gcs in sorted(names.items()):
         if len(gcs) > 1:
@@ -594,12 +571,12 @@ def check(args):
             method = error
             if len([1 for n in gcs if n.level != args.repos.languoid_levels.dialect]) <= 1:
                 # at most one of the languoids is not a dialect, just warn
-                method = warn
+                method = warn  # pragma: no cover
             if len([1 for n in gcs
                     if (not n.lineage) or
                        (n.lineage[0][1] != args.repos.language_types.bookkeeping.pseudo_family_id)]) <= 1:
                 # at most one of the languoids is not in bookkeping, just warn
-                method = warn
+                method = warn  # pragma: no cover
             method(name, 'duplicate name: {0}'.format(', '.join(sorted(
                 ['{0} <{1}>'.format(n.id, n.level.name[0]) for n in gcs]))))
 

@@ -148,6 +148,12 @@ def test_Languoid_sorting(api):
     assert api.languoid('abcd1236') >= api.languoid('abcd1235')
 
 
+def test_factory_without_api(api_copy):
+    f = Languoid.from_dir(api_copy.tree / 'abcd1234', _api=api_copy)
+    l = Languoid.from_dir(api_copy.tree / f.id / 'abcd1235')
+    assert len(l.macroareas) == 0  # No API passed at initialization => no macroareas!
+
+
 def test_factory(tmpdir, api_copy):
     f = Languoid.from_dir(api_copy.tree / 'abcd1234', _api=api_copy)
     assert f.category == 'Family'

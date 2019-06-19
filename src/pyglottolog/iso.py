@@ -290,15 +290,42 @@ def retirements(api, log, max_year=None):
         if r.cr and r.cr.Change_Request_Number:
             lang.cfg.set('iso_retirement', 'change_request', r.cr.Change_Request_Number)
         lang.write_info()
-    """
-    [iso_retirement]
-    comment = Interlingue is the later name (currently in use) for this language, created by
-        Edgar de Wahl. The [ile] identifier is in ISO 639-2 (as well as ISO 639-3).
-        Occidental should be added as another name associated with [ile].
-    code = occ
-    name = Occidental
-    effective = 2007-07-18
-    reason = duplicate
-    remedy = Merge into Interlingue [ile] as Duplicate
-    change_request = 2006-090
-    """
+
+
+def check_coverage(iso, iso_in_gl, iso_splits):
+    changed_to = set(itertools.chain(*[code.change_to for code in iso.retirements]))
+    for code in sorted(iso.languages):
+        if code.type == 'Individual/Living':
+            if code not in changed_to:
+                if code.code not in iso_in_gl:
+                    yield 'info', repr(code), 'missing'
+    for lang in iso_splits:
+        isocode = iso[lang.iso]
+        missing = [s.code for s in isocode.change_to if s.code not in iso_in_gl]
+        if missing:
+            yield (
+                'warn',
+                lang,
+                '{0} missing new codes: {1}'.format(repr(isocode), ', '.join(missing)),
+            )
+
+
+def check_lang(api, isocode, lang, iso_splits=None):
+    iso_splits = [] if iso_splits is None else iso_splits
+    fid = lang.lineage[0][1] if lang.lineage else None
+    if isocode.is_retired and \
+            fid not in [api.language_types.bookkeeping.pseudo_family_id,
+                        api.language_types.unattested.pseudo_family_id]:
+        if isocode.type == 'Retirement/split':
+            iso_splits.append(lang)
+        else:
+            if isocode.type == 'Retirement/merge' and lang.level == api.languoid_levels.dialect:
+                # See https://github.com/clld/pyglottolog/issues/2
+                pass
+            else:
+                msg = repr(isocode)
+                level = 'info'
+                if len(isocode.change_to) == 1:
+                    level = 'warn'
+                    msg += ' changed to [%s]' % isocode.change_to[0].code
+                return level, lang, msg

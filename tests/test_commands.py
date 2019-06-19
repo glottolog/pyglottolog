@@ -171,7 +171,7 @@ def test_check(capsys, api_copy):
     msgs = [a[0] for a, _ in args.log.error.call_args_list]
     assert any('unregistered glottocode' in m for m in msgs)
     assert any('missing reference' in m for m in msgs)
-    assert len(msgs) == 26
+    assert len(msgs) == 27
 
     copytree(
         api_copy.tree / 'abcd1234' / 'abcd1235',
@@ -181,7 +181,7 @@ def test_check(capsys, api_copy):
     commands.check(args)
     msgs = [a[0] for a, _ in args.log.error.call_args_list]
     assert any('duplicate glottocode' in m for m in msgs)
-    assert len(msgs) == 28
+    assert len(msgs) == 29
 
     (api_copy.tree / 'abcd1235').rename(api_copy.tree / 'abcd1237')
     args = _args(api_copy)
@@ -189,6 +189,13 @@ def test_check(capsys, api_copy):
     msgs = [a[0] for a, _ in args.log.error.call_args_list]
     assert any('duplicate hid' in m for m in msgs)
     assert len(msgs) >= 9
+
+
+def test_check_2(api_copy, mocker, caplog):
+    mocker.patch('pyglottolog.iso.check_lang', lambda _, i, l, **kw: ('warn', l, 'xyz'))
+    commands.check(_args(api_copy, 'tree'))
+    for record in caplog.records:
+        print(record.message)
 
 
 def test_monster(capsys, api_copy):

@@ -1,7 +1,5 @@
 from __future__ import unicode_literals
 
-import six
-
 import pytest
 
 from pyglottolog.references.bibfiles_db import Database, distance
@@ -10,6 +8,8 @@ from pyglottolog.references.bibfiles_db import Database, distance
 def test_Database(capsys, tmpdir, bibfiles_copy):
     fpath = str(tmpdir / 'test.sqlite3')
     bibfiles_copy.to_sqlite(fpath)
+    assert 'ENTRYTYPE' in capsys.readouterr()[0]
+    bibfiles_copy.to_sqlite(fpath, verbose=True, rebuild=True)
     assert 'ENTRYTYPE' in capsys.readouterr()[0]
 
     bibfiles_copy.to_sqlite(fpath)
@@ -27,11 +27,22 @@ def test_Database(capsys, tmpdir, bibfiles_copy):
     db.trickle(bibfiles_copy)
     assert '2 changed 1 added in a' in capsys.readouterr()[0]
 
+    with pytest.raises(KeyError):
+        _ = db[('b.bib', 'arakawa9')]
+
     key, (entrytype, fields) = db[('b.bib', 'arakawa97')]
     assert entrytype == 'article'
     assert fields['volume'] == '16'
 
+    with pytest.raises(KeyError):
+        _ = db['arakawa97']  # Must pass a hash, not a bibkey!
+
+    for e in db:  # iterate over entries in the db, and get the first by hash:
+        assert db[e[0][1]]
+        break
+
     db.stats()
+    db.stats(field_files=True)
 
     db.show_splits()
 
