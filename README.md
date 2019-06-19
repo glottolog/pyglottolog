@@ -97,7 +97,24 @@ to `Languoid` objects) as parameter, e.g. `Languoid.ancestors_from_nodemap` or
 
 ### Accessing configuration data
 
-The `config`
+The `config` subdirectory of Glottolog data contains machine readable metadata like the list
+of macroareas. This information can be accessed via an instance of `Glottolog`, too, using the
+stem of the filename as attribute name:
+```python
+>>> for ma in glottolog.macroareas.values():
+...     print(ma.name)
+...     
+South America
+Eurasia
+Africa
+Papunesia
+North America
+Australia
+```
+
+Note that the data read from the INI files is stored as `dict`, with section names (or explicit
+`id` options) as keys and instances of the corresponding class in `pyglottolog.config` as
+values.
 
 
 ## Command line interface
@@ -153,3 +170,55 @@ This will create a CSVW package, i.e.
 where `VERSION` is the result of running `git describe` on the data repository,
 or the version string passed as`--version=VERSION` in case you are running the command
 on an export of the repository or a download from ZENODO.
+
+
+### Languoid search
+
+To allow convenient search across all languoid info files, `pyglottolog` comes with functionality
+to create and search a [Whoosh](https://whoosh.readthedocs.io/en/latest/intro.html) index. To do
+so, run
+```bash
+glottolog --repos=PATH/TO/glottolog langindex
+```
+
+This will take about a minute or two and build an index of about 90 MB size at `build/whoosh_langs`.
+
+Now you can search the index, e.g. using alternative names as query:
+```bash
+$ glottolog --repos=. langsearch "Abipónok"
+1 matches
+Abipon [abip1241] language
+languoids/tree/guai1249/guai1250/abip1241/md.ini
+Abipónok [hu]
+
+1 matches
+```
+
+But you can also exploit the schema defined in `pyglottolog.fts.get_langs_index`:
+```bash
+$ glottolog --repos=. langsearch "country:Papua New Guinea"
+...
+
+Alamblak [alam1246] language
+languoids/tree/sepi1257/sepi1258/east2496/alam1246/md.ini
+Papua New Guinea (PG)
+
+900 matches
+```
+
+
+### Reference search
+
+The same can be done for reference data: To create a Whoosh index with all reference data, run
+```bash
+glottolog --repos=PATH/TO/glottolog refindex
+```
+
+This will take about 15 minutes and build an index of about 700 MB size at `build/whoosh`.
+
+Now you can query the index:
+```bash
+$ glottolog --repos=. refsearch "author:Haspelmath AND title:Atlas"
+...
+(13 matches)
+```
