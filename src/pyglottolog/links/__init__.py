@@ -8,7 +8,6 @@ subclass util.LinkProvider and override `iterupdated`, a method with the followi
 accepting the list of all Glottolog `Languoid` objects and yielding the ones that have been
 updated in the function.
 """
-from __future__ import unicode_literals, print_function, division
 from os.path import dirname, basename, isfile, join
 import glob
 

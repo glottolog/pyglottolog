@@ -10,3 +10,8 @@ def test_aes(api_copy):
 def test_doctype(api_copy):
     dt = Config.from_ini(api_copy.repos / 'config' / 'document_types.ini', DocumentType)
     assert dt.grammar > dt.grammar_sketch
+
+
+def test_editors(api_copy):
+    assert len([e for e in api_copy.editors.values() if not e.current]) == 2
+    assert len([e for e in api_copy.editors.values() if e.current]) == 3

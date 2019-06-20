@@ -40,6 +40,8 @@ class Glottolog(API):
         'macroareas': config.Macroarea,
         'language_types': config.LanguageType,
         'languoid_levels': config.LanguoidLevel,
+        'editors': config.Generic,
+        'publication': config.Generic,
     }
 
     def __init__(self, repos='.'):

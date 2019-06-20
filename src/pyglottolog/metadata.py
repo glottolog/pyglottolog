@@ -9,22 +9,12 @@ from clldutils.path import read_text
 from clldutils.jsonlib import dump
 
 
-URL = 'https://glottolog.org'
-EDITORS = {
-    'Harald Hammarström': ('University Uppsala', None),
-    'Robert Forkel': (
-        'Max Planck Institute for the Science of Human History', '0000-0003-1081-086X'),
-    'Martin Haspelmath': (
-        'Max Planck Institute for the Science of Human History', '0000-0003-2100-8493'),
-}
-
-
-def to_html(text):
+def to_html(text, url):
     c2n = html_entities.codepoint2name
     text = text.replace('&', '&amp;')
     text = ''.join('&{0};'.format(
         c2n[ord(c)]) if ord(c) > 128 and ord(c) in c2n else c for c in text)
-    return markdown(text.replace(URL, '[{0}]({0})'.format(URL)))
+    return markdown(text.replace(url, '[{0}]({0})'.format(url)))
 
 
 def read_editors(repos):
@@ -50,13 +40,15 @@ def read_editors(repos):
     return sorted(res, key=lambda t: tuple(map(int, t[0].split('.'))), reverse=True)
 
 
-def editor_to_dict(n):
+def editor_to_dict(n, editors):
     res = {'name': n}
-    affiliation, orcid = EDITORS.get(n, (None, None))
-    if affiliation:
-        res['affiliation'] = affiliation
-    if orcid:
-        res['orcid'] = orcid
+    for e in editors.values():
+        if e.name == n:
+            if e.affiliation:
+                res['affiliation'] = e.affiliation
+            if e.orcid:
+                res['orcid'] = e.orcid
+            break
     return res
 
 
@@ -67,21 +59,24 @@ def prepare_release(repos, version):
     else:  # pragma: no cover
         raise ValueError('Add version to CONTRIBUTORS.md first!')
 
-    citation = """\
-{0}. {1}.
-Glottolog {2}.
-Jena: Max Planck Institute for the Science of Human History.
-(Available online at https://glottolog.org)
-""".format(' & '.join('{0.last}, {0.first}'.format(HumanName(e)) for e in editors), year, version)
+    citation = "{0}. {1}. {2} {3}. {4}: {5}. (Available online at {6})".format(
+        ' & '.join('{0.last}, {0.first}'.format(HumanName(e)) for e in editors),
+        year,
+        repos.publication.web.name,
+        version,
+        repos.publication.publisher.place,
+        repos.publication.publisher.name,
+        repos.publication.web.url,
+    )
     dump(
         {
-            "title": "glottolog/glottolog: Glottolog database {0}".format(version),
-            "description": to_html(citation),
-            "license": {"id": "CC-BY-4.0"},
-            "keywords": ["linguistics"],
-            "upload_type": "dataset",
-            "communities": [{"identifier": "clld"}],
-            "creators": [editor_to_dict(n) for n in editors],
+            "title": repos.publication.zenodo.title_format.format(version),
+            "description": to_html(citation, repos.publication.web.url),
+            "license": {"id": repos.publication.zenodo.license_id},
+            "keywords": repos.publication.zenodo.keywords.split(),
+            "communities": [
+                {"identifier": cid} for cid in repos.publication.zenodo.communities.split()],
+            "creators": [editor_to_dict(n, repos.editors) for n in editors],
             "access_right": "open"
         },
         repos.path('.zenodo.json'),

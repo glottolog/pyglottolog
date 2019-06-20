@@ -5,12 +5,10 @@ from __future__ import unicode_literals
 import os
 import functools
 
-from six import string_types
 from clldutils.misc import UnicodeMixin
 from clldutils.path import Path
 from clldutils.inifile import INI
 from newick import Node
-from purl import URL
 
 from .models import (
     Glottocode, Country, Reference, Endangerment, Link,

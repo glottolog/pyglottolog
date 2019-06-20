@@ -27,7 +27,7 @@ from .references import evobib
 from .util import message, sprint
 from .metadata import prepare_release
 # Make sure we import all link providers:
-from .links import *
+from .links import *  # noqa: F401, F403
 from .links.util import LinkProvider
 
 

@@ -5,7 +5,7 @@ from __future__ import unicode_literals, print_function, division
 from collections import OrderedDict, defaultdict
 import re
 
-from six import text_type
+from six import text_type, string_types
 import attr
 import markdown
 import pycountry
@@ -50,7 +50,7 @@ class Link(object):
     def from_(cls, obj):
         if isinstance(obj, cls):
             return obj
-        if isinstance(obj, str):
+        if isinstance(obj, string_types):
             return cls.from_string(obj)
         if isinstance(obj, (list, tuple)) and len(obj) == 2:
             return cls(*obj)

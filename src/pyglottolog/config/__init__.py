@@ -9,7 +9,8 @@ from clldutils.inifile import INI
 from clldutils.path import Path
 
 __all__ = [
-    'AES', 'AESSource', 'Macroarea', 'DocumentType', 'LanguageType', 'LanguoidLevel', 'Config']
+    'AES', 'AESSource', 'Macroarea', 'DocumentType', 'LanguageType', 'LanguoidLevel',
+    'Generic', 'Config']
 
 
 class ConfigObject(object):
@@ -20,6 +21,14 @@ class ConfigObject(object):
         return cls(**kw)
 
 
+class Generic(ConfigObject):
+    def __init__(self, **kw):
+        for k, v in kw.items():
+            if v in ['True', 'False']:
+                v = eval(v)
+            setattr(self, k, v)
+
+
 @attr.s
 class AES(ConfigObject):
     # The attribute which is used for ordering objects of this type must come first:
@@ -27,6 +36,8 @@ class AES(ConfigObject):
     id = attr.ib()
     name = attr.ib()
     egids = attr.ib()
+    unesco = attr.ib()
+    elcat = attr.ib()
     reference_id = attr.ib()
 
 

@@ -69,7 +69,8 @@ class ElCat(LinkProvider):
             changed = False
             if l.iso in elcat_langs:
                 if l.update_links(
-                        'endangeredlanguages.com', [(l.url, l.name) for l in elcat_langs[l.iso]]):
+                    'endangeredlanguages.com', [(l_.url, l_.name) for l_ in elcat_langs[l.iso]]
+                ):
                     changed = True
                 names = set(itertools.chain(*l.names.values()))
                 for elcat_lang in elcat_langs[l.iso]:
