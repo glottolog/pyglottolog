@@ -224,11 +224,11 @@ def elcat_diff(args):  # pragma: no cover
     aes = {}
     for l in langs:
         if l.endangerment and l.endangerment.source.id == 'ElCat':
-           m = re.search('\((?P<id>[0-9]+)\-', l.endangerment.comment or '')
-           if m:
-               aes[int(m.group('id'))] = l
+            m = re.search('\((?P<id>[0-9]+)\-', l.endangerment.comment or '')
+            if m:
+                aes[int(m.group('id'))] = l
 
-    in_gl = {}#l.iso for l in langs if l.iso}
+    in_gl = {}
     for l in langs:
         if l.identifier.get('multitree'):
             in_gl[l.identifier['multitree']] = l
@@ -251,7 +251,6 @@ def elcat_diff(args):  # pragma: no cover
 
         if iso in in_gl:
             c.update(['LL match'])
-            #print('{0.name} [{0.id}][{0.isos}] -> {1.name} [{1.id}]'.format(l, in_gl[iso]))
             continue
 
         if l.id in aes:
@@ -265,14 +264,9 @@ def elcat_diff(args):  # pragma: no cover
         print('~~~ no match: {0.name} [{0.id}][{0.isos}]'.format(l))
         c.update(['no match'])
 
-    #print(c)
     for k, v in c.most_common():
         print(k, v)
     print(sum(c.values()))
-        #if not l.iso:
-        #    args.log.info('no ISO code for {0.name} [{0.id}]'.format(l))
-        #elif l.iso not in in_gl:
-        #    args.log.warn('ISO code {0.iso} for {0.name} [{0.id}] not in Glottolog'.format(l))
 
 
 @command()

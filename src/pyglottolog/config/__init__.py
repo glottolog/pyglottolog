@@ -23,7 +23,7 @@ class ConfigObject(object):
 
         kw = {'name' if 'id' in cfg[section] else 'id': section}
         kw.update(cfg[section].items())
-        return cls(**{k: v for k, v in kw.items() if fields is None or k in fields })
+        return cls(**{k: v for k, v in kw.items() if fields is None or k in fields})
 
 
 class Generic(ConfigObject):
