@@ -72,14 +72,14 @@ class ElCat(LinkProvider):
                     'endangeredlanguages.com', [(l_.url, l_.name) for l_ in elcat_langs[l.iso]]
                 ):
                     changed = True
-                names = set(itertools.chain(*l.names.values()))
-                for elcat_lang in elcat_langs[l.iso]:
-                    for name in [elcat_lang.name] + elcat_lang.also_known_as:
-                        if name not in names:
-                            names.add(name)
-                            l.add_name(name, 'ElCat')
-                            changed = True
+                if len(elcat_langs[l.iso]) == 1:
+                    # Only add alternative names, if only one ElCat language matches!
+                    changed = l.update_names(
+                        [elcat_langs[l.iso][0].name] + elcat_langs[l.iso][0].also_known_as,
+                        type_='elcat') or changed
             else:
-                changed = l.update_links('endangeredlanguages.com', []) or changed
+                changed = any([l.update_links('endangeredlanguages.com', []),
+                               l.update_names([], type_='elcat')])
+
             if changed:
                 yield l

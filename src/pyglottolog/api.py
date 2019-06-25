@@ -224,6 +224,7 @@ class Glottolog(API):
         })
         tg.tables[0].url = out.name
         for col in [
+            dict(name='LL_Code'),
             dict(name='Classification', separator='/'),
             dict(name='Family_Glottocode'),
             dict(name='Family_Name'),
@@ -248,11 +249,12 @@ class Glottolog(API):
             langs.append(dict(
                 ID=lang.id,
                 Name=lang.name,
-                Macroarea=lang.macroareas[0] if lang.macroareas else None,
+                Macroarea=lang.macroareas[0].name if lang.macroareas else None,
                 Latitude=lang.latitude,
                 Longitude=lang.longitude,
                 Glottocode=lang.id,
                 ISO639P3code=lang.iso,
+                LL_Code=lang.identifier.get('multitree'),
                 Classification=[c[1] for c in lang.lineage],
                 Language_Glottocode=lid,
                 Language_Name=lname,

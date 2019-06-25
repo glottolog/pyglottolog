@@ -1,10 +1,15 @@
-from pyglottolog.config import Config, AES, DocumentType
+from pyglottolog.config import Config, AES, DocumentType, Macroarea
 
 
 def test_aes(api_copy):
     aes = Config.from_ini(api_copy.repos / 'config' / 'aes_status.ini', AES)
     assert aes.safe < aes.definite
     assert aes.vulnerable == aes.get('threatened')
+
+
+def test_macroarea(api_copy):
+    ma = Config.from_ini(api_copy.repos / 'config' / 'macroareas.ini', Macroarea)
+    assert ma.__defaults__['description']
 
 
 def test_doctype(api_copy):

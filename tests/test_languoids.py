@@ -16,6 +16,7 @@ def test_legacy_imports():
 def test_Link():
     assert Link.from_(dict(url='xyz')).label is None
     assert Link.from_('[label](url)').url == 'url'
+    assert 'url' in Link.from_('[label](url)').__json__()
 
     with pytest.raises(TypeError):
         Link.from_(5)
@@ -121,6 +122,7 @@ def test_ancestors(api):
 def test_endangerment(api):
     lang = api.languoid('abcd1235')
     assert lang.endangerment.status == api.aes_status.vulnerable
+    assert 'source' in lang.endangerment.__json__()
 
 
 def test_Level(api):
@@ -145,6 +147,7 @@ def test_sources(api):
 
 def test_ethnologue_comment(api):
     assert api.languoid('book1243').ethnologue_comment.comment_type == 'missing'
+    assert api.languoid('book1243').ethnologue_comment.__json__()
 
 
 def test_classification_comment(api):

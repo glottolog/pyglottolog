@@ -245,6 +245,13 @@ class Languoid(UnicodeMixin):
         if name not in names:
             self.cfg.set('altnames', type_, sorted(names + [name]))
 
+    def update_names(self, names, type_='glottolog'):
+        new = set(names)
+        if new != set(self.cfg.getlist('altnames', type_)):
+            self.cfg.set('altnames', type_, sorted(new))
+            return True
+        return False
+
     @property
     def identifier(self):
         if 'identifier' in self.cfg:

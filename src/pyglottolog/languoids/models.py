@@ -63,6 +63,9 @@ class Link(object):
             return '[{0}]({1})'.format(self.label, self.url)
         return self.url
 
+    def __json__(self):
+        return attr.asdict(self)
+
 
 class Glottocodes(object):
     """
@@ -251,6 +254,8 @@ class ISORetirement(object):
     def asdict(self):
         return attr.asdict(self)
 
+    __json__ = asdict
+
 
 @attr.s
 class Endangerment(object):
@@ -258,6 +263,11 @@ class Endangerment(object):
     source = attr.ib(validator=attr.validators.instance_of(AESSource))
     comment = attr.ib()
     date = attr.ib(converter=parser.parse)
+
+    def __json__(self):
+        res = attr.asdict(self, recurse=True)
+        res['date'] = res['date'].isoformat().split('T')[0]
+        return res
 
 
 def valid_ethnologue_versions(inst, attr, value):
@@ -299,6 +309,9 @@ class EthnologueComment(UnicodeMixin):
         validator=valid_ethnologue_versions,
         converter=lambda s: s.replace('693', '639').split('/'))
     comment = attr.ib(default=None, validator=valid_comment)
+
+    def __json__(self):
+        return attr.asdict(self)
 
     def check(self, lang, keys, log):
         try:

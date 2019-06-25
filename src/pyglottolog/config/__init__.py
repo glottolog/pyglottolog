@@ -16,9 +16,14 @@ __all__ = [
 class ConfigObject(object):
     @classmethod
     def from_section(cls, cfg, section):
+        try:
+            fields = set(f.name for f in attr.fields(cls))
+        except attr.exceptions.NotAnAttrsClassError:
+            fields = None
+
         kw = {'name' if 'id' in cfg[section] else 'id': section}
         kw.update(cfg[section].items())
-        return cls(**kw)
+        return cls(**{k: v for k, v in kw.items() if fields is None or k in fields })
 
 
 class Generic(ConfigObject):
@@ -39,6 +44,7 @@ class AES(ConfigObject):
     unesco = attr.ib()
     elcat = attr.ib()
     reference_id = attr.ib()
+    icon = attr.ib(default=None)
 
 
 @attr.s
@@ -75,6 +81,7 @@ class MEDType(ConfigObject):
     id = attr.ib()
     name = attr.ib()
     description = attr.ib()
+    icon = attr.ib(default=None)
 
 
 @attr.s
@@ -107,6 +114,8 @@ def get_ini(fname, **kw):
 
 
 class Config(collections.OrderedDict):
+    __defaults__ = {}
+
     @classmethod
     def from_ini(cls, fname, object_class):
         ini = get_ini(fname)
@@ -114,7 +123,9 @@ class Config(collections.OrderedDict):
         for sec in ini.sections():
             obj = object_class.from_section(ini, sec)
             d[obj.id] = obj
-        return cls(**d)
+        res = cls(**d)
+        res.__defaults__ = ini['DEFAULT']
+        return res
 
     def __getattribute__(self, item):
         if item in self:

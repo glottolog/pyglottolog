@@ -303,6 +303,15 @@ class Entry(UnicodeMixin):
         if self.fields.get('pages'):
             return util.compute_pages(self.fields['pages'])[2]
 
+    @lazyproperty
+    def publisher_and_address(self):
+        p = self.fields.get('publisher')
+        if p and ':' in p:
+            address, publisher = [s.strip() for s in p.split(':', 1)]
+            if (not self.fields.get('address')) or self.fields['address'] == address:
+                return publisher, address
+        return p, self.fields.get('address')
+
     def __unicode__(self):
         """
         :return: BibTeX representation of the entry.

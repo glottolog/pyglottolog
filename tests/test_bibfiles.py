@@ -66,6 +66,19 @@ def test_Entry_lgcodes():
 
 
 @pytest.mark.parametrize(
+    'publisher,address,p_and_a',
+    [
+        ('Berlin: LSP', None, ('LSP', 'Berlin')),
+        ('LSP', 'Berlin', ('LSP', 'Berlin')),
+        ('Kassel: LSP', 'Berlin', ('Kassel: LSP', 'Berlin')),
+    ]
+)
+def test_Entry_publisher_and_address(publisher, address, p_and_a):
+    e = Entry('x', 'misc', dict(publisher=publisher, address=address), None)
+    assert e.publisher_and_address == p_and_a
+
+
+@pytest.mark.parametrize(
     'smaller,bigger',
     [
         # Better doctype wins:
