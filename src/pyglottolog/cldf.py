@@ -70,7 +70,7 @@ def cldf(api, outdir, log):
             Name=el.category))
     for el in sorted(api.aes_status.values()):
         data['CodeTable'].append(dict(
-            ID='aes-{0}'.format(el.name),
+            ID='aes-{0}'.format(el.name.replace(' ', '_')),
             Parameter_ID='aes',
             Name=el.name,
             numerical_value=el.ordinal))
@@ -150,7 +150,8 @@ def cldf(api, outdir, log):
                 l.endangerment.status.name if l.endangerment else None,
                 Comment=l.endangerment.comment if l.endangerment else None,
                 Source=[aes_src] if aes_src else [],
-                Code_ID='aes-{0}'.format(l.endangerment.status.name) if l.endangerment else None),
+                Code_ID='aes-{0}'.format(
+                    l.endangerment.status.name.replace(' ', '_')) if l.endangerment else None),
             value(
                 l.id,
                 'med',

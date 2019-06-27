@@ -181,6 +181,8 @@ def iso2codes(args):
 @command('cldf')
 @assert_repos
 def _cldf(args):
+    """glottolog cldf PATH/TO/glottolog-cldf
+    """
     cldf.cldf(args.repos, Path(args.args[0]), args.log)
 
 
