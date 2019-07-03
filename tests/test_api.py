@@ -21,6 +21,13 @@ def test_glottolog_invalid_repos(tmpdir):
         Glottolog(str(tmpdir))
 
 
+def test_editors(api):
+    eids = [
+        e.id for e in sorted(api.editors.values(), key=lambda i: int(i.ord))
+        if e.current]
+    assert eids[0] == 'hammarstroem'
+
+
 def test_paths(api):
     assert api.ftsindex
 
