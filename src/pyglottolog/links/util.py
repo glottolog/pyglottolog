@@ -7,6 +7,7 @@ import collections
 from csvw.dsv import reader
 import requests
 from pycldf.dataset import MD_SUFFIX
+from bs4 import BeautifulSoup
 
 
 def read_cldf_languages(url):  # pragma: no cover
@@ -73,6 +74,23 @@ class LinkProvider(object):
                     yield l
         else:
             raise NotImplementedError()
+
+
+class PHOIBLE(LinkProvider):  # pragma: no cover
+    __domain__ = 'phoible.org'
+
+    def __init__(self):
+        r = requests.get('https://doi.org/10.5281/zenodo.2562766')
+        html = BeautifulSoup(r.text, 'html.parser')
+        self.__cldf_dataset_url__ = html.find('link', rel='alternate')['href']
+
+    def iterupdated(self, languoids):  # pragma: no cover
+        urls = {}
+        for gc, langs in read_grouped_cldf_languages(self.__cldf_dataset_url__):
+            urls[gc] = ['https://{0}/languages/{1}'.format(self.__domain__, gc)]
+        for l in languoids:
+            if l.update_links(self.__domain__, urls.get(l.id, [])):
+                yield l
 
 
 class APICS(LinkProvider):  # pragma: no cover
