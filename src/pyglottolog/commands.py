@@ -1,6 +1,6 @@
 # coding: utf8
 from __future__ import unicode_literals, print_function, division
-from collections import defaultdict, Counter
+from collections import defaultdict, Counter, OrderedDict
 import os
 import sys
 import re
@@ -13,6 +13,7 @@ import functools
 from termcolor import colored
 from clldutils.clilib import command, ParserError
 from clldutils.misc import slug
+from clldutils.color import qualitative_colors
 from clldutils.markup import Table
 from clldutils.path import Path, write_text, read_text, git_describe
 
@@ -24,6 +25,7 @@ from . import lff
 from . import cldf
 from .monster import compile
 from .references import evobib
+from .references import ldh
 from .util import message, sprint
 from .metadata import prepare_release
 # Make sure we import all link providers:
@@ -71,21 +73,26 @@ def languoids(args):
 @assert_repos
 def htmlmap(args, min_langs_for_legend_item=10):
     """
-    glottolog --repos=. htmlmap [OUTDIR]
+    glottolog --repos=. htmlmap [OUTDIR] [GLOTTOCODES]
     """
     nodes = {n.id: n for n in args.repos.languoids()}
     legend = Counter()
 
+    glottocodes = None
+    if len(args.args) > 1:
+        glottocodes = read_text(args.args[1]).split()
+
     langs = []
     for n in nodes.values():
-        if n.level == args.repos.languoid_levels.language and n.latitude != None:
+        if ((glottocodes is None and n.level == args.repos.languoid_levels.language) or (glottocodes and n.id in glottocodes)) and n.latitude != None:
             fid = n.lineage[0][1] if n.lineage else n.id
             if (not nodes[fid].category.startswith('Pseudo')) or fid == n.id:
                 langs.append((n, fid))
                 legend.update([fid])
 
-    color_map = {fid: "{0:0{1}X}".format((i + 1) * 10, 3)
-                 for i, fid in enumerate(sorted(legend.keys()))}
+    color_map = [fid for fid, _ in legend.most_common()]
+    color_map = dict(zip(color_map, qualitative_colors(len(color_map))))
+    print(color_map)
 
     def l2f(t):
         n, fid = t
@@ -107,7 +114,7 @@ def htmlmap(args, min_langs_for_legend_item=10):
 
     def legend_item(fid, c):
         return \
-            '<span style="background-color: #{0}; border: 1px solid black;">'\
+            '<span style="background-color: {0}; border: 1px solid black;">'\
             '&nbsp;&nbsp;&nbsp;</span> '\
             '<a href="https://glottolog.org/resource/languoid/id/{1}">{2}</a> ({3})'.format(
                 color_map[fid], fid, nodes[fid].name, c)
@@ -190,6 +197,12 @@ def _cldf(args):
 @assert_repos
 def _evobib(args):  # pragma: no cover
     evobib.download(args.repos.bibfiles['evobib.bib'], args.log)
+
+
+@command('ldh')
+@assert_repos
+def _ldh(args):  # pragma: no cover
+    ldh.download(args.repos.bibfiles['ldh.bib'], args.log)
 
 
 @command()
