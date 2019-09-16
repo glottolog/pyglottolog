@@ -212,6 +212,8 @@ class Glottolog(API):
 
     def write_languoids_table(self, outdir, version=None):
         version = version or self.describe()
+        if outdir is not None and not outdir.exists():
+            raise IOError("Specified output directory %s does not exist. Please create it." % outdir)
         out = outdir / 'glottolog-languoids-{0}.csv'.format(version)
         md = outdir / (out.name + '-metadata.json')
         tg = TableGroup.fromvalue({
