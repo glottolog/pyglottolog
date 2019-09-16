@@ -36,7 +36,17 @@ def cldf(api, outdir, log):
     ds.add_component('CodeTable', 'numerical_value')
     ds.add_columns('ValueTable', 'codeReference')
     ds.add_component(
-        'LanguageTable', dict(name='Countries', separator=';'), 'Family_ID', 'Language_ID')
+        'LanguageTable',
+        dict(name='Countries', separator=';'),
+        {
+            'name': 'Family_ID',
+            'dc:description': 'Glottocode of the top-level genetic unit, the '
+            'languoid belongs to'},
+        {
+            'name': 'Language_ID',
+            'dc:description': 'Glottocode of the language-level languoid, the '
+            'languoid belongs to (in case of dialects)'},
+    )
     ds.add_foreign_key('LanguageTable', 'Family_ID', 'LanguageTable', 'ID')
     ds.add_foreign_key('LanguageTable', 'Language_ID', 'LanguageTable', 'ID')
 
