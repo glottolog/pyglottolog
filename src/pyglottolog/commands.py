@@ -1,6 +1,6 @@
 # coding: utf8
 from __future__ import unicode_literals, print_function, division
-from collections import defaultdict, Counter, OrderedDict
+from collections import defaultdict, Counter
 import os
 import sys
 import re
@@ -16,6 +16,7 @@ from clldutils.misc import slug
 from clldutils.color import qualitative_colors
 from clldutils.markup import Table
 from clldutils.path import Path, write_text, read_text, git_describe
+from csvw.dsv import UnicodeWriter
 
 import pyglottolog
 import pyglottolog.iso
@@ -156,8 +157,6 @@ def iso2codes(args):
     """
     Map ISO codes to the list of all Glottolog languages and dialects subsumed "under" it.
     """
-    from clldutils.dsv import UnicodeWriter
-
     nodes = list(args.repos.languoids())
 
     res = {}

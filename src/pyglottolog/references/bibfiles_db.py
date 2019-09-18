@@ -16,7 +16,8 @@ from six.moves import map
 import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy.ext.declarative  # noqa: F401
-from clldutils import path, dsv, jsonlib
+from clldutils import path, jsonlib
+from csvw import dsv
 
 from . import bibtex
 from ..util import unique, group_first

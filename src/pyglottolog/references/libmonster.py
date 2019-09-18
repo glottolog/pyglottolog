@@ -11,7 +11,7 @@ from collections import defaultdict
 from itertools import groupby
 from operator import itemgetter
 
-from clldutils.dsv import UnicodeWriter
+from csvw.dsv import UnicodeWriter
 
 from ..util import unique, Trigger
 from .bibfiles import Entry
