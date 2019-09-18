@@ -2,7 +2,7 @@
 
 Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 
-[![Build Status](https://travis-ci.org/clld/pyglottolog.svg?branch=master)](https://travis-ci.org/glottolog/pyglottolog)
+[![Build Status](https://travis-ci.org/glottolog/pyglottolog.svg?branch=master)](https://travis-ci.org/glottolog/pyglottolog)
 [![codecov](https://codecov.io/gh/clld/pyglottolog/branch/master/graph/badge.svg)](https://codecov.io/gh/glottolog/pyglottolog)
 [![PyPI](https://img.shields.io/pypi/v/pyglottolog.svg)](https://pypi.org/project/pyglottolog)
 
@@ -72,7 +72,7 @@ German [stan1295]
 Reading the data for Glottolog's almost 25,000 languoids from the same number of files in individual
 directories isn't particularly quick. So on average computers running
 ```python
->>> list(Glottolog().languoids())
+>>> list(glottolog.languoids())
 ```
 would take around 15 seconds.
 
@@ -88,7 +88,7 @@ to a similar method of `Languoid`, which accepts a "node map" (i.e. a `dict` map
 to `Languoid` objects) as parameter, e.g. `Languoid.ancestors_from_nodemap` or
 `Languoid.descendants_from_nodemap`. Typical usage would look as follows:
 ```python
->>> languoids = {l.id: l for l in Glottolog().languoids()}
+>>> languoids = {l.id: l for l in glottolog.languoids()}
 >>> for l in languoids.values():
 ...    if not l.ancestors_from_nodemap(languoids):
 ...        print('top-level {0}: {1}'.format(l.level, l.name))
@@ -194,7 +194,7 @@ Abipónok [hu]
 1 matches
 ```
 
-But you can also exploit the schema defined in `pyglottolog.fts.get_langs_index`:
+But you can also exploit the schema defined in [pyglottolog.fts.get_langs_index](src/pyglottolog/fts.py):
 ```bash
 $ glottolog --repos=. langsearch "country:Papua New Guinea"
 ...
@@ -204,6 +204,14 @@ languoids/tree/sepi1257/sepi1258/east2496/alam1246/md.ini
 Papua New Guinea (PG)
 
 900 matches
+
+$ glottolog --repos=. langsearch "iso:mal"
+...
+
+Malayalam [mala1464] language
+languoids/tree/drav1251/sout3133/sout3138/tami1291/tami1292/tami1293/tami1294/tami1297/tami1298/mala1541/mala1464/md.ini
+
+1 matches
 ```
 
 
