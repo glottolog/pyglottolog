@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 import os
 import functools
 
-from clldutils.misc import UnicodeMixin
 from clldutils.path import Path
 from clldutils.inifile import INI
 from newick import Node
@@ -21,7 +20,7 @@ INFO_FILENAME = 'md.ini'
 
 
 @functools.total_ordering
-class Languoid(UnicodeMixin):
+class Languoid:
     """
     Info on languoids is encoded in the ini files and in the directory hierarchy.
     This class provides access to all of it.

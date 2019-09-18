@@ -13,7 +13,7 @@ from six import string_types
 
 import attr
 
-from clldutils.misc import UnicodeMixin, lazyproperty
+from clldutils.misc import lazyproperty
 from clldutils.path import memorymapped, Path
 from clldutils.source import Source
 from clldutils.text import split_text
@@ -93,7 +93,7 @@ def file_if_exists(i, a, value):
 
 
 @attr.s
-class BibFile(UnicodeMixin):
+class BibFile:
 
     fname = attr.ib(validator=file_if_exists)
     name = attr.ib(default=None)
@@ -215,7 +215,7 @@ class BibFile(UnicodeMixin):
 
 @functools.total_ordering
 @attr.s(cmp=False)
-class Entry(UnicodeMixin):
+class Entry:
 
     key = attr.ib()
     type = attr.ib()

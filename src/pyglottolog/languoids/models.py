@@ -9,7 +9,7 @@ from six import text_type, string_types
 import attr
 import markdown
 import pycountry
-from clldutils.misc import slug, UnicodeMixin, nfilter
+from clldutils.misc import slug, nfilter
 from clldutils import jsonlib
 from dateutil import parser
 import purl
@@ -114,7 +114,7 @@ class Glottocode(text_type):
 
 
 @attr.s
-class Reference(UnicodeMixin):
+class Reference:
     key = attr.ib()
     pages = attr.ib(default=None)
     trigger = attr.ib(default=None)
@@ -169,7 +169,7 @@ class Reference(UnicodeMixin):
 
 
 @attr.s
-class Country(UnicodeMixin):
+class Country:
     """
     Glottolog languoids can be related to the countries they are spoken in. These
     countries are identified by ISO 3166 Alpha-2 codes.
@@ -286,7 +286,7 @@ def valid_comment(inst, attr, value):
 
 
 @attr.s
-class EthnologueComment(UnicodeMixin):
+class EthnologueComment:
     # There's the isohid field which says which iso/hid the comment concerns.
     isohid = attr.ib()
 
