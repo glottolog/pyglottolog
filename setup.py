@@ -42,7 +42,6 @@ setup(
         'newick<=0.9.2; python_version < "3.5"',
         'newick>=0.9.2; python_version >= "3.5"',
         'markdown',
-        'bs4',
         'requests',
         'nameparser',
     ],
