@@ -1,8 +1,7 @@
 from tempfile import NamedTemporaryFile
 from subprocess import check_output
 from collections import Counter
-
-from six.moves.urllib.request import urlopen
+from urllib.request import urlopen
 
 from clldutils.markup import Table
 

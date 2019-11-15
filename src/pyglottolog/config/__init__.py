@@ -1,8 +1,5 @@
-from __future__ import unicode_literals
-
 import collections
 
-from six import string_types
 import attr
 from clldutils.misc import nfilter
 from clldutils.inifile import INI
@@ -133,7 +130,7 @@ class Config(collections.OrderedDict):
         return dict.__getattribute__(self, item)
 
     def get(self, item, default=None):
-        if isinstance(item, string_types) and item in self:
+        if isinstance(item, str) and item in self:
             return self[item]
         if isinstance(item, ConfigObject) and getattr(item, 'id', None) in self:
             return self[item.id]

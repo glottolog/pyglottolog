@@ -12,7 +12,6 @@ The basic invocation looks like
     glottolog [OPTIONS] <command> [args]
 
 """
-from __future__ import unicode_literals, print_function
 import sys
 
 from clldutils.clilib import ArgumentParserWithLogging

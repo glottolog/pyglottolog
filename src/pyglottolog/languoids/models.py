@@ -1,15 +1,12 @@
 # coding: utf8
 
-from __future__ import unicode_literals, print_function, division
-
 from collections import OrderedDict, defaultdict
 import re
 
-from six import text_type, string_types
 import attr
 import markdown
 import pycountry
-from clldutils.misc import slug, UnicodeMixin, nfilter
+from clldutils.misc import slug, nfilter
 from clldutils import jsonlib
 from dateutil import parser
 import purl
@@ -50,7 +47,7 @@ class Link(object):
     def from_(cls, obj):
         if isinstance(obj, cls):
             return obj
-        if isinstance(obj, string_types):
+        if isinstance(obj, str):
             return cls.from_string(obj)
         if isinstance(obj, (list, tuple)) and len(obj) == 2:
             return cls(*obj)
@@ -85,7 +82,7 @@ class Glottocodes(object):
                 yield '{0}{1}'.format(alpha, n)
 
     def new(self, name, dry_run=False):
-        alpha = slug(text_type(name))[:4]
+        alpha = slug(str(name))[:4]
         assert alpha
         while len(alpha) < 4:
             alpha += alpha[-1]
@@ -100,21 +97,21 @@ class Glottocodes(object):
         return Glottocode('%s%s' % (alpha, num))
 
 
-class Glottocode(text_type):
+class Glottocode(str):
     regex = '[a-z0-9]{4}[0-9]{4}'
     pattern = re.compile(regex + '$')
 
     def __new__(cls, content):
         if not cls.pattern.match(content):
             raise ValueError(content)
-        return text_type.__new__(cls, content)
+        return str.__new__(cls, content)
 
     def split(self):
         return self[:4], int(self[4:])
 
 
 @attr.s
-class Reference(UnicodeMixin):
+class Reference(object):
     key = attr.ib()
     pages = attr.ib(default=None)
     trigger = attr.ib(default=None)
@@ -124,7 +121,7 @@ class Reference(UnicodeMixin):
         '(<trigger "(?P<trigger>[^\"]+)">)?')
     old_pattern = re.compile('[^\[]+\[(?P<pages>[^\]]*)\]\s*\([0-9]+\s+(?P<key>[^\)]+)\)')
 
-    def __unicode__(self):
+    def __str__(self):
         res = '**{0.key}**'.format(self)
         if self.pages:
             res += ':{0.pages}'.format(self)
@@ -169,7 +166,7 @@ class Reference(UnicodeMixin):
 
 
 @attr.s
-class Country(UnicodeMixin):
+class Country(object):
     """
     Glottolog languoids can be related to the countries they are spoken in. These
     countries are identified by ISO 3166 Alpha-2 codes.
@@ -179,7 +176,7 @@ class Country(UnicodeMixin):
     id = attr.ib()
     name = attr.ib()
 
-    def __unicode__(self):
+    def __str__(self):
         return '{0.name} ({0.id})'.format(self)
 
     @classmethod
@@ -281,12 +278,12 @@ def valid_comment_type(inst, attr, value):
 
 
 def valid_comment(inst, attr, value):
-    if not value or not isinstance(value, text_type):
+    if not value or not isinstance(value, str):
         raise ValueError(value)
 
 
 @attr.s
-class EthnologueComment(UnicodeMixin):
+class EthnologueComment(object):
     # There's the isohid field which says which iso/hid the comment concerns.
     isohid = attr.ib()
 

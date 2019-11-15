@@ -1,11 +1,7 @@
-# coding: utf8
-from __future__ import unicode_literals
-
-from six.moves import html_entities
+from html import entities as html_entities
 
 from nameparser import HumanName
 from markdown import markdown
-from clldutils.path import read_text
 from clldutils.jsonlib import dump
 
 
@@ -20,7 +16,7 @@ def to_html(text, url):
 def read_editors(repos):
     res = []
     in_editors, in_table = False, False
-    for line in read_text(repos.path('CONTRIBUTORS.md')).split('\n'):
+    for line in repos.path('CONTRIBUTORS.md').read_text(encoding='utf8').split('\n'):
         line = line.strip()
         if line.startswith('##'):
             if in_editors:

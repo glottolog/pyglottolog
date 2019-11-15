@@ -1,7 +1,5 @@
 # languoids
 
-from __future__ import unicode_literals
-
 from .languoid import Languoid
 from .models import (
     Glottocode, Glottocodes,

@@ -1,5 +1,4 @@
 # coding: utf8
-from __future__ import unicode_literals, print_function, division
 from collections import defaultdict, Counter
 import os
 import sys
@@ -9,13 +8,14 @@ import subprocess
 from json import dumps
 from string import Template
 import functools
+from pathlib import Path
 
 from termcolor import colored
 from clldutils.clilib import command, ParserError
 from clldutils.misc import slug
 from clldutils.color import qualitative_colors
 from clldutils.markup import Table
-from clldutils.path import Path, write_text, read_text, git_describe
+from clldutils.path import git_describe
 from csvw.dsv import UnicodeWriter
 
 import pyglottolog
@@ -81,7 +81,7 @@ def htmlmap(args, min_langs_for_legend_item=10):
 
     glottocodes = None
     if len(args.args) > 1:
-        glottocodes = read_text(args.args[1]).split()
+        glottocodes = Path(args.args[1]).read_text(encoding='utf8').split()
 
     langs = []
     for n in nodes.values():
@@ -131,23 +131,22 @@ def htmlmap(args, min_langs_for_legend_item=10):
     }
 
     def rendered_template(name, **kw):
-        return Template(read_text(
-            Path(pyglottolog.__file__).parent.joinpath('templates', 'htmlmap', name))
+        return Template(Path(
+            pyglottolog.__file__).parent.joinpath('templates', 'htmlmap', name).read_text(encoding='utf8')
         ).substitute(**kw)
 
     jsname = 'glottolog_map.json'
     outdir = Path('.') if not args.args else Path(args.args[0])
-    write_text(
-        outdir.joinpath(jsname),
-        rendered_template('htmlmap.js', geojson=dumps(geojson, indent=4)))
+    outdir.joinpath(jsname).write_text(
+        rendered_template('htmlmap.js', geojson=dumps(geojson, indent=4)), encoding='utf8')
     html = outdir.joinpath('glottolog_map.html')
-    write_text(
-        html,
+    html.write_text(
         rendered_template(
             'htmlmap.html',
             version=git_describe(args.repos.repos),
             jsname=jsname,
-            nlangs=len(langs)))
+            nlangs=len(langs)),
+        encoding='utf8')
     print(html.resolve().as_uri())
 
 

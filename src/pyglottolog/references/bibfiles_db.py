@@ -1,22 +1,18 @@
 # bibfiles_db.py - load bibfiles into sqlite3, hash, assign ids (split/merge)
 
-from __future__ import print_function
-
 import logging
 import difflib
+import pathlib
 import operator
 import functools
 import itertools
 import contextlib
 import collections
 
-from six import string_types, iteritems, itervalues, viewkeys
-from six.moves import map
-
 import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy.ext.declarative  # noqa: F401
-from clldutils import path, jsonlib
+from clldutils import jsonlib
 from csvw import dsv
 
 from . import bibtex
@@ -42,7 +38,7 @@ class Database(object):
         if self.filepath.exists():
             if not rebuild and self.is_uptodate(bibfiles):
                 return self
-            path.remove(self.filepath)
+            self.filepath.unlink()
 
         with self.engine.connect() as conn:
             if page_size is not None:
@@ -72,8 +68,7 @@ class Database(object):
         return self
 
     def __init__(self, filepath):
-        if not isinstance(filepath, path.Path):
-            filepath = path.Path(filepath)
+        filepath = pathlib.Path(filepath)
         self.filepath = filepath
         self.engine = sa.create_engine('sqlite:///%s' % filepath, paramstyle='qmark')
 
@@ -180,7 +175,7 @@ class Database(object):
                             (field, [(vl, fn, bk) for _, _, _, vl, fn, bk in g])
                             for field, g in itertools.groupby(grp, get_field)])
 
-    def __getitem__(self, key, _types=(tuple, int) + string_types):
+    def __getitem__(self, key, _types=(tuple, int, str)):
         """Entry by (fn, bk) or merged entry by refid (old grouping) or hash (current grouping)."""
         if not isinstance(key, _types):
             raise ValueError  # pragma: no cover
@@ -333,7 +328,7 @@ class File(Model):
         if dict(ondisk) == dict(indb):
             return True
         if verbose:
-            ondisk_names, indb_names = (viewkeys(d) for d in (ondisk, indb))
+            ondisk_names, indb_names = (d.keys() for d in (ondisk, indb))
             print('missing in db: %s' % list(ondisk_names - indb_names))
             print('missing on disk: %s' % list(indb_names - ondisk_names))
             print('differing in size/mtime: %s' % [
@@ -513,7 +508,7 @@ def import_bibfiles(conn, bibfiles):
         for e in b.iterentries():
             bibkey = e.key
             entry_pk = insert_entry((file_pk, bibkey, e.fields.get('glottolog_ref_id'))).lastrowid
-            fields = itertools.chain([('ENTRYTYPE', e.type)], iteritems(e.fields))
+            fields = itertools.chain([('ENTRYTYPE', e.type)], e.fields.items())
             insert_values(((entry_pk, field, value) for field, value in fields))
 
 
@@ -526,7 +521,7 @@ def generate_hashes(conn):
         for title, in rows:
             words.update(wrds(title))
     # TODO: consider dropping stop words/hapaxes from freq. distribution
-    print('%d title words (from %d tokens)' % (len(words), sum(itervalues(words))))
+    print('%d title words (from %d tokens)' % (len(words), sum(words.values())))
 
     def windowed_entries(chunksize=500):
         select_files = sa.select([File.pk], bind=conn).order_by(File.name)
@@ -681,12 +676,12 @@ def distance(left, right, weight={'author': 3, 'year': 3, 'title': 3, 'ENTRYTYPE
     if not (left or right):
         return 0.0
 
-    keys = viewkeys(left) & viewkeys(right)
+    keys = left.keys() & right.keys()
     if not keys:
         return 1.0
 
     weights = {k: weight.get(k, 1) for k in keys}
     ratios = (
         w * difflib.SequenceMatcher(None, left[k], right[k]).ratio()
-        for k, w in iteritems(weights))
-    return 1 - (sum(ratios) / sum(itervalues(weights)))
+        for k, w in weights.items())
+    return 1 - (sum(ratios) / sum(weights.values()))

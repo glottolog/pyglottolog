@@ -1,11 +1,10 @@
-from __future__ import unicode_literals, print_function, division
 from collections import defaultdict, Counter
 from operator import itemgetter
 import re
 import os
 import logging
 
-from clldutils.path import as_posix, move, readlines
+from clldutils.path import move, readlines
 
 from .languoids import Languoid, Glottocode
 
@@ -27,7 +26,7 @@ def parse_languoid(s, log):
 
 def rmtree(d, **kw):
     """More performant way to remove large directory structures."""
-    d = as_posix(d)
+    d = str(d)
     for path in (os.path.join(d, f) for f in os.listdir(d)):
         if os.path.isdir(path):
             rmtree(path)

@@ -1,9 +1,5 @@
 # isbns.py
 
-from __future__ import unicode_literals
-
-from six.moves import map
-
 import re
 
 __all__ = ['Isbns', 'Isbn']

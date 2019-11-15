@@ -1,7 +1,3 @@
-from __future__ import unicode_literals
-
-import six
-
 import pytest
 import mock
 
@@ -40,13 +36,13 @@ def test_update_links(api_copy, capsys, elcat):
 
 def test_show(capsys, api):
     commands.show(_args(api, '**a:key**'))
-    assert (b'@misc' if six.PY2 else '@misc') in capsys.readouterr()[0]
+    assert '@misc' in capsys.readouterr()[0]
 
     commands.show(_args(api, 'a:key'))
-    assert (b'@misc' if six.PY2 else '@misc') in capsys.readouterr()[0]
+    assert '@misc' in capsys.readouterr()[0]
 
     commands.show(_args(api, 'abcd1236'))
-    assert (b'Classification' if six.PY2 else 'Classificat') in capsys.readouterr()[0]
+    assert 'Classificat' in capsys.readouterr()[0]
 
 
 def test_edit(mocker, api):
@@ -111,7 +107,7 @@ def test_tree(capsys, api):
 
     commands.tree(_args(api, 'abc', 'language'))
     out, _ = capsys.readouterr()
-    if not isinstance(out, six.text_type):
+    if not isinstance(out, str):
         out = out.decode('utf-8')
     assert 'language' in out
     assert 'dialect' not in out

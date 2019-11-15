@@ -1,10 +1,8 @@
-from __future__ import unicode_literals
+import pathlib
 
 import pytest
 
-from clldutils.path import read_text, write_text
-
-from pyglottolog.references import BibFiles, BibFile, Entry
+from pyglottolog.references import Entry
 
 
 def test_BibFiles_getitem(bibfiles):
@@ -31,9 +29,9 @@ def test_BibFile(tmpdir, bibfiles):
 
     assert len(list(bf.iterentries())) == 3
 
-    lines = [line for line in read_text(bf.fname).split('\n')
+    lines = [line for line in pathlib.Path(bf.fname).read_text(encoding='utf8').split('\n')
              if not line.strip().startswith('glottolog_ref_id')]
-    write_text(str(tmpdir / 'a.bib'), '\n'.join(lines))
+    (tmpdir / 'a.bib').write_text('\n'.join(lines), encoding='utf8')
 
     entries = bf.load()  # FIXME
     bf.fname = str(tmpdir / ' newa.bib')

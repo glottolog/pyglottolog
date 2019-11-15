@@ -1,20 +1,17 @@
 # bibfiles.py - ordered collection of bibfiles with load/save api
 
-from __future__ import unicode_literals, print_function
-
 import re
 import collections
 import unicodedata
 import datetime
 import math
 import functools
-
-from six import string_types
+from pathlib import Path
 
 import attr
 
-from clldutils.misc import UnicodeMixin, lazyproperty
-from clldutils.path import memorymapped, Path
+from clldutils.misc import lazyproperty
+from clldutils.path import memorymapped
 from clldutils.source import Source
 from clldutils.text import split_text
 from clldutils.inifile import INI
@@ -74,7 +71,7 @@ class BibFiles(list):
 
     def __getitem__(self, index_or_filename):
         """Retrieve a bibfile by index or filename."""
-        if isinstance(index_or_filename, string_types):
+        if isinstance(index_or_filename, str):
             return self._map[index_or_filename]
         return super(BibFiles, self).__getitem__(index_or_filename)
 
@@ -93,7 +90,7 @@ def file_if_exists(i, a, value):
 
 
 @attr.s
-class BibFile(UnicodeMixin):
+class BibFile(object):
 
     fname = attr.ib(validator=file_if_exists)
     name = attr.ib(default=None)
@@ -186,7 +183,7 @@ class BibFile(UnicodeMixin):
             encoding=self.encoding,
             normalize=self.normalize)
 
-    def __unicode__(self):
+    def __str__(self):
         return '<%s %s>' % (self.__class__.__name__, self.fname.name)
 
     def check(self, log):
@@ -215,7 +212,7 @@ class BibFile(UnicodeMixin):
 
 @functools.total_ordering
 @attr.s(cmp=False)
-class Entry(UnicodeMixin):
+class Entry(object):
 
     key = attr.ib()
     type = attr.ib()
@@ -312,7 +309,7 @@ class Entry(UnicodeMixin):
                 return publisher, address
         return p, self.fields.get('address')
 
-    def __unicode__(self):
+    def __str__(self):
         """
         :return: BibTeX representation of the entry.
         """

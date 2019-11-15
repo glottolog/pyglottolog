@@ -4,7 +4,6 @@ libmonster.py - mixed support library
 # TODO: consider replacing pauthor in keyid with _bibtex.names
 # TODO: enusure \emph is dropped from titles in keyid calculation
 """
-from __future__ import unicode_literals, print_function
 import re
 from heapq import nsmallest
 from collections import defaultdict

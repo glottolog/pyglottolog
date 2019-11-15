@@ -1,8 +1,6 @@
-# coding: utf-8
-from __future__ import unicode_literals
 import contextlib
+from io import BytesIO
 
-from six import BytesIO
 import pytest
 from clldutils.iso_639_3 import Code
 

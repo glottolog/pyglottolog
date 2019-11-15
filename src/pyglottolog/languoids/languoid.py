@@ -1,12 +1,9 @@
 # languoid.py
 
-from __future__ import unicode_literals
-
 import os
 import functools
+from pathlib import Path
 
-from clldutils.misc import UnicodeMixin
-from clldutils.path import Path
 from clldutils.inifile import INI
 from newick import Node
 
@@ -21,7 +18,7 @@ INFO_FILENAME = 'md.ini'
 
 
 @functools.total_ordering
-class Languoid(UnicodeMixin):
+class Languoid(object):
     """
     Info on languoids is encoded in the ini files and in the directory hierarchy.
     This class provides access to all of it.
@@ -120,7 +117,7 @@ class Languoid(UnicodeMixin):
     def __repr__(self):
         return '<%s %s>' % (getattr(self.level, 'name', self.level).capitalize(), self.id)
 
-    def __unicode__(self):
+    def __str__(self):
         return '%s [%s]' % (self.name, self.id)
 
     def _set(self, key, value, section=None):

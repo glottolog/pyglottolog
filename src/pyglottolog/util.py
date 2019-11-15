@@ -1,19 +1,16 @@
-# coding: utf8
-from __future__ import unicode_literals
 import itertools
 import operator
 import functools
 from copy import copy
 import textwrap
+from pathlib import Path
 
-from six import PY2, text_type
 from termcolor import colored
-from clldutils.path import Path
 from clldutils.iso_639_3 import ISO, download_tables
 
 
 def sprint(text, *args, **kw):
-    if not isinstance(text, text_type):
+    if not isinstance(text, str):
         text = '{0}'.format(text)
     if args:
         text = text.format(*args)
@@ -21,8 +18,6 @@ def sprint(text, *args, **kw):
     attrs = kw.pop('attrs', None)
     if color or attrs:
         text = colored(text, color=color, attrs=attrs)
-    if PY2:  # pragma: no cover
-        text = text.encode('utf8')
     print(text)
 
 

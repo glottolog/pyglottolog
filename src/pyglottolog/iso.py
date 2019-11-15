@@ -1,16 +1,12 @@
-from __future__ import unicode_literals
-
 import re
 import itertools
 from datetime import date
 import hashlib
 from xml.etree import ElementTree
-
-from six import text_type
+from pathlib import Path
 
 import attr
 from clldutils import iso_639_3
-from clldutils.path import read_text, write_text, Path
 from csvw import dsv
 
 from .references.bibtex import save
@@ -30,11 +26,11 @@ def read_url(path, cache_dir=None, log=None):
         fpath = cache_dir / hashlib.md5(path.encode('utf8')).hexdigest()
         if not fpath.exists():
             with iso_639_3._open(path) as fp:
-                write_text(fpath, fp.read().decode('utf8'))
+                fpath.write_text(fp.read().decode('utf8'), encoding='utf8')
         else:  # pragma: no cover
             if log:
                 log.debug('... from cache {0}'.format(fpath))
-        return read_text(fpath)
+        return fpath.read_text(encoding='utf8')
 
     with iso_639_3._open(path) as fp:
         return fp.read().decode('utf8')
@@ -93,7 +89,7 @@ class ChangeRequest(object):
     Effective_Date = attr.ib(
         converter=lambda v: date(*[int(p) for p in v.split('-')]) if v else None)
     Change_Type = attr.ib(validator=attr.validators.in_(list(CHANGE_TYPES.keys())))
-    Change_Request_Number = attr.ib(converter=lambda v: text_type(v) if v else None)
+    Change_Request_Number = attr.ib(converter=lambda v: str(v) if v else None)
     Region_Group = attr.ib()
     Affected_Identifier = attr.ib()
     Language_Family_Group = attr.ib()

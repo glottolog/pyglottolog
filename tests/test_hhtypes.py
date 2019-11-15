@@ -1,7 +1,3 @@
-from __future__ import unicode_literals
-
-from six.moves import zip
-
 import itertools
 
 

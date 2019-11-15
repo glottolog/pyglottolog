@@ -1,4 +1,3 @@
-# coding: utf8
 """
 Modules implementing functionality to add links to resources for Glottolog languoids must
 subclass util.LinkProvider and override `iterupdated`, a method with the following signature:

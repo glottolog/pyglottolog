@@ -47,7 +47,6 @@ deduplication and annotation in the process.
 
 5.    A final monster-utf8.bib is written
 """
-from __future__ import print_function
 import time
 from collections import Counter
 import logging

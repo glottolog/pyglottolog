@@ -7,8 +7,6 @@ import functools
 import collections
 import unicodedata
 
-from six import text_type
-
 from pybtex.database.input.bibtex import LowLevelParser, Parser, UndefinedMacro
 from pybtex.scanner import PybtexSyntaxError
 from pybtex.exceptions import PybtexError
@@ -16,7 +14,7 @@ from pybtex.textutils import whitespace_re
 from pybtex.bibtex.utils import split_name_list
 from pybtex.database import Person
 
-from clldutils.path import as_posix, memorymapped
+from clldutils.path import memorymapped
 
 FIELDORDER = [
     'author', 'editor', 'title', 'booktitle', 'journal',
@@ -38,7 +36,7 @@ def iterentries_from_text(text, encoding='utf-8'):
     py2_decode = identity
     if hasattr(text, 'read'):
         text = text.read(-1)
-    if not isinstance(text, text_type):
+    if not isinstance(text, str):
         text = text.decode(encoding)
     for entrytype, (bibkey, fields) in LowLevelParser(text):
         fields = {
@@ -50,7 +48,7 @@ def iterentries_from_text(text, encoding='utf-8'):
 
 def iterentries(filename, encoding=None):
     encoding = encoding or 'utf8'
-    with memorymapped(as_posix(filename)) as source:
+    with memorymapped(str(filename)) as source:
         try:
             for entrytype, (bibkey, fields) in iterentries_from_text(source, encoding):
                 yield entrytype, (bibkey, fields)
@@ -87,7 +85,7 @@ class Name(collections.namedtuple('Name', 'prelast last given lineage')):
 
 
 def save(entries, filename, sortkey, encoding='utf-8', normalize='NFC'):
-    with io.open(as_posix(filename), 'w', encoding=encoding, errors='strict') as fd:
+    with io.open(str(filename), 'w', encoding=encoding, errors='strict') as fd:
         dump(entries, fd, sortkey, normalize)
 
 
@@ -158,7 +156,7 @@ fieldorder = Ordering.fromlist(FIELDORDER)
 
 def check(filename, encoding=None):
     parser = CheckParser(encoding=encoding)
-    parser.parse_file(as_posix(filename))
+    parser.parse_file(str(filename))
     return parser.error_count
 
 

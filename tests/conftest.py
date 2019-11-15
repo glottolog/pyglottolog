@@ -1,12 +1,11 @@
-from __future__ import unicode_literals
+import pathlib
 
 import pytest
-
 from clldutils import path
 
 import pyglottolog
 
-TESTS_DIR = path.Path(__file__).parent
+TESTS_DIR = pathlib.Path(__file__).parent
 
 
 @pytest.fixture

@@ -1,7 +1,3 @@
-from __future__ import unicode_literals
-
-import six
-
 from pyglottolog.references.bibtex_undiacritic import undiacritic
 
 import pytest

@@ -1,15 +1,14 @@
 # coding=utf8
 
-from __future__ import unicode_literals
-
 import re
 import os
 import contextlib
 from collections import OrderedDict, defaultdict
+from pathlib import Path
 
 import pycldf.util
 from csvw import TableGroup, Column
-from clldutils.path import Path, as_posix, walk, git_describe
+from clldutils.path import walk, git_describe
 from clldutils.misc import lazyproperty
 from clldutils.apilib import API
 from clldutils.jsonlib import load
@@ -115,7 +114,7 @@ class Glottolog(API):
         maxlevel = self.languoid_levels.get(maxlevel or 'dialect')
         nodes = {}
 
-        for dirpath, dirnames, filenames in os.walk(as_posix(self.tree)):
+        for dirpath, dirnames, filenames in os.walk(str(self.tree)):
             dp = Path(dirpath)
             if dp.name in nodes and nodes[dp.name][2] > maxlevel:
                 del dirnames[:]

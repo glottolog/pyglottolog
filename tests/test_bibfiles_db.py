@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import pytest
 
 from pyglottolog.references.bibfiles_db import Database, distance
