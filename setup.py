@@ -25,6 +25,7 @@ setup(
         ],
     },
     install_requires=[
+        'cldfcatalog',
         'csvw>=1.5.6',
         'clldutils>=3.3',
         'purl',
@@ -52,6 +53,6 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.7',
     ],
 )
