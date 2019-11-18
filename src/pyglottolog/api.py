@@ -55,7 +55,7 @@ class Glottolog(API):
             fname = self.repos / 'config' / (name + '.ini')
             setattr(self, name, config.Config.from_ini(fname, object_class=cls))
 
-    def __unicode__(self):
+    def __str__(self):
         return '<Glottolog repos {0} at {1}>'.format(git_describe(self.repos), self.repos)
 
     def describe(self):
@@ -148,17 +148,18 @@ class Glottolog(API):
             '',
             self.languoid_levels)
 
-    def newick_tree(self, start=None, template=None, nodes=None):
+    def newick_tree(self, start=None, template=None, nodes=None, maxlevel=None):
         template = template or languoids.Languoid._newick_default_template
         if start:
             return self.languoid(start).newick_node(
-                template=template, nodes=nodes).newick + ';'
+                template=template, nodes=nodes, maxlevel=maxlevel, level=1).newick + ';'
         if nodes is None:
             nodes = OrderedDict((l.id, l) for l in self.languoids())
         trees = []
         for lang in nodes.values():
             if not lang.lineage and not lang.category.startswith('Pseudo '):
-                ns = lang.newick_node(nodes=nodes, template=template).newick
+                ns = lang.newick_node(
+                    nodes=nodes, template=template, maxlevel=maxlevel, level=1).newick
                 if lang.level == self.languoid_levels.language:
                     # An isolate: we wrap it in a pseudo-family with the same name and ID.
                     fam = languoids.Languoid.from_name_id_level(
@@ -211,8 +212,6 @@ class Glottolog(API):
 
     def write_languoids_table(self, outdir, version=None):
         version = version or self.describe()
-        if outdir is not None and not outdir.exists():
-            raise IOError("Specified output directory %s does not exist. Please create it." % outdir)
         out = outdir / 'glottolog-languoids-{0}.csv'.format(version)
         md = outdir / (out.name + '-metadata.json')
         tg = TableGroup.fromvalue({

@@ -19,7 +19,10 @@ setup(
     include_package_data=True,
     zip_safe=False,
     entry_points={
-        'console_scripts': ['glottolog=pyglottolog.__main__:main'],
+        'console_scripts': [
+            'glottolog=pyglottolog.__main__:main',
+            'glottolog-admin=pyglottolog.__main__:admin_main',
+        ],
     },
     install_requires=[
         'csvw>=1.5.6',

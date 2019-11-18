@@ -11,6 +11,7 @@ from .models import (
     Glottocode, Country, Reference, Endangerment, Link,
     ClassificationComment, EthnologueComment, ISORetirement,
 )
+from pyglottolog import config
 
 __all__ = ['Languoid']
 
@@ -133,12 +134,18 @@ class Languoid(object):
             return type_(res)
         return res
 
-    def newick_node(self, nodes=None, template=None):
+    def newick_node(self, nodes=None, template=None, maxlevel=None, level=0):
         template = template or self._newick_default_template
         n = Node(name=template.format(l=self), length='1')  # noqa: E741
+
         children = self.children if nodes is None else self.children_from_nodemap(nodes)
         for nn in sorted(children, key=lambda nn: nn.name):
-            n.add_descendant(nn.newick_node(nodes=nodes, template=template))
+            if maxlevel:
+                if (isinstance(maxlevel, config.LanguoidLevel) and nn.level > maxlevel) or \
+                        (not isinstance(maxlevel, config.LanguoidLevel) and level > maxlevel):
+                    continue
+            n.add_descendant(
+                nn.newick_node(nodes=nodes, template=template, maxlevel=maxlevel, level=level + 1))
         return n
 
     def write_info(self, outdir=None):
@@ -202,7 +209,7 @@ class Languoid(object):
 
     @property
     def children(self):
-        return [Languoid.from_dir(d) for d in self.dir.iterdir() if d.is_dir()]
+        return [Languoid.from_dir(d, _api=self._api) for d in self.dir.iterdir() if d.is_dir()]
 
     def ancestors_from_nodemap(self, nodes):
         # A faster alternative to `ancestors` when the relevant languoids have already
