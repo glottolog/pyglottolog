@@ -278,7 +278,16 @@ class Languoid(object):
         if ('endangerment' in self.cfg) and self._api:
             kw = {k: v for k, v in self.cfg['endangerment'].items()}
             kw['status'] = self._api.aes_status.get(kw['status'])
-            kw['source'] = self._api.aes_sources[kw['source']]
+            if kw['source'] in self._api.aes_sources:
+                kw['source'] = self._api.aes_sources[kw['source']]
+            else:
+                ref = Reference.from_string(kw['source'])
+                kw['source'] = config.AESSource(
+                    id=ref.key,
+                    name=None,
+                    url=None,
+                    reference_id=ref.key,
+                    pages=ref.pages)
             return Endangerment(**kw)
 
     @property

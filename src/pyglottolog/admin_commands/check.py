@@ -136,6 +136,15 @@ def run(args):
             else:
                 error(lang, 'family without children')  # pragma: no cover
 
+        try:
+            endangerment = lang.endangerment
+            if endangerment and endangerment.source and endangerment.source.reference_id:
+                ref = endangerment.source.reference_id
+                if ref not in refkeys:  # pragma: no cover
+                    error(lang, 'endangerment: invalid ref {0}'.format(ref))
+        except (ValueError, KeyError) as e:  # pragma: no cover
+            error(lang, 'endangerment: {0}: {1}'.format(e.__class__.__name__, str(e)))
+
     if iso:
         for level, obj, msg in pyglottolog.iso.check_coverage(iso, iso_in_gl, iso_splits):
             dict(info=info, warn=warn)[level](obj, msg)  # pragma: no cover

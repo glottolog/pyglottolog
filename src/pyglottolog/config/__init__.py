@@ -50,6 +50,7 @@ class AESSource(ConfigObject):
     name = attr.ib()
     url = attr.ib()
     reference_id = attr.ib()
+    pages = attr.ib(default=None)
 
 
 @attr.s
