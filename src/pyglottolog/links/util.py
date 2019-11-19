@@ -1,13 +1,12 @@
-import zipfile
 import io
-import itertools
 import json
+import zipfile
+import itertools
 import collections
 
 from csvw.dsv import reader
 import requests
 from pycldf.dataset import MD_SUFFIX
-
 
 
 def read_cldf_languages(url):  # pragma: no cover

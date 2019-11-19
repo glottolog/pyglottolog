@@ -1,9 +1,9 @@
 import re
-import itertools
-from datetime import date
 import hashlib
+import pathlib
+import datetime
+import itertools
 from xml.etree import ElementTree
-from pathlib import Path
 
 import attr
 from clldutils import iso_639_3
@@ -20,7 +20,7 @@ def read_url(path, cache_dir=None, log=None):
     Delegate scraping to clldutils, since nowadays this requires tweaking the user agent as well.
     """
     if cache_dir:
-        cache_dir = Path(cache_dir)
+        cache_dir = pathlib.Path(cache_dir)
         if log:  # pragma: no cover
             log.debug('retrieving {0} ...'.format(path))
         fpath = cache_dir / hashlib.md5(path.encode('utf8')).hexdigest()
@@ -61,7 +61,8 @@ class Retirement(object):
         converter=lambda v: v or None,
         validator=attr.validators.optional(valid_iso_code))
     Ret_Remedy = attr.ib(converter=normalize_whitespace)
-    Effective = attr.ib(converter=lambda v: date(*[int(p) for p in v.split('-')]) if v else None)
+    Effective = attr.ib(
+        converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
     cr = attr.ib(default=None)
 
     @classmethod
@@ -87,7 +88,7 @@ class ChangeRequest(object):
         validator=attr.validators.in_(['Rejected', 'Adopted', 'Pending', 'Partially Adopted']))
     Reference_Name = attr.ib()
     Effective_Date = attr.ib(
-        converter=lambda v: date(*[int(p) for p in v.split('-')]) if v else None)
+        converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
     Change_Type = attr.ib(validator=attr.validators.in_(list(CHANGE_TYPES.keys())))
     Change_Request_Number = attr.ib(converter=lambda v: str(v) if v else None)
     Region_Group = attr.ib()
@@ -114,7 +115,7 @@ class ChangeRequest(object):
                "field_change_instance_chnge_type_tid=All&field_change_request_act_status_tid=All&" \
                "items_per_page=100&page={1}"
         year, page = 2006, 0
-        while year < (max_year or date.today().year):
+        while year < (max_year or datetime.date.today().year):
             while True:
                 i = 0
                 for i, cr in enumerate(
@@ -229,7 +230,8 @@ def get_retirements(table=None, max_year=None, cache_dir=None, log=None):
     crs = (
         r for r in ChangeRequest.iter(max_year=max_year, cache_dir=cache_dir, log=log)
         if r.Status == 'Adopted')
-    crs = sorted(crs, key=lambda r: (r.Affected_Identifier, r.Effective_Date or date.today()))
+    crs = sorted(
+        crs, key=lambda r: (r.Affected_Identifier, r.Effective_Date or datetime.date.today()))
     crs = itertools.groupby(crs, lambda r: r.Affected_Identifier)
     crs = {id_: list(grp)[-1] for id_, grp in crs}
 

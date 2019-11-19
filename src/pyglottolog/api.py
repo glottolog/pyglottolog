@@ -1,10 +1,8 @@
-# coding=utf8
-
 import re
 import os
+import pathlib
 import contextlib
-from collections import OrderedDict, defaultdict
-from pathlib import Path
+import collections
 
 import pycldf.util
 from csvw import TableGroup, Column
@@ -115,7 +113,7 @@ class Glottolog(API):
         nodes = {}
 
         for dirpath, dirnames, filenames in os.walk(str(self.tree)):
-            dp = Path(dirpath)
+            dp = pathlib.Path(dirpath)
             if dp.name in nodes and nodes[dp.name][2] > maxlevel:
                 del dirnames[:]
 
@@ -154,7 +152,7 @@ class Glottolog(API):
             return self.languoid(start).newick_node(
                 template=template, nodes=nodes, maxlevel=maxlevel, level=1).newick + ';'
         if nodes is None:
-            nodes = OrderedDict((l.id, l) for l in self.languoids())
+            nodes = collections.OrderedDict((l.id, l) for l in self.languoids())
         trees = []
         for lang in nodes.values():
             if not lang.lineage and not lang.category.startswith('Pseudo '):
@@ -175,7 +173,7 @@ class Glottolog(API):
     def refs_by_languoid(self, nodes=None):
         all = {}
         languoids_by_code = self.languoids_by_code(nodes or {l.id: l for l in self.languoids()})
-        res = defaultdict(list)
+        res = collections.defaultdict(list)
         for bib in tqdm(self.bibfiles):
             for entry in bib.iterentries():
                 all[entry.id] = entry

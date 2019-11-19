@@ -1,8 +1,8 @@
-from collections import defaultdict, Counter
-from operator import itemgetter
 import re
 import os
 import logging
+import operator
+import collections
 
 from clldutils.path import move, readlines
 
@@ -208,8 +208,8 @@ def lff2tree(api, log=logging.getLogger(__name__)):
         lang2tree(api, log, lang, lin, out, old_tree)
 
     duplicates = False
-    for name, getter in [('name', itemgetter(0)), ('hid', itemgetter(2))]:
-        count = Counter(getter(spec) for spec in languoids.values())
+    for name, getter in [('name', operator.itemgetter(0)), ('hid', operator.itemgetter(2))]:
+        count = collections.Counter(getter(spec) for spec in languoids.values())
         for thing, n in count.most_common():
             if thing is None:
                 continue
@@ -247,8 +247,8 @@ def format_classification(api, l, agg):
 
 
 def tree2lff(api, log=logging.getLogger(__name__)):
-    languoids = {api.languoid_levels.dialect: defaultdict(list),
-                 api.languoid_levels.language: defaultdict(list)}
+    languoids = {api.languoid_levels.dialect: collections.defaultdict(list),
+                 api.languoid_levels.language: collections.defaultdict(list)}
 
     agg = {}
     for l in api.languoids():

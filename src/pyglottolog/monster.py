@@ -48,8 +48,8 @@ deduplication and annotation in the process.
 5.    A final monster-utf8.bib is written
 """
 import time
-from collections import Counter
 import logging
+import collections
 
 from .references import BibFile
 from .references.libmonster import lgcode, add_inlg_e, markconservative
@@ -110,7 +110,7 @@ def compile(api, log=None, rebuild=False):
     m = add_inlg_e(m, api.triggers['inlg'])
 
     # Print some statistics
-    stats = Counter()
+    stats = collections.Counter()
     log.info(time.ctime())
     for t, f in m.values():
         stats.update(['entry'])

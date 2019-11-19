@@ -1,9 +1,9 @@
-import itertools
+import copy
+import pathlib
 import operator
-import functools
-from copy import copy
 import textwrap
-from pathlib import Path
+import itertools
+import functools
 
 from termcolor import colored
 from clldutils.iso_639_3 import ISO, download_tables
@@ -46,7 +46,7 @@ def message(obj, msg):
 
 def get_iso(d):
     zips = sorted(
-        list(Path(d).glob('iso-639-3_Code_Tables_*.zip')),
+        list(pathlib.Path(d).glob('iso-639-3_Code_Tables_*.zip')),
         key=lambda p: p.name)
     if zips:
         return ISO(zips[-1])
@@ -78,9 +78,9 @@ class Trigger(object):
 
     def __call__(self, allkeys, keys_by_word):
         allkeys = set(allkeys)
-        matching = copy(allkeys)
+        matching = copy.copy(allkeys)
         for isin, word in self.clauses:
-            matching_for_clause = copy(keys_by_word[word])
+            matching_for_clause = copy.copy(keys_by_word[word])
             if not isin:
                 matching_for_clause = allkeys.difference(matching_for_clause)
             matching.intersection_update(matching_for_clause)

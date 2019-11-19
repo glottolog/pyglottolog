@@ -35,7 +35,7 @@ def run(args):
     langs = []
     for n in nodes.values():
         if ((glottocodes is None and n.level == args.repos.languoid_levels.language)
-                or (glottocodes and n.id in glottocodes)) and n.latitude != None:
+                or (glottocodes and n.id in glottocodes)) and n.latitude != None:  # noqa: W503
             fid = n.lineage[0][1] if n.lineage else n.id
             if (not nodes[fid].category.startswith('Pseudo')) or fid == n.id:
                 langs.append((n, fid))

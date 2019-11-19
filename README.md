@@ -9,8 +9,8 @@ Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 
 ## Install
 
-To install `pyglottolog` you need a python installation on your system, running python 2.7 or >3.4. Run
-```
+To install `pyglottolog` you need a python installation on your system, running python >3.4. Run
+```shell script
 pip install pyglottolog
 ```
 
@@ -22,8 +22,12 @@ This will also install the command line interface `glottolog`.
 - an unzipped [released version of Glottolog](https://github.com/glottolog/glottolog/releases) from GitHub,
 - or an unzipped download of a [released version of Glottolog](https://doi.org/10.5281/zenodo.596479) from ZENODO.
 
-Make sure you remember where this local copy of the data is located - you always
-have to pass this location as argument when using `pyglottolog`.
+Make sure you remember where this local copy of the data is located - you may
+have to pass this location as option when using `pyglottolog`.
+
+A convenient way to clone the data repository, keep it updated and access it
+from `pyglottolog` is provided
+by [`cldfbench`](https://pypi.org/project/cldfbench). See the [`README`](https://github.com/cldf/cldfbench#catalogs) for details.
 
 
 ## Python API
@@ -121,33 +125,43 @@ values.
 
 Command line functionality is implemented via sub-commands of `glottolog`. The list of
 available sub-commands can be inspected running
-```
-$ glottolog --help
-usage: glottolog [-h] [--verbosity VERBOSITY] [--log-level LOG_LEVEL]
-                 [--repos REPOS]
-                 command ...
-
-Main command line interface of the pyglottolog package.
-
-positional arguments:
-  command               isobib | show | edit | create | bib | tree | newick |
-                        index | check | metadata | refsearch | refindex |
-                        langsearch | langindex | tree2lff | lff2tree
-  args
+```shell script
+$ glottolog -h
+usage: glottolog [-h] [--log-level LOG_LEVEL] [--repos REPOS]
+                 [--repos-version REPOS_VERSION]
+                 COMMAND ...
 
 optional arguments:
   -h, --help            show this help message and exit
-  --verbosity VERBOSITY
-                        increase output verbosity
   --log-level LOG_LEVEL
-                        log level [ERROR|WARN|INFO|DEBUG]
-  --repos REPOS         path to glottolog data repository
+                        log level [ERROR|WARN|INFO|DEBUG] (default: 20)
+  --repos REPOS         clone of glottolog/glottolog
+  --repos-version REPOS_VERSION
+                        version of repository data. Requires a git clone!
+                        (default: None)
 
-Use 'glottolog help <cmd>' to get help about individual commands.
+available commands:
+  Run "COMAMND -h" to get help for a specific command.
+
+  COMMAND
+    cldf                Dump Glottolog data as CLDF dataset
+    create              Create a new languoid directory for a languoid
+                        specified by name and level.
+    edit                Open a languoid's INI file in a text editor.
+    htmlmap             Create an HTML/Javascript map (using leaflet) of
+                        Glottolog languoids.
+    iso2codes           Map ISO codes to the list of all Glottolog languages
+                        and dialects subsumed "under" it.
+    langdatastats       List all metadata fields used in languoid INI files
+                        and their frequency.
+    langsearch          Search Glottolog languoids.
+    languoids           Write languoids data to csv files
+    refsearch           Search Glottolog references
+    searchindex         Index
+    show                Display details of a Glottolog object.
+    tree                Print the classification tree starting at a specific
+                        languoid.
 ```
-
-Note: The location of your local clone or export of the Glottolog data should
-be passed as `--repos=PATH/TO/glottolog`.
 
 
 ### Extracting languoid data
@@ -159,8 +173,8 @@ in a [CLDF](https://cldf.clld.org) dataset.
 To make this easier, `pyglottolog` provides the `languoids` subcommand, which
 dumps basic languoid data into a CSVW file with accompanying metadata:
 
-```bash
-glottolog --repos=PATH/TO/glottolog languoids [--output=OUTDIR] [--version=VERSION]
+```shell script
+glottolog languoids [--output=OUTDIR] [--version=VERSION]
 ```
 
 This will create a CSVW package, i.e. 
@@ -177,15 +191,15 @@ on an export of the repository or a download from ZENODO.
 To allow convenient search across all languoid info files, `pyglottolog` comes with functionality
 to create and search a [Whoosh](https://whoosh.readthedocs.io/en/latest/intro.html) index. To do
 so, run
-```bash
-glottolog --repos=PATH/TO/glottolog langindex
+```shell script
+glottolog searchindex
 ```
 
-This will take about a minute or two and build an index of about 90 MB size at `build/whoosh_langs`.
+This will take a couple of minutes and build an indeces of about 750 MB size at `build/`.
 
 Now you can search the index, e.g. using alternative names as query:
-```bash
-$ glottolog --repos=. langsearch "Abipónok"
+```shell script
+$ glottolog langsearch "Abipónok"
 1 matches
 Abipon [abip1241] language
 languoids/tree/guai1249/guai1250/abip1241/md.ini
@@ -195,8 +209,8 @@ Abipónok [hu]
 ```
 
 But you can also exploit the schema defined in [pyglottolog.fts.get_langs_index](src/pyglottolog/fts.py):
-```bash
-$ glottolog --repos=. langsearch "country:Papua New Guinea"
+```shell script
+$ glottolog langsearch "country:Papua New Guinea"
 ...
 
 Alamblak [alam1246] language
@@ -218,15 +232,13 @@ languoids/tree/drav1251/sout3133/sout3138/tami1291/tami1292/tami1293/tami1294/ta
 ### Reference search
 
 The same can be done for reference data: To create a Whoosh index with all reference data, run
-```bash
-glottolog --repos=PATH/TO/glottolog refindex
+```shell script
+glottolog searchindex
 ```
 
-This will take about 15 minutes and build an index of about 700 MB size at `build/whoosh`.
-
 Now you can query the index:
-```bash
-$ glottolog --repos=. refsearch "author:Haspelmath AND title:Atlas"
+```shell script
+$ glottolog refsearch "author:Haspelmath AND title:Atlas"
 ...
 (13 matches)
 ```
