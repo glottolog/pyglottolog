@@ -27,15 +27,6 @@ ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 
 class Glottolog(API):
     """API to access Glottolog data"""
-
-    __default_metadata__ = {
-        'title': 'Glottolog',
-        'url': 'https://glottolog.org',
-        'publisher': {
-            'name': 'Max Planck Institute for the Science of Human History',
-            'place': 'Jena',
-        },
-    }
     countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
     __config__ = {
         'aes_status': config.AES,
@@ -229,11 +220,12 @@ class Glottolog(API):
             "dc:version": version,
             "dc:bibliographicCitation":
                 "{0}. "
-                "{1} (Version {2}) [Data set]. "
-                "Zenodo. https://doi.org/10.5281/zenodo.596479".format(
+                "{1} [Data set]. "
+                "Zenodo. https://doi.org/{2}".format(
                     ' & '.join([e.name for e in self.current_editors]),
-                    self.dataset_metadata.title,
-                    version),
+                    self.publication.zenodo.title_format.format('(Version {0})'.format(version)),
+                    self.publication.zenodo.doi,
+                ),
             "tables": [load(pycldf.util.pkg_path('components', 'LanguageTable-metadata.json'))],
         })
         tg.tables[0].url = out.name
