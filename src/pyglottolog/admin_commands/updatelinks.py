@@ -15,7 +15,7 @@ def run(args):
     updated = set()
     for cls in LinkProvider.__subclasses__():
         name = cls.__name__.lower()
-        if (not args.provider) or (name in args.provider):
+        if (not getattr(args, 'provider')) or (name in args.provider):
             args.log.info('updating {0} links ...'.format(name))
             i = 0
             for i, l in enumerate(cls().iterupdated(langs), start=1):
