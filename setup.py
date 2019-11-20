@@ -27,7 +27,7 @@ setup(
     install_requires=[
         'cldfcatalog',
         'csvw>=1.5.6',
-        'clldutils>=3.3',
+        'clldutils>=3.4',
         'purl',
         'pycldf>=1.6.4',
         'sqlalchemy',

@@ -28,6 +28,14 @@ ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 class Glottolog(API):
     """API to access Glottolog data"""
 
+    __default_metadata__ = {
+        'title': 'Glottolog',
+        'url': 'https://glottolog.org',
+        'publisher': {
+            'name': 'Max Planck Institute for the Science of Human History',
+            'place': 'Jena',
+        },
+    }
     countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
     __config__ = {
         'aes_status': config.AES,
@@ -208,6 +216,10 @@ class Glottolog(API):
                 res[lang.hid] = ma
         return res
 
+    @property
+    def current_editors(self):
+        return sorted([e for e in self.editors.values() if e.current], key=lambda e: int(e.ord))
+
     def write_languoids_table(self, outdir, version=None):
         version = version or self.describe()
         out = outdir / 'glottolog-languoids-{0}.csv'.format(version)
@@ -215,9 +227,13 @@ class Glottolog(API):
         tg = TableGroup.fromvalue({
             "@context": "http://www.w3.org/ns/csvw",
             "dc:version": version,
-            "dc:": "Harald Hammarström, Robert Forkel & Martin Haspelmath. "
-                   "clld/glottolog: Glottolog database (Version {0}) [Data set]. "
-                   "Zenodo. http://doi.org/10.5281/zenodo.596479".format(version),
+            "dc:bibliographicCitation":
+                "{0}. "
+                "{1} (Version {2}) [Data set]. "
+                "Zenodo. https://doi.org/10.5281/zenodo.596479".format(
+                    ' & '.join([e.name for e in self.current_editors]),
+                    self.dataset_metadata.title,
+                    version),
             "tables": [load(pycldf.util.pkg_path('components', 'LanguageTable-metadata.json'))],
         })
         tg.tables[0].url = out.name
