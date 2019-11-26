@@ -7,8 +7,9 @@ import collections
 
 from clldutils.color import qualitative_colors
 from clldutils.path import git_describe
+from clldutils.clilib import PathType
 
-from pyglottolog.cli_util import add_output_dir, ExistingFile
+from pyglottolog.cli_util import add_output_dir
 
 
 def register(parser):
@@ -16,7 +17,7 @@ def register(parser):
     parser.add_argument(
         '--glottocodes',
         help='File listing Glottocodes the map should be restricted to',
-        action=ExistingFile,
+        type=PathType(type='file'),
         default=None,
     )
     parser.add_argument(

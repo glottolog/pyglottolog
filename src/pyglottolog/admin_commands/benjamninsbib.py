@@ -3,13 +3,13 @@ Update benjamins.bib from a freshly compiled update.
 """
 import argparse
 
-from pyglottolog.cli_util import ExistingFile
+from clldutils.clilib import PathType
 
 
 def register(parser):
     parser.add_argument(
         'bib',
-        action=ExistingFile,
+        type=PathType(type='file'),
         help='path to updated benjamins.bib')
     parser.add_argument(
         '--bibkey',

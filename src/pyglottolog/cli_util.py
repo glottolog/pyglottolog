@@ -1,34 +1,17 @@
 import pathlib
-import argparse
 
-from clldutils.clilib import ParserError, add_format
+from clldutils.clilib import ParserError, add_format, PathType
 
-__all__ = ['add_output_dir', 'ExistingDir', 'ExistingFile']
-
-
-class ExistingFile(argparse.Action):
-    def __call__(self, parser, namespace, value, option_string=None):
-        d = pathlib.Path(value)
-        if not (d.exists() and d.is_file()):
-            raise argparse.ArgumentError(None, '{0} must be an existing file'.format(self.dest))
-        setattr(namespace, self.dest, d)
-
-
-class ExistingDir(argparse.Action):
-    def __call__(self, parser, namespace, value, option_string=None):
-        d = pathlib.Path(value)
-        if not (d.exists() and d.is_dir()):
-            raise argparse.ArgumentError(
-                None, '{0} must be an existing directory'.format(self.dest))
-        setattr(namespace, self.dest, d)
+__all__ = ['add_output_dir']
 
 
 def add_output_dir(parser):
     parser.add_argument(
         '--output',
         help='An existing directory for the output',
+        type=PathType(type='dir'),
         default=pathlib.Path('.'),
-        action=ExistingDir)
+    )
 
 
 def register_search(parser, example):
