@@ -1,5 +1,6 @@
 import io
 import json
+import pathlib
 import collections
 
 from csvw.dsv import reader
@@ -32,6 +33,12 @@ class AIATSIS(LinkProvider):
                                 print(d['AIATSIS_Code'], list(md.keys())[:10])
                                 continue
                             lmap[d['Glottolog_ID']].add(code)
+        with pathlib.Path(__file__).parent.joinpath('aiatsis.json').open(encoding='utf8') as fp:
+            for code, gc in json.load(fp).items():
+                if code not in md:
+                    print(code, list(md.keys())[:10])
+                    continue
+                lmap[gc].add(code)
 
         for l in languoids:
             links, names = [], []

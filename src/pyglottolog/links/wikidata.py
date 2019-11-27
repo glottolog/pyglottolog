@@ -28,7 +28,7 @@ class Wikidata(LinkProvider):
         res = {d['glottocode']: d for d in reader(res.text.split('\n'), dicts=True)}
         for l in languoids:
             urls = {
-                'www.wikidata.org': [res[l.id]['item']] if l.id in res else [],
+                'www.wikidata.org': [res[l.id]['item'].replace('http:', 'https:')] if l.id in res else [],
                 'en.wikipedia.org': [
                     res[l.id]['wikipedia']] if (l.id in res) and res[l.id]['wikipedia'] else [],
             }
