@@ -151,7 +151,10 @@ class Reference(object):
 
     @classmethod
     def from_string(cls, string, pattern=None):
-        return cls.from_match((pattern or cls.pattern).match(string.strip()))
+        try:
+            return cls.from_match((pattern or cls.pattern).match(string.strip()))
+        except AssertionError:
+            raise ValueError('Invalid reference: {0}'.format(string))
 
     @classmethod
     def from_list(cls, l, pattern=None):

@@ -107,20 +107,32 @@ class Glottolog(API):
                 if d.name == id_:
                     return languoids.Languoid.from_dir(d, _api=self)
 
-    def languoids(self, ids=None, maxlevel=None):
-        maxlevel = self.languoid_levels.get(maxlevel or 'dialect')
+    def languoids(self, ids=None, maxlevel=None, exclude_pseudo_families=False):
+        """
+        :param ids:
+        :param maxlevel: Numeric maximal nesting depth of languoids, or Languoid.level.
+        :return: Generator object, to iterate over languoids.
+        """
+        if isinstance(maxlevel, int):
+            pass
+        else:
+            maxlevel = self.languoid_levels.get(maxlevel or 'dialect')
         nodes = {}
 
         for dirpath, dirnames, filenames in os.walk(str(self.tree)):
             dp = pathlib.Path(dirpath)
-            if dp.name in nodes and nodes[dp.name][2] > maxlevel:
+            if dp.name in nodes \
+                    and (not isinstance(maxlevel, int)) \
+                    and nodes[dp.name][2] > maxlevel:
                 del dirnames[:]
 
             for dirname in dirnames:
                 if ids is None or dirname in ids:
                     lang = languoids.Languoid.from_dir(dp.joinpath(dirname), nodes=nodes, _api=self)
-                    if lang.level <= maxlevel:
-                        yield lang
+                    if (isinstance(maxlevel, int) and len(lang.lineage) <= maxlevel) \
+                            or ((not isinstance(maxlevel, int)) and lang.level <= maxlevel):
+                        if (not exclude_pseudo_families) or not lang.category.startswith('Pseudo'):
+                            yield lang
 
     def languoids_by_code(self, nodes=None):
         """
