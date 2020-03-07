@@ -39,7 +39,10 @@ def test_descendants_from_nodemap(api):
     l = api.languoid('abcd1234')
     assert len(l.descendants_from_nodemap(nodemap)) == 2
     assert len(l.descendants_from_nodemap(nodemap, level=api.languoid_levels.language)) == 1
-    assert len(l.descendants_from_nodemap(nodemap, level=api.languoid_levels.dialect)) == 1
+    assert len(l.descendants_from_nodemap(nodemap, level='dialect')) == 1
+
+    with pytest.raises(ValueError):
+        l.descendants_from_nodemap(nodemap, level='dialects')
 
 
 def test_languoids(api):

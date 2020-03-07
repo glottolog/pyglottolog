@@ -87,8 +87,6 @@ def test_tree(capsys, _main):
 
     _main('tree abc --maxlevel language')
     out, _ = capsys.readouterr()
-    if not isinstance(out, str):
-        out = out.decode('utf-8')
     assert 'language' in out
     assert 'dialect' not in out
 

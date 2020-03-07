@@ -1,5 +1,3 @@
-# coding: utf8
-
 from collections import OrderedDict, defaultdict
 import re
 

@@ -202,6 +202,8 @@ class Languoid(object):
         return [nodes[d.name] for d in self.dir.iterdir() if d.is_dir()]
 
     def descendants_from_nodemap(self, nodes, level=None):
+        if isinstance(level, str):
+            level = self._api.languoid_levels.get(level)
         return [
             n for n in nodes.values() if
             n.lineage and self.id in [li[1] for li in n.lineage] and
