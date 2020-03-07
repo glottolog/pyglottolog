@@ -45,8 +45,8 @@ setup(
         'nameparser',
     ],
     extras_require={
-        'dev': ['tox>=2.9', 'flake8', 'pep8-naming', 'wheel', 'twine'],
-        'test': ['mock>=2', 'pytest>=3.6', 'pytest-mock', 'pytest-cov'],
+        'dev': ['tox>=3.14', 'flake8', 'pep8-naming', 'wheel', 'twine'],
+        'test': ['mock>=2', 'pytest>=5', 'pytest-mock', 'pytest-cov'],
     },
     classifiers=[
         'Programming Language :: Python',
@@ -54,5 +54,6 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 )

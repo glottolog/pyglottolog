@@ -26,7 +26,7 @@ def run(args):
         args.log.error(message(obj, msg))
 
     def warn(obj, msg):
-        args.log.warn(message(obj, msg))
+        args.log.warning(message(obj, msg))
 
     def info(obj, msg):
         args.log.info(message(obj, msg))

@@ -22,6 +22,7 @@ from .bibfiles_db import Database
 
 __all__ = ['BibFiles', 'BibFile', 'Entry']
 
+ATTRS_VERSION = tuple(int(v) for v in getattr(attr, '__version__', '20.1').split('.'))
 BIBFILES = 'bibfiles.sqlite3'
 DOCTYPES = collections.OrderedDict((k, k) for k in [
     'grammar',
@@ -211,7 +212,7 @@ class BibFile(object):
 
 
 @functools.total_ordering
-@attr.s(cmp=False)
+@attr.s(**{'cmp' if ATTRS_VERSION < (19, 2) else 'eq': False})
 class Entry(object):
 
     key = attr.ib()
