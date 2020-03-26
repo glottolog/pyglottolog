@@ -212,9 +212,8 @@ class BibFile(object):
 
 
 @functools.total_ordering
-@attr.s(**{'cmp' if ATTRS_VERSION < (19, 2) else 'eq': False})
+@attr.s(eq=False)
 class Entry(object):
-
     key = attr.ib()
     type = attr.ib()
     fields = attr.ib()

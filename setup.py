@@ -25,6 +25,7 @@ setup(
         ],
     },
     install_requires=[
+        'attrs>=19.2',
         'cldfcatalog',
         'csvw>=1.5.6',
         'clldutils>=3.5',
@@ -36,7 +37,6 @@ setup(
         'latexcodec',
         'unidecode',
         'whoosh',
-        'attrs>=18.1',
         'pycountry>=18.12.8',
         'termcolor',
         'newick>=0.9.2',
