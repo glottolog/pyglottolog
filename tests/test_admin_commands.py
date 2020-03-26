@@ -55,6 +55,12 @@ def test_index(api_copy, _main):
     assert len(list(api_copy.repos.joinpath('languoids').glob('*.md'))) == 10
 
 
+def test_update_macroareas(_main, capsys):
+    _main('updatemacroareas')
+    out, _ = capsys.readouterr()
+    assert '1 dialects updated' in out
+
+
 def test_update_sources(_main, capsys):
     _main('updatesources')
     out, _ = capsys.readouterr()
