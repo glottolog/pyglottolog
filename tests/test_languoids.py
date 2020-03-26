@@ -1,4 +1,7 @@
+import pathlib
+
 import pytest
+
 
 from pyglottolog.languoids import (Languoid,
     Glottocodes, Glottocode, Country, Reference,
@@ -150,6 +153,14 @@ def test_ethnologue_comment(api):
 
 def test_classification_comment(api):
     assert api.languoid('abcd1234').classification_comment
+
+
+def test_classification_setter(api, tmpdir):
+    l = api.languoid('abcd1234')
+    l.cfg.set('classification', 'familyrefs', ['abc', 'def'])
+    l.write_info(pathlib.Path(str(tmpdir)))
+    ini = pathlib.Path(str(tmpdir)).joinpath('abcd1234', 'md.ini').read_text(encoding='utf8')
+    assert '\tabc\n\tdef' in ini
 
 
 def test_Languoid_sorting(api):
