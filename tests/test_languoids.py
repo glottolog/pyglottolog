@@ -155,6 +155,15 @@ def test_classification_comment(api):
     assert api.languoid('abcd1234').classification_comment
 
 
+def test_coordinates_setter(api, tmpdir):
+    l = api.languoid('abcd1234')
+    l.latitude = 1.12345678
+    l.longitude = 1.123456789
+    l.write_info(pathlib.Path(str(tmpdir)))
+    ini = pathlib.Path(str(tmpdir)).joinpath('abcd1234', 'md.ini').read_text(encoding='utf8')
+    assert 'latitude = 1.12346' in ini and 'longitude = 1.12346'
+
+
 def test_classification_setter(api, tmpdir):
     l = api.languoid('abcd1234')
     l.cfg.set('classification', 'familyrefs', ['abc', 'def'])

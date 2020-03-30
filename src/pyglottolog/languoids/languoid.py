@@ -364,7 +364,7 @@ class Languoid(object):
 
     @latitude.setter
     def latitude(self, value):
-        self._set('latitude', float(value))
+        self._set('latitude', round(float(value), 5))
 
     @property
     def longitude(self):
@@ -372,7 +372,7 @@ class Languoid(object):
 
     @longitude.setter
     def longitude(self, value):
-        self._set('longitude', float(value))
+        self._set('longitude', round(float(value), 5))
 
     @property
     def hid(self):
