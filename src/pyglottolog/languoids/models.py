@@ -161,7 +161,7 @@ class Reference(object):
             if s.strip():
                 try:
                     res.append(cls.from_string(s, pattern=pattern))
-                except AssertionError:
+                except AssertionError:  # pragma: no cover
                     raise ValueError('invalid ref: {0}'.format(s))
         return res
 

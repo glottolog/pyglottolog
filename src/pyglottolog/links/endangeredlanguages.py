@@ -1,4 +1,3 @@
-# coding: utf8
 import re
 import functools
 import collections
@@ -17,7 +16,16 @@ CSV_URL = BASE_URL + "/userquery/download/"
 
 
 def split(s, sep=';'):
-    return nfilter(ss.strip() for ss in s.split(sep))
+    def unquote(n):
+        n = n.strip()
+        if n == '"':  # A stray, trailing quote.
+            return None
+        if n.startswith('"'):
+            n = n[1:].strip()
+        if n.endswith('"'):
+            n = n[:-1].strip()
+        return n
+    return nfilter(unquote(ss) for ss in s.split(sep))
 
 
 def parse_coords(s):
