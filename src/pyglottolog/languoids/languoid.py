@@ -325,8 +325,8 @@ class Languoid(object):
 
     @property
     def timespan(self):
-        DATE_FORMAT = '%Y-%m-%d'
-        ISO_8601_INTERVAL = re.compile(
+        date_format = '%Y-%m-%d'
+        iso8601_interval = re.compile(
             r'(?P<start_bce>-?)'
             r'(?P<start_date>\d{1,4}-\d{2}-\d{2})'
             r'/'
@@ -341,7 +341,7 @@ class Languoid(object):
         if not value:
             return None
         value = value.strip()
-        ma = ISO_8601_INTERVAL.fullmatch(value)
+        ma = iso8601_interval.fullmatch(value)
         if ma is None:
             raise ValueError('invalid interval', value)  # pragma: no cover
 
@@ -355,7 +355,7 @@ class Languoid(object):
                 yield '{}{}{}'.format(year, sep, rest)
 
         dates = list(iterdates(dates))
-        start, end = (datetime.datetime.strptime(d, DATE_FORMAT).date() for d in dates)
+        start, end = (datetime.datetime.strptime(d, date_format).date() for d in dates)
 
         return (
             -start.year if ma.group('start_bce') else start.year,

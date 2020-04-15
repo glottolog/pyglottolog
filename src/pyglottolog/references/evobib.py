@@ -17,31 +17,35 @@ def bibtool(bib):  # pragma: no cover
         ('select.crossrefs', 'on'),
         ('expand.crossref', 'on'),
         ('new.entry.type', 'mvreference'),
+        ('new.entry.type', 'mvbook'),
+        ('new.entry.type', 'bookinbook'),
         ('new.entry.type', 'thesis'),
         ('new.entry.type', 'report'),
     ]:
         args.append('--{0}="{1}"'.format(k, v))
-    args.append(bib)
-    res = check_output(args)
-    with open(bib, mode='wb') as fp:
+    args.append(bib.name)
+    res = check_output(args, cwd=str(bib.parent))
+    with bib.open(mode='wb') as fp:
         fp.write(res)
 
 
-def download(bibfile, log):  # pragma: no cover
-    with NamedTemporaryFile(delete=False) as fp:
-        log.info('download bib from {0}'.format(URL))
-        fp.write(urlopen(URL).read())
-
-    bibtool(fp.name)
+def update(newbib, bibfile, log):  # pragma: no cover
+    bibtool(newbib)
     stats = Counter()
 
     def fix_entry_type(entry):
         type_ = entry.type.lower()
-        type_map = {'thesis': 'phdthesis', 'mvreference': 'misc', 'report': 'techreport'}
+        type_map = {
+            'thesis': 'phdthesis',
+            'mvreference': 'misc',
+            'mvbook': 'book',
+            'bookinbook': 'book',
+            'report': 'techreport',
+        }
         entry.type = type_map.get(type_, type_)
         stats.update([entry.type])
 
-    bibfile.update(fp.name, log=log)
+    bibfile.update(newbib, log=log)
     bibfile.visit(fix_entry_type)
     bibfile.check(log)
     res = Table('entry type', '#')
