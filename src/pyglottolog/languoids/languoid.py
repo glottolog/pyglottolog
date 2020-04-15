@@ -1,6 +1,6 @@
-# languoid.py
-
 import os
+import re
+import datetime
 import functools
 from pathlib import Path
 
@@ -322,6 +322,55 @@ class Languoid(object):
             assert isinstance(value, (list, tuple)) \
                 and all(self._api.macroareas.get(n) for n in value)
             self._set('macroareas', [ma.name for ma in value])
+
+    @property
+    def timespan(self):
+        DATE_FORMAT = '%Y-%m-%d'
+        ISO_8601_INTERVAL = re.compile(
+            r'(?P<start_bce>-?)'
+            r'(?P<start_date>\d{1,4}-\d{2}-\d{2})'
+            r'/'
+            r'(?P<end_bce>-?)'
+            r'(?P<end_date>\d{1,4}-\d{2}-\d{2})',
+            flags=re.ASCII)
+        if 'timespan' in self.cfg[self.section_core]:
+            value = self.cfg.get(self.section_core, 'timespan')
+        else:
+            value = None
+
+        if not value:
+            return None
+        value = value.strip()
+        ma = ISO_8601_INTERVAL.fullmatch(value)
+        if ma is None:
+            raise ValueError('invalid interval', value)  # pragma: no cover
+
+        dates = ma.group('start_date', 'end_date')
+
+        def iterdates(dates):
+            for d in dates:
+                year, sep, rest = d.partition('-')
+                assert all([year, sep, rest])
+                year = '{:04d}'.format(int(year))
+                yield '{}{}{}'.format(year, sep, rest)
+
+        dates = list(iterdates(dates))
+        start, end = (datetime.datetime.strptime(d, DATE_FORMAT).date() for d in dates)
+
+        return (
+            -start.year if ma.group('start_bce') else start.year,
+            -end.year if ma.group('end_bce') else end.year)
+
+    @timespan.setter
+    def timespan(self, value):
+        if not (isinstance(value, (list, tuple)) and len(value) == 2):
+            raise ValueError(value)
+
+        def fmt(v):
+            sign = '-' if v < 0 else ''
+            return '{}{:04d}'.format(sign, abs(v))
+
+        self._set('timespan', '{}-01-01/{}-01-01'.format(*map(fmt, value)))
 
     @property
     def links(self):

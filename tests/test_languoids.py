@@ -126,6 +126,22 @@ def test_endangerment(api):
     assert 'source' in lang.endangerment.__json__()
 
 
+def test_timespan(api, tmpdir):
+    assert api.languoid('abcd1235').timespan == None
+
+    with pytest.raises(ValueError):
+        api.languoid('abcd1235').timespan = (1,)
+
+    l = api.languoid('abcd1235')
+    l.timespan = (-1, 300)
+    assert l.timespan == (-1, 300)
+
+    p = pathlib.Path(str(tmpdir))
+    l.write_info(p)
+    print(p.joinpath('abcd1235', 'md.ini').read_text(encoding='utf8'))
+    assert '-0001-01-01/0300-01-01' in p.joinpath('abcd1235', 'md.ini').read_text(encoding='utf8')
+
+
 def test_Level(api):
     assert api.languoid_levels.dialect > api.languoid_levels.language
     assert api.languoid_levels.language == api.languoid('abcd1235').level
