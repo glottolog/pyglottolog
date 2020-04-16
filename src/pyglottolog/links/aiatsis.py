@@ -5,6 +5,7 @@ import collections
 
 from csvw.dsv import reader
 import requests
+from clldutils.misc import nfilter
 
 from .util import LinkProvider
 
@@ -44,8 +45,9 @@ class AIATSIS(LinkProvider):
             links, names = [], []
             for c in sorted(lmap.get(l.id, [])):
                 links.append((md[c]['uri'], md[c]['language_name']))
-                names.append(md[c]['language_name'])
-                names.extend([n.strip() for n in md[c]['language_synonym'].split('|')])
+                if md[c]['language_name']:
+                    names.append(md[c]['language_name'])
+                names.extend(nfilter([n.strip() for n in md[c]['language_synonym'].split('|')]))
             if any([
                 l.update_links(DOMAIN, links),
                 l.update_names(names, type_='aiatsis'),
