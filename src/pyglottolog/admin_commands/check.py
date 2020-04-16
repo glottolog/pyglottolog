@@ -75,6 +75,7 @@ def run(args):
 
         assert isinstance(lang.countries, list)
         assert isinstance(lang.macroareas, list)
+        assert (lang.timespan is None) or isinstance(lang.timespan, tuple)
 
         if 'sources' in lang.cfg:
             for ref in Reference.from_list(lang.cfg.getlist('sources', 'glottolog')):

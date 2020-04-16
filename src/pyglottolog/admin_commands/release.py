@@ -5,8 +5,8 @@ from pyglottolog.metadata import prepare_release
 
 
 def register(parser):
-    parser.add_argument('version')
+    parser.add_argument('version', help="version number without leading 'v'")
 
 
 def run(args):
-    prepare_release(args.repos, args.version)
+    print(prepare_release(args.repos, args.version))

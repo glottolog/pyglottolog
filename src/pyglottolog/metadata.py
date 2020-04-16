@@ -77,3 +77,4 @@ def prepare_release(repos, version):
         },
         repos.path('.zenodo.json'),
         indent=4)
+    return citation

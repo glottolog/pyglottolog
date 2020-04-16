@@ -1,7 +1,5 @@
-from tempfile import NamedTemporaryFile
 from subprocess import check_output
 from collections import Counter
-from urllib.request import urlopen
 
 from clldutils.markup import Table
 
