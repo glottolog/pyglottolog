@@ -40,6 +40,7 @@ def editor_to_dict(n, editors):
     res = {'name': n}
     for e in editors.values():
         if e.name == n:
+            assert e.current, '{} is not marked as current editor'.format(n)
             if e.affiliation:
                 res['affiliation'] = e.affiliation
             if e.orcid:
