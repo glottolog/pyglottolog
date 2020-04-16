@@ -13,7 +13,7 @@ def test_el_altnames():
         id=1,
         isos='',
         name='',
-        also_known_as='инари-саамский язык; Anárašgiella; Enaresamiska"; "Inari Lappish;"',
+        also_known_as='инари-саамский язык; Anárašgiella; Enaresamiska; "Inari Lappish;"',
         status=None,
         speakers=None,
         classification=None,
@@ -24,7 +24,7 @@ def test_el_altnames():
         continent=None,
         coordinates='1;2',
     )
-    assert 'Inari Lappish' in lang.also_known_as
+    assert '"Inari Lappish"' in lang.also_known_as
     assert '"' not in lang.also_known_as
 
 

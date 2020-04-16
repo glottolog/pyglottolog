@@ -6,8 +6,12 @@ from pyglottolog.links import *  # noqa: F401, F403
 from pyglottolog.links.util import LinkProvider
 
 
+def providers():
+    return {cls.__name__.lower(): cls for cls in LinkProvider.__subclasses__()}
+
+
 def register(parser):
-    parser.add_argument('provider', nargs='*')
+    parser.add_argument('provider', nargs='*', help='|'.join(providers()))
 
 
 def run(args):
