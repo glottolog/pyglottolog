@@ -1,3 +1,4 @@
+import pathlib
 from setuptools import setup, find_packages
 
 
@@ -7,7 +8,7 @@ setup(
     author='Robert Forkel',
     author_email='forkel@shh.mpg.de',
     description='python package for glottolog data curation',
-    long_description=open('README.md').read(),
+    long_description=pathlib.Path('README.md').read_text(encoding='utf-8'),
     long_description_content_type='text/markdown',
     keywords='data linguistics',
     license='Apache 2.0',
