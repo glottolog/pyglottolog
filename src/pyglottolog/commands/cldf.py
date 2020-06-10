@@ -21,4 +21,4 @@ def run(args):
     zenodo['title'] = zenodo['title'].replace('/glottolog:', '/glottolog-cldf:') + ' as CLDF'
     zenodo['communities'].append(dict(identifier='cldf-datasets'))
     zenodo['keywords'].append('cldf:StructureDataset')
-    jsonlib.dump(zenodo, args.cldf_dir / '.zenodo.json', indent=4)
+    jsonlib.dump(zenodo, args.cldf_dir.parent / '.zenodo.json', indent=4)

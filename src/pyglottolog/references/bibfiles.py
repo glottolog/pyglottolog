@@ -15,6 +15,7 @@ from clldutils.path import memorymapped
 from clldutils.source import Source
 from clldutils.text import split_text
 from clldutils.inifile import INI
+from clldutils.attrlib import cmp_off
 
 from . import bibtex
 from . import util
@@ -212,7 +213,7 @@ class BibFile(object):
 
 
 @functools.total_ordering
-@attr.s(eq=False)
+@attr.s(**cmp_off)
 class Entry(object):
     key = attr.ib()
     type = attr.ib()

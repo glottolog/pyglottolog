@@ -29,7 +29,7 @@ setup(
         'attrs>=19.2',
         'cldfcatalog',
         'csvw>=1.5.6',
-        'clldutils>=3.5',
+        'clldutils>=3.5.2',
         'purl',
         'pycldf>=1.6.4',
         'sqlalchemy',
