@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pyglottolog',
-    version='3.2.2.dev0',
+    version='3.2.2',
     author='Robert Forkel',
     author_email='forkel@shh.mpg.de',
     description='python package for glottolog data curation',
@@ -27,9 +27,9 @@ setup(
     },
     install_requires=[
         'attrs>=19.2',
+        'clldutils>=3.5.2',
         'cldfcatalog',
         'csvw>=1.5.6',
-        'clldutils>=3.5.2',
         'purl',
         'pycldf>=1.6.4',
         'sqlalchemy',
