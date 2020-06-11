@@ -2,6 +2,7 @@ import os
 import re
 import datetime
 import functools
+import warnings
 from pathlib import Path
 
 from clldutils.inifile import INI
@@ -16,6 +17,14 @@ from pyglottolog import config
 __all__ = ['Languoid']
 
 INFO_FILENAME = 'md.ini'
+
+ISO_8601_INTERVAL = re.compile(
+    r'(?P<start_sign>[+-]?)'
+    r'(?P<start_date>\d{1,4}-\d{2}-\d{2})'
+    r'/'
+    r'(?P<end_sign>[+-]?)'
+    r'(?P<end_date>\d{1,4}-\d{2}-\d{2})',
+    flags=re.ASCII)
 
 
 @functools.total_ordering
@@ -324,47 +333,43 @@ class Languoid(object):
             self._set('macroareas', [ma.name for ma in value])
 
     @property
-    def timespan(self):
-        date_format = '%Y-%m-%d'
-        iso8601_interval = re.compile(
-            r'(?P<start_bce>-?)'
-            r'(?P<start_date>\d{1,4}-\d{2}-\d{2})'
-            r'/'
-            r'(?P<end_bce>-?)'
-            r'(?P<end_date>\d{1,4}-\d{2}-\d{2})',
-            flags=re.ASCII)
-        if 'timespan' in self.cfg[self.section_core]:
-            value = self.cfg.get(self.section_core, 'timespan')
-        else:
-            value = None
-
+    def timespan(self, _date_format='%Y-%m-%d'):
+        value = self.cfg.get(self.section_core, 'timespan',
+                             fallback=None)
         if not value:
             return None
         value = value.strip()
-        ma = iso8601_interval.fullmatch(value)
+        ma = ISO_8601_INTERVAL.fullmatch(value)
         if ma is None:
             raise ValueError('invalid interval', value)  # pragma: no cover
 
         dates = ma.group('start_date', 'end_date')
 
-        def iterdates(dates):
-            for d in dates:
-                year, sep, rest = d.partition('-')
-                assert all([year, sep, rest])
-                year = '{:04d}'.format(int(year))
-                yield '{}{}{}'.format(year, sep, rest)
+        def fix_date(d, year_tmpl='{:04d}'):
+            year, sep, rest = d.partition('-')
+            assert year and sep and rest
+            year = year_tmpl.format(int(year))
+            return '{}{}{}'.format(year, sep, rest)
 
-        dates = list(iterdates(dates))
-        start, end = (datetime.datetime.strptime(d, date_format).date() for d in dates)
+        dates = map(fix_date, dates)
+        dates = [datetime.datetime.strptime(d, _date_format).date() for d in dates]
 
+        if any((d.month, d.day) != (1, 1) for d in dates):
+            warnigns.warn('ignoring non -1-1 date(s) month/day: {!r}'.format(dates))
+
+        start, end = dates
         return (
-            -start.year if ma.group('start_bce') else start.year,
-            -end.year if ma.group('end_bce') else end.year)
+            -start.year if ma.group('start_sign') == '-' else start.year,
+            -end.year if ma.group('end_sign') == '-' else end.year)
 
     @timespan.setter
     def timespan(self, value):
         if not (isinstance(value, (list, tuple)) and len(value) == 2):
             raise ValueError(value)
+
+        # https://en.wikipedia.org/wiki/ISO_8601#Years
+        if not all(-9999 <= v <= 9999 for v in value):
+            warnings.warn('serializing year(s) outside the four-digit-range: {!r}'.format(value))
 
         def fmt(v):
             sign = '-' if v < 0 else ''

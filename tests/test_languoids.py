@@ -126,7 +126,7 @@ def test_endangerment(api):
     assert 'source' in lang.endangerment.__json__()
 
 
-def test_timespan(api, tmpdir):
+def test_timespan(api, tmpdir, recwarn):
     assert api.languoid('abcd1235').timespan == None
 
     with pytest.raises(ValueError):
@@ -138,8 +138,10 @@ def test_timespan(api, tmpdir):
 
     p = pathlib.Path(str(tmpdir))
     l.write_info(p)
-    print(p.joinpath('abcd1235', 'md.ini').read_text(encoding='utf8'))
     assert '-0001-01-01/0300-01-01' in p.joinpath('abcd1235', 'md.ini').read_text(encoding='utf8')
+
+    l.timespan = (-10000, 2000)
+    assert recwarn.pop(UserWarning)
 
 
 def test_Level(api):
