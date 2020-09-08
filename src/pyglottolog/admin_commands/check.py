@@ -3,6 +3,7 @@ Check the glottolog data for consistency.
 """
 import collections
 
+from clldutils.jsonlib import load
 from pyglottolog.languoids import Reference
 from pyglottolog.util import message
 import pyglottolog.iso
@@ -16,6 +17,11 @@ def register(parser):
     )
     parser.add_argument(
         '--tree-only',
+        action='store_true',
+        default=False,
+    )
+    parser.add_argument(
+        '--old-languoids',
         action='store_true',
         default=False,
     )
@@ -56,13 +62,29 @@ def run(args):
             if ref_id and ref_id not in refkeys:
                 error(obj, 'missing reference: {0}'.format(ref_id))
 
+    old_languoids = load(args.repos.build_path('languoids.json')) if args.old_languoids else None
+    old_languages_count = len(old_languoids['language']) if old_languoids else 0
     for lang in args.repos.languoids():
         # duplicate glottocodes:
         if lang.id in languoids:
             error(
                 lang.id,
                 'duplicate glottocode\n{0}\n{1}'.format(languoids[lang.id].dir, lang.dir))
+        if old_languoids:
+            if lang.id in old_languoids[lang.level.name]:
+                old_languoids[lang.level.name].remove(lang.id)
         languoids[lang.id] = lang
+
+    if old_languoids:
+        for gc in old_languoids['language']:
+            error(gc, 'deleted language level languoid!')
+        if not old_languoids['language']:
+            args.log.info(
+                'All {} language level languoids still present'.format(old_languages_count))
+        for level in ['family', 'dialect']:
+            if old_languoids[level]:
+                args.log.info(
+                    '{} {} level languoids deleted'.format(len(old_languoids[level]), level))
 
     for lang in languoids.values():
         ancestors = lang.ancestors_from_nodemap(languoids)
