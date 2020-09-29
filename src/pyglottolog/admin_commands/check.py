@@ -77,7 +77,11 @@ def run(args):
 
     if old_languoids:
         for gc in old_languoids['language']:
-            error(gc, 'deleted language level languoid!')
+            if gc not in languoids:
+                error(gc, 'deleted language level languoid!')
+            else:
+                args.log.warning(
+                    '{} switched from language to {}'.format(gc, languoids[gc].level.name))
         if not old_languoids['language']:
             args.log.info(
                 'All {} language level languoids still present'.format(old_languages_count))
