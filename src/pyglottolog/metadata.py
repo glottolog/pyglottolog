@@ -74,7 +74,8 @@ def prepare_release(repos, version):
             "communities": [
                 {"identifier": cid} for cid in repos.publication.zenodo.communities.split()],
             "creators": [editor_to_dict(n, repos.editors) for n in editors],
-            "access_right": "open"
+            "access_right": "open",
+            "upload_type": "dataset",
         },
         repos.path('.zenodo.json'),
         indent=4)

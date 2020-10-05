@@ -27,7 +27,7 @@ setup(
     },
     install_requires=[
         'attrs>=19.2',
-        'clldutils>=3.5.2',
+        'clldutils>=3.5.3',
         'cldfcatalog',
         'csvw>=1.5.6',
         'purl',
