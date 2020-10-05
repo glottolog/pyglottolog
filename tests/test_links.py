@@ -12,7 +12,7 @@ def test_el_altnames():
     lang = endangeredlanguages.ElCatLanguage(
         id=1,
         isos='',
-        name='',
+        name=' инари-саамский язык',
         also_known_as='инари-саамский язык; Anárašgiella; Enaresamiska; "Inari Lappish;"',
         status=None,
         speakers=None,
@@ -26,6 +26,7 @@ def test_el_altnames():
     )
     assert '"Inari Lappish"' in lang.also_known_as
     assert '"' not in lang.also_known_as
+    assert len(lang.names) == 4
 
 
 def test_wikidata(mocker, api_copy):

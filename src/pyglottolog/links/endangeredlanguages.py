@@ -35,7 +35,7 @@ class Coordinate(object):
 class ElCatLanguage(object):
     id = attr.ib(converter=int)
     isos = attr.ib(converter=functools.partial(split, sep=','))
-    name = attr.ib()
+    name = attr.ib(converter=lambda s: s.strip())
     also_known_as = attr.ib(converter=split)
     status = attr.ib()
     speakers = attr.ib()
@@ -46,6 +46,10 @@ class ElCatLanguage(object):
     countries = attr.ib(converter=split)
     continent = attr.ib()
     coordinates = attr.ib(converter=parse_coords)
+
+    @property
+    def names(self):
+        return [self.name] + [n for n in self.also_known_as if n != self.name]
 
     @property
     def url(self):
@@ -72,9 +76,7 @@ class ElCat(LinkProvider):
                     changed = True
                 if len(elcat_langs[l.iso]) == 1:
                     # Only add alternative names, if only one ElCat language matches!
-                    changed = l.update_names(
-                        [elcat_langs[l.iso][0].name] + elcat_langs[l.iso][0].also_known_as,
-                        type_='elcat') or changed
+                    changed = l.update_names(elcat_langs[l.iso][0].names, type_='elcat') or changed
             else:
                 changed = any([l.update_links('endangeredlanguages.com', []),
                                l.update_names([], type_='elcat')])
