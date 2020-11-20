@@ -26,6 +26,8 @@ setup(
         ],
     },
     install_requires=[
+        'pybtex>=0.22,<0.23; python_version < "3.6"',
+        'pybtex>=0.22; python_version > "3.5"',
         'attrs>=19.2',
         'clldutils>=3.5.3',
         'cldfcatalog',
@@ -34,7 +36,6 @@ setup(
         'pycldf>=1.6.4',
         'sqlalchemy',
         'tqdm',
-        'pybtex>=0.22',
         'latexcodec',
         'unidecode',
         'whoosh',
