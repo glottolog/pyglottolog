@@ -2,7 +2,7 @@
 
 Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 
-[![Build Status](https://travis-ci.org/glottolog/pyglottolog.svg?branch=master)](https://travis-ci.org/glottolog/pyglottolog)
+[![Build Status](https://github.com/glottolog/pyglottolog/workflows/tests/badge.svg)](https://github.com/glottolog/pyglottolog/actions?query=workflow%3Atests)
 [![codecov](https://codecov.io/gh/glottolog/pyglottolog/branch/master/graph/badge.svg)](https://codecov.io/gh/glottolog/pyglottolog)
 [![PyPI](https://img.shields.io/pypi/v/pyglottolog.svg)](https://pypi.org/project/pyglottolog)
 
