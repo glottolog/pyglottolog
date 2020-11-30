@@ -26,7 +26,7 @@ def test_el_altnames():
     )
     assert '"Inari Lappish"' in lang.also_known_as
     assert '"' not in lang.also_known_as
-    assert len(lang.names) == 4
+    assert len(lang.also_known_as) == 4
 
 
 def test_wikidata(mocker, api_copy):
