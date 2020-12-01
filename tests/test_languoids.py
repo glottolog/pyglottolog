@@ -51,9 +51,22 @@ def test_pattern(input_, valid, _match=Glottocode.pattern.match):
     assert (_match(input_) is not None) == valid
 
 
-def test_Country():
-    assert Country.from_text('Germany').id == 'DE'
+@pytest.mark.parametrize('text, expected_id, expected_str', [
+    ('Germany', 'DE', 'DE'),
+    ('Russian Federation (RU)', 'RU', 'RU'),
+    ('RU', 'RU', 'RU'),
+])
+def test_Country_from_text(text, expected_id, expected_str):
+    country = Country.from_text(text)
+    assert country.id == expected_id
+    assert str(country) == expected_str
+
+
+def test_Country_from_name():
     assert Country.from_name('abcdefg') is None
+
+
+def test_Country_from_id():
     assert Country.from_id('abcdefg') is None
 
 

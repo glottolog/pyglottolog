@@ -178,7 +178,11 @@ class Country(object):
     name = attr.ib()
 
     def __str__(self):
-        return '{0.name} ({0.id})'.format(self)
+        return self._format()
+
+    def _format(self, minimal=True):
+        tmpl = '{0.name} ({0.id})' if not minimal else '{0.id}'
+        return tmpl.format(self)
 
     @classmethod
     def from_name(cls, name):
@@ -194,9 +198,10 @@ class Country(object):
 
     @classmethod
     def from_text(cls, text):
-        match = re.search(r'\(?(?P<code>[A-Z]{2})\)?', text)
+        match = re.search(r'(?P<code_only>^[A-Z]{2}$)|\(?(?P<code>[A-Z]{2})\)?', text)
         if match:
-            return cls.from_id(match.group('code'))
+            code = match.group('code_only') or match.group('code')
+            return cls.from_id(code)
         return cls.from_name(text)
 
 
