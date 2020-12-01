@@ -135,5 +135,7 @@ def test_iso2codes(_main, tmpdir):
 
 
 def test_cldf(_main, tmpdir):
-    _main('cldf {0}'.format(tmpdir.join('cldf')))
-    _main('cldf {0}'.format(tmpdir.join('cldf')))
+    tmppath = pathlib.Path(str(tmpdir))
+    path = (tmppath / 'cldf').as_posix()
+    _main('cldf {0}'.format(path))
+    _main('cldf {0}'.format(path))
