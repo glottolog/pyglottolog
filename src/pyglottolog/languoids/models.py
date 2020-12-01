@@ -96,8 +96,8 @@ class Glottocodes(object):
 
 
 class Glottocode(str):
-    regex = '[a-z0-9]{4}[0-9]{4}'
-    pattern = re.compile(regex + '$')
+    regex = r'[a-z0-9]{4}[0-9]{4}'
+    pattern = re.compile(regex + r'$')
 
     def __new__(cls, content):
         if not cls.pattern.match(content):
@@ -114,10 +114,10 @@ class Reference(object):
     pages = attr.ib(default=None)
     trigger = attr.ib(default=None)
     pattern = re.compile(
-        "\*\*(?P<key>[a-z0-9\-_]+:[a-zA-Z.?\-;*'/()\[\]!_:0-9\u2014]+?)\*\*"
-        "(:(?P<pages>[0-9\-f]+))?"
-        '(<trigger "(?P<trigger>[^\"]+)">)?')
-    old_pattern = re.compile('[^\[]+\[(?P<pages>[^\]]*)\]\s*\([0-9]+\s+(?P<key>[^\)]+)\)')
+        r"\*\*(?P<key>[a-z0-9\-_]+:[a-zA-Z.?\-;*'/()\[\]!_:0-9\u2014]+?)\*\*"
+        r"(:(?P<pages>[0-9\-f]+))?"
+        r'(<trigger "(?P<trigger>[^\"]+)">)?')
+    old_pattern = re.compile(r'[^\[]+\[(?P<pages>[^\]]*)\]\s*\([0-9]+\s+(?P<key>[^\)]+)\)')
 
     def __str__(self):
         res = '**{0.key}**'.format(self)
@@ -194,7 +194,7 @@ class Country(object):
 
     @classmethod
     def from_text(cls, text):
-        match = re.search('\(?(?P<code>[A-Z]{2})\)?', text)
+        match = re.search(r'\(?(?P<code>[A-Z]{2})\)?', text)
         if match:
             return cls.from_id(match.group('code'))
         return cls.from_name(text)
@@ -269,7 +269,7 @@ class Endangerment(object):
 
 
 def valid_ethnologue_versions(inst, attr, value):
-    pattern = re.compile('(E[1-9][0-9]|ISO 639-3)$')
+    pattern = re.compile(r'(E[1-9][0-9]|ISO 639-3)$')
     if not all(bool(pattern.match(x)) for x in value):
         raise ValueError('invalid ethnologue_versions: {0}'.format('/'.join(value)))
 
