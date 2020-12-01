@@ -1,18 +1,14 @@
 name: tests
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [push]
 
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]  # slow: macos-latest
         python-version: [3.5, 3.6, 3.7, 3.8]
         exclude:
            - os: windows-latest
