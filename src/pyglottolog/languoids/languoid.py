@@ -355,7 +355,7 @@ class Languoid(object):
         dates = [datetime.datetime.strptime(d, _date_format).date() for d in dates]
 
         if any((d.month, d.day) != (1, 1) for d in dates):
-            warnigns.warn('ignoring non -1-1 date(s) month/day: {!r}'.format(dates))
+            warnings.warn('ignoring non -1-1 date(s) month/day: {!r}'.format(dates))
 
         start, end = dates
         return (

@@ -5,7 +5,7 @@ import subprocess
 
 import requests
 from clldutils.source import Source
-from bs4 import BeautifulSoup as bs
+from bs4 import BeautifulSoup as bs  # noqa: N813
 
 LS_INDEX = 'http://www.elpublishing.org/language-snapshots'
 LC_INDEX = 'http://www.elpublishing.org/language-contexts'
