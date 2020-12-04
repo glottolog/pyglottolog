@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pyglottolog',
-    version='3.3.0',
+    version='3.3.1.dev0',
     author='Robert Forkel',
     author_email='forkel@shh.mpg.de',
     description='python package for glottolog data curation',
