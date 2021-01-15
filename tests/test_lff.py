@@ -22,6 +22,23 @@ def _set_lff(api_copy, name, content):
     return content
 
 
+def test_lff2tree_update_iso_code(api_copy):
+    # https://github.com/glottolog/pyglottolog/issues/47
+    md = api_copy.path('languoids', 'tree', 'abcd1234', 'md.ini')
+    # We remove the iso code from the languoid
+    text = '\n'.join(
+        [l for l in md.read_text(encoding='utf8').split('\n') if not l.startswith('iso')])
+    md.write_text(text, encoding='utf8')
+    # Now the following lff should reset hid **and** iso code:
+    lfftext = _set_lff(api_copy, 'lff.txt', """# -*- coding: utf-8 -*-
+Name [abcd1234] aaa
+    Other [abcd1235] abk
+    """)
+    _set_lff(api_copy, 'dff.txt', "")
+    lff2tree(api_copy)
+    assert api_copy.languoid('abcd1234').iso == 'aaa'
+
+
 def test_lff2tree(api_copy):
     lfftext = _set_lff(api_copy, 'lff.txt', """# -*- coding: utf-8 -*-
 Abkhaz-Adyge [abkh1242] aaa
