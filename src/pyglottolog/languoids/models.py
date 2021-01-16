@@ -275,7 +275,7 @@ class Endangerment(object):
 
 def valid_ethnologue_versions(inst, attr, value):
     pattern = re.compile(r'(E[1-9][0-9]|ISO 639-3)$')
-    if not all(bool(pattern.match(x)) for x in value):
+    if not all(bool(pattern.match(x)) for x in value):  # pragma: no cover
         raise ValueError('invalid ethnologue_versions: {0}'.format('/'.join(value)))
 
 

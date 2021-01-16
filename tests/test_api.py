@@ -19,6 +19,22 @@ def test_glottolog_invalid_repos(tmpdir):
         Glottolog(str(tmpdir))
 
 
+def test_cache(caching_api, api):
+    lang = api.languoid('abcd1234')
+    assert lang is not api.languoid('abcd1234')
+
+    lang = caching_api.languoid('abcd1234')
+    assert lang is caching_api.languoid('abcd1234')
+    assert caching_api.languoid('aaa') is lang
+    assert caching_api.languoid('abc').id == 'abcd1235'
+
+
+def test_cache_languoids(caching_api):
+    assert 'aaa' not in caching_api.cache
+    _ = list(caching_api.languoids())
+    assert 'aaa' in caching_api.cache
+
+
 def test_editors(api):
     eids = [
         e.id for e in sorted(api.editors.values(), key=lambda i: int(i.ord))
