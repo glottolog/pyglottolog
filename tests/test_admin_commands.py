@@ -64,7 +64,7 @@ def test_update_macroareas(_main, capsys):
 def test_update_sources(_main, capsys):
     _main('updatesources')
     out, _ = capsys.readouterr()
-    assert '1 languoids updated' in out
+    assert '2 languoids updated' in out
 
 
 def test_check(capsys, _main, mocker, api_copy):

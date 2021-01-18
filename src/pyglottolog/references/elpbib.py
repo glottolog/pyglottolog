@@ -5,7 +5,10 @@ import subprocess
 
 import requests
 from clldutils.source import Source
-from bs4 import BeautifulSoup as bs  # noqa: N813
+try:
+    from bs4 import BeautifulSoup as bs  # noqa: N813
+except ImportError:  # pragma: no cover
+    bs = None
 
 LS_INDEX = 'http://www.elpublishing.org/language-snapshots'
 LC_INDEX = 'http://www.elpublishing.org/language-contexts'
