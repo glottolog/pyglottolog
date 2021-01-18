@@ -2,6 +2,8 @@
 Programmatic access to Glottolog data.
 """
 import re
+import typing
+import pathlib
 import contextlib
 import collections
 
@@ -32,21 +34,21 @@ class Cache:
         self.by_id = {}
         self._lineage = {}
 
-    def __contains__(self, item):
-        return (item in self.by_iso) or item in self.by_iso
+    def __contains__(self, id_: str):
+        return (id_ in self.by_iso) or id_ in self.by_iso
 
-    def __getitem__(self, item):
-        return self.by_iso.get(item) or self.by_id[item]
+    def __getitem__(self, id_: str):
+        return self.by_iso.get(id_) or self.by_id[id_]
 
-    def add(self, d, api):
-        if d.name not in self.by_id:
-            lang = languoids.Languoid.from_dir(d, nodes=self._lineage, _api=api)
+    def add(self, directory: pathlib.Path, api) -> languoids.Languoid:
+        if directory.name not in self.by_id:
+            lang = languoids.Languoid.from_dir(directory, nodes=self._lineage, _api=api)
             self._lineage[lang.id] = (lang.name, lang.id, lang.level)
             self.by_id[lang.id] = lang
             if lang.iso:
                 self.by_iso[lang.iso] = lang
         else:
-            lang = self.by_id[d.name]
+            lang = self.by_id[directory.name]
         return lang
 
 
@@ -65,7 +67,7 @@ class Glottolog(API):
         'publication': config.Generic,
     }
 
-    def __init__(self, repos='.', cache=False):
+    def __init__(self, repos='.', *, cache=False):
         """
         :param repos: Path to a clone or export of https://github.com/glottolog/glottolog
         :param cache: Indicate whether to cache `Languoid` objects or not. If `True`, the API must \
@@ -128,12 +130,11 @@ class Glottolog(API):
     def _tree_dirs(self):
         return list(walk(self.tree, mode='dirs'))
 
-    def languoid(self, id_):
+    def languoid(self, id_) -> languoids.Languoid:
         """
         Retrieve a languoid.
 
         :param id_: Glottocode or ISO code.
-        :return: `languoids.Languoid` instance.
         """
         if isinstance(id_, languoids.Languoid):
             return id_
@@ -160,7 +161,8 @@ class Glottolog(API):
                         return l_
                     return languoids.Languoid.from_dir(d, _api=self)
 
-    def languoids(self, ids=None, maxlevel=None, exclude_pseudo_families=False):
+    def languoids(self, ids=None, maxlevel=None, exclude_pseudo_families=False) \
+            -> typing.Generator[languoids.Languoid, None, None]:
         """
         :param ids: `set` of Glottocodes to limit the result to.
         :param maxlevel: Numeric maximal nesting depth of languoids, or Languoid.level.
@@ -184,7 +186,7 @@ class Glottolog(API):
                     if (not exclude_pseudo_families) or not lang.category.startswith('Pseudo'):
                         yield lang
 
-    def languoids_by_code(self, nodes=None):
+    def languoids_by_code(self, nodes=None) -> dict:
         """
         Returns a `dict` mapping the three major language code schemes
         (Glottocode, ISO code, and Harald's NOCODE_s) to Languoid objects.
@@ -199,6 +201,9 @@ class Glottolog(API):
         return res
 
     def ascii_tree(self, start, maxlevel=None):
+        """
+        Prints an ASCII representation of the languoid tree starting at `start` to `stdout`.
+        """
         _ascii_node(
             self.languoid(start),
             0,
