@@ -13,13 +13,13 @@ glottolog-admin check --old-languoids
 """
 try:
     from git import Repo
-except ImportError:
+except ImportError:  # pragma: no cover
     Repo = None
 
 from clldutils import jsonlib
 
 
-def run(args):
+def run(args):  # pragma: no cover
     if Repo:
         assert str(Repo(str(args.repos.repos)).active_branch) == 'master', \
             'Command should be run on master branch'

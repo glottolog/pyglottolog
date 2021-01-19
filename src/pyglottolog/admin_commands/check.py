@@ -70,12 +70,12 @@ def run(args):
             error(
                 lang.id,
                 'duplicate glottocode\n{0}\n{1}'.format(languoids[lang.id].dir, lang.dir))
-        if old_languoids:
+        if old_languoids:  # pragma: no cover
             if lang.id in old_languoids[lang.level.name]:
                 old_languoids[lang.level.name].remove(lang.id)
         languoids[lang.id] = lang
 
-    if old_languoids:
+    if old_languoids:  # pragma: no cover
         for gc in old_languoids['language']:
             if gc not in languoids:
                 error(gc, 'deleted language level languoid!')

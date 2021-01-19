@@ -51,6 +51,12 @@ def api(repos_path):
 
 
 @pytest.fixture
+def caching_api(repos_path):
+    """Glottolog instance from shared directory for read-only tests."""
+    return pyglottolog.Glottolog(str(repos_path), cache=True)
+
+
+@pytest.fixture
 def api_copy(tmpdir, repos_path):
     """Glottolog instance from isolated directory copy."""
     repos_copy = str(tmpdir / 'repos')
