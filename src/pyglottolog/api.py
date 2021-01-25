@@ -28,9 +28,9 @@ __all__ = ['Glottolog']
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 
 
-class Cache(collections.ChainMap):
+class Cache(dict):
     def __init__(self):
-        super().__init__({}, {})
+        super().__init__()
         self._lineage = {}
 
     def __bool__(self):
