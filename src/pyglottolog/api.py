@@ -28,27 +28,23 @@ __all__ = ['Glottolog']
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 
 
-class Cache:
+class Cache(collections.ChainMap):
     def __init__(self):
-        self.by_iso = {}
-        self.by_id = {}
+        super().__init__({}, {})
         self._lineage = {}
 
-    def __contains__(self, id_: str):
-        return (id_ in self.by_iso) or id_ in self.by_iso
-
-    def __getitem__(self, id_: str):
-        return self.by_iso.get(id_) or self.by_id[id_]
+    def __bool__(self):
+        return True
 
     def add(self, directory: pathlib.Path, api) -> languoids.Languoid:
-        if directory.name not in self.by_id:
+        if directory.name not in self:
             lang = languoids.Languoid.from_dir(directory, nodes=self._lineage, _api=api)
             self._lineage[lang.id] = (lang.name, lang.id, lang.level)
-            self.by_id[lang.id] = lang
+            self[lang.id] = lang
             if lang.iso:
-                self.by_iso[lang.iso] = lang
+                self[lang.iso] = lang
         else:
-            lang = self.by_id[directory.name]
+            lang = self[directory.name]
         return lang
 
 

@@ -31,8 +31,10 @@ def test_cache(caching_api, api):
 
 def test_cache_languoids(caching_api):
     assert 'aaa' not in caching_api.cache
+    assert 'abcd1234' not in caching_api.cache
     _ = list(caching_api.languoids())
     assert 'aaa' in caching_api.cache
+    assert 'abcd1234' in caching_api.cache
 
 
 def test_editors(api):
