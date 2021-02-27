@@ -13,8 +13,8 @@ def register(parser):
 def run(args):
     ops = collections.defaultdict(collections.Counter)
 
-    for l in args.repos.languoids():
-        for secname, sec in l.cfg.items():
+    for lang in args.repos.languoids():
+        for secname, sec in lang.cfg.items():
             ops[secname].update(opt for opt, val in sec.items() if val)
 
     ops.pop('DEFAULT', None)

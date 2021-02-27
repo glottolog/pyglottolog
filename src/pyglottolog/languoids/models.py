@@ -155,9 +155,9 @@ class Reference(object):
             raise ValueError('Invalid reference: {0}'.format(string))
 
     @classmethod
-    def from_list(cls, l, pattern=None):
+    def from_list(cls, list_, pattern=None):
         res = []
-        for s in l:
+        for s in list_:
             if s.strip():
                 try:
                     res.append(cls.from_string(s, pattern=pattern))

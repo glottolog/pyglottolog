@@ -215,7 +215,7 @@ class Languoid(object):
             level = self._api.languoid_levels.get(level)
         return [
             n for n in nodes.values() if
-            n.lineage and self.id in [li[1] for li in n.lineage] and
+            n.lineage and self.id in [li[1] for li in n.lineage] and  # noqa: W504
             ((level is None) or n.level == level)]
 
     @property
@@ -225,7 +225,7 @@ class Languoid(object):
     def ancestors_from_nodemap(self, nodes):
         # A faster alternative to `ancestors` when the relevant languoids have already
         # been read from disc.
-        return [nodes[l[1]] for l in self.lineage]
+        return [nodes[lineage[1]] for lineage in self.lineage]
 
     @property
     def ancestors(self):

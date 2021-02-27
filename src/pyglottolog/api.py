@@ -214,7 +214,7 @@ class Glottolog(API):
             return self.languoid(start).newick_node(
                 template=template, nodes=nodes, maxlevel=maxlevel, level=1).newick + ';'
         if nodes is None:
-            nodes = collections.OrderedDict((l.id, l) for l in self.languoids())
+            nodes = collections.OrderedDict((lang.id, lang) for lang in self.languoids())
         trees = []
         for lang in nodes.values():
             if not lang.lineage and not lang.category.startswith('Pseudo '):
@@ -234,7 +234,8 @@ class Glottolog(API):
 
     def refs_by_languoid(self, nodes=None):
         all = {}
-        languoids_by_code = self.languoids_by_code(nodes or {l.id: l for l in self.languoids()})
+        languoids_by_code = self.languoids_by_code(
+            nodes or {lang.id: lang for lang in self.languoids()})
         res = collections.defaultdict(list)
         for bib in tqdm(self.bibfiles):
             for entry in bib.iterentries():

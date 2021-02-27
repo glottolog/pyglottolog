@@ -91,35 +91,36 @@ def cldf(api, outdir, log):
             Name=el.name,
             Description=el.description,
             numerical_value=el.rank))
-    languoids = collections.OrderedDict((l.id, l) for l in api.languoids())
+    languoids = collections.OrderedDict((lang.id, lang) for lang in api.languoids())
     refs_by_languoid, refs = api.refs_by_languoid(languoids)
 
-    def get_language_id(l):
-        if l.level == api.languoid_levels.dialect:
-            for _, lid, _ in reversed(l.lineage):
+    def get_language_id(lang):
+        if lang.level == api.languoid_levels.dialect:
+            for _, lid, _ in reversed(lang.lineage):
                 if languoids[lid].level == api.languoid_levels.language:
                     return lid
 
     def format_ref(ref):
         return '{0}[{1}]'.format(ref.key, ref.pages.replace(';', ',')) if ref.pages else ref.key
 
-    for l in languoids.values():
+    for lang in languoids.values():
         data['LanguageTable'].append(dict(
-            ID=l.id,
-            Name=l.name,
-            Glottocode=l.id,
-            ISO639P3code=l.iso,
-            Latitude=l.latitude,
-            Longitude=l.longitude,
-            Macroarea=[ma.name for ma in l.macroareas],
-            Countries=[c.id for c in l.countries],
-            Family_ID=l.lineage[0][1] if l.lineage else None,
-            Language_ID=get_language_id(l),
+            ID=lang.id,
+            Name=lang.name,
+            Glottocode=lang.id,
+            ISO639P3code=lang.iso,
+            Latitude=lang.latitude,
+            Longitude=lang.longitude,
+            Macroarea=[ma.name for ma in lang.macroareas],
+            Countries=[c.id for c in lang.countries],
+            Family_ID=lang.lineage[0][1] if lang.lineage else None,
+            Language_ID=get_language_id(lang),
         ))
-        med = sorted(refs_by_languoid[l.id], reverse=True)[0] if l.id in refs_by_languoid else None
+        med = sorted(refs_by_languoid[lang.id], reverse=True)[0] \
+            if lang.id in refs_by_languoid else None
         if med:
             ds.add_sources(Source(med.type, med.id, _check_id=False, **med.fields))
-        clf = l.classification_comment
+        clf = lang.classification_comment
         if clf:
             for ref in clf.merged_refs('family') + clf.merged_refs('sub'):
                 if ref.key not in refs:
@@ -128,42 +129,42 @@ def cldf(api, outdir, log):
                 e = refs[ref.key]
                 ds.add_sources(Source(e.type, ref.key, _check_id=False, **e.fields))
 
-        aes_src = l.endangerment.source.reference_id if l.endangerment else None
+        aes_src = lang.endangerment.source.reference_id if lang.endangerment else None
         if aes_src:
             e = refs[aes_src]
             ds.add_sources(Source(e.type, aes_src, _check_id=False, **e.fields))
 
         data['ValueTable'].extend([
             value(
-                l.id,
+                lang.id,
                 'level',
-                l.level.name,
-                Code_ID='level-{0}'.format(l.level.name)),
-            value(l.id, 'category', l.category.replace(' ', '_')),
+                lang.level.name,
+                Code_ID='level-{0}'.format(lang.level.name)),
+            value(lang.id, 'category', lang.category.replace(' ', '_')),
             value(
-                l.id,
+                lang.id,
                 'classification',
-                '/'.join(l[1] for l in l.lineage),
+                '/'.join(li[1] for li in lang.lineage),
                 Source=[format_ref(ref) for ref in clf.merged_refs('family')] if clf else [],
                 Comment=clf.family if clf else None,
             ),
             value(
-                l.id,
+                lang.id,
                 'subclassification',
-                l.newick_node(nodes=languoids, template="{l.id}").newick,
+                lang.newick_node(nodes=languoids, template="{l.id}").newick,
                 Source=[format_ref(ref) for ref in clf.merged_refs('sub')] if clf else [],
                 Comment=clf.sub if clf else None,
             ),
             value(
-                l.id,
+                lang.id,
                 'aes',
-                l.endangerment.status.name if l.endangerment else None,
-                Comment=l.endangerment.comment if l.endangerment else None,
+                lang.endangerment.status.name if lang.endangerment else None,
+                Comment=lang.endangerment.comment if lang.endangerment else None,
                 Source=[aes_src] if aes_src else [],
-                Code_ID='aes-{0}'.format(
-                    l.endangerment.status.name.replace(' ', '_')) if l.endangerment else None),
+                Code_ID='aes-{0}'.format(lang.endangerment.status.name.replace(' ', '_'))
+                if lang.endangerment else None),
             value(
-                l.id,
+                lang.id,
                 'med',
                 med.med_type.name if med else None,
                 Source=[med.id] if med else [],

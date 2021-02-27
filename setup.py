@@ -16,7 +16,7 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     platforms='any',
-    python_requires='>=3.5',
+    python_requires='>=3.6',
     include_package_data=True,
     zip_safe=False,
     entry_points={
@@ -26,10 +26,9 @@ setup(
         ],
     },
     install_requires=[
-        'pybtex>=0.22,<0.23; python_version < "3.6"',
-        'pybtex>=0.22; python_version > "3.5"',
+        'pybtex>=0.22',
         'attrs>=19.2',
-        'clldutils>=3.5.3',
+        'clldutils>=3.7',
         'cldfcatalog',
         'csvw>=1.5.6',
         'purl',
@@ -53,9 +52,9 @@ setup(
     classifiers=[
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
 )

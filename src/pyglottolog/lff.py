@@ -11,9 +11,9 @@ from .languoids import Languoid, Glottocode
 ISOLATE_ID = '-isolate-'
 LINEAGE_SEP = ';'
 NAME_AND_ID_PATTERN = re.compile(
-    '(?P<name>[^\[;]+)'
-    '(\[(?P<gc>(' + Glottocode.regex + ')|' + ISOLATE_ID + ')?\])\s*'
-    '(?P<hid>[a-z]{3}|NOCODE_[^;]+)?$')
+    r'(?P<name>[^\[;]+)'
+    r'(\[(?P<gc>(' + Glottocode.regex + ')|' + ISOLATE_ID + r')?])\s*'
+    r'(?P<hid>[a-z]{3}|NOCODE_[^;]+)?$')
 
 
 def parse_languoid(s, log):
@@ -83,7 +83,7 @@ def read_lff(api, log, new, level, fname=None):
             # ignore comments or empty lines
             continue
 
-        if re.match('\s', line):
+        if re.match(r'\s', line):
             # leading whitespace => a language/dialect spec.
             if path is None:
                 raise ValueError('language line without classification line')
@@ -160,7 +160,7 @@ def lff2tree(api, log=logging.getLogger(__name__)):
     - copy new tree
     """
     builddir = api.build_path('tree')
-    old_tree = {l.id: l for l in api.languoids()}
+    old_tree = {lang.id: lang for lang in api.languoids()}
     out = api.tree
 
     if out.exists():
@@ -179,8 +179,8 @@ def lff2tree(api, log=logging.getLogger(__name__)):
     languages = {}
     languoids = {}
 
-    def checked(l, lin):
-        assert l.id not in languoids
+    def checked(lang, lin):
+        assert lang.id not in languoids
         for n, gc, _level, hid in lin:
             if gc in languoids:
                 if languoids[gc] != (n, _level, hid):
@@ -189,8 +189,8 @@ def lff2tree(api, log=logging.getLogger(__name__)):
                     raise ValueError('inconsistent languoid data')
             else:
                 languoids[gc] = (n, _level, hid)
-        languoids[l.id] = (l.name, l.level, l.iso or l.hid)
-        return l
+        languoids[lang.id] = (lang.name, lang.level, lang.iso or lang.hid)
+        return lang
 
     for lang, lineage in read_lff(
             api, log, new, api.languoid_levels.language, api.build_path('lff.txt')):
@@ -221,27 +221,28 @@ def lff2tree(api, log=logging.getLogger(__name__)):
         raise ValueError('duplicates found')
 
 
-def format_comp(l, gc=None):
-    res = '{0} [{1}]'.format(l.name, gc or l.id)
-    if l.iso:
-        res += ' {0}'.format(l.iso)
-    elif l.hid:
-        res += ' {0}'.format(l.hid)
+def format_comp(lang, gc=None):
+    res = '{0} [{1}]'.format(lang.name, gc or lang.id)
+    if lang.iso:
+        res += ' {0}'.format(lang.iso)
+    elif lang.hid:
+        res += ' {0}'.format(lang.hid)
     return res
 
 
-def format_language(l):
-    return '    {0}'.format(format_comp(l))
+def format_language(lang):
+    return '    {0}'.format(format_comp(lang))
 
 
-def format_classification(api, l, agg):
-    if not l.lineage:
-        return format_comp(l, gc=ISOLATE_ID)
+def format_classification(api, lang, agg):
+    if not lang.lineage:
+        return format_comp(lang, gc=ISOLATE_ID)
     comps = []
-    for _, gc, _ in l.lineage:
+    for _, gc, _ in lang.lineage:
         a = agg[gc]
-        if l.level == api.languoid_levels.language or \
-                (l.level == api.languoid_levels.dialect and a.level != api.languoid_levels.family):
+        if lang.level == api.languoid_levels.language or \
+                (lang.level == api.languoid_levels.dialect and  # noqa: W504
+                 a.level != api.languoid_levels.family):
             comps.append(format_comp(a))
     return (LINEAGE_SEP + ' ').join(comps)
 
@@ -251,10 +252,11 @@ def tree2lff(api, log=logging.getLogger(__name__)):
                  api.languoid_levels.language: collections.defaultdict(list)}
 
     agg = {}
-    for l in api.languoids():
-        agg[l.id] = l
-        if l.level in languoids:
-            languoids[l.level][format_classification(api, l, agg)].append(format_language(l))
+    for lang in api.languoids():
+        agg[lang.id] = lang
+        if lang.level in languoids:
+            languoids[lang.level][format_classification(api, lang, agg)].append(
+                format_language(lang))
 
     for level, languages in languoids.items():
         ff = api.build_path('%sff.txt' % level.name[0])
@@ -262,6 +264,6 @@ def tree2lff(api, log=logging.getLogger(__name__)):
             fp.write('# -*- coding: utf-8 -*-\n')
             for path in sorted(languages):
                 fp.write(path + '\n')
-                for l in sorted(languages[path]):
-                    fp.write(l + '\n')
+                for lang in sorted(languages[path]):
+                    fp.write(lang + '\n')
         log.info('{0}s written to {1}'.format(level.name, ff.as_posix()))

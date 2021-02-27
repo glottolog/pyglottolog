@@ -27,7 +27,7 @@ class CRUBADAN(LinkProvider):
         lmap = collections.defaultdict(list)
         for lid, iso in iter_id_iso():
             lmap[iso].append(lid)
-        for l in languoids:
-            links = ["http://crubadan.org/languages/" + c for c in lmap.get(l.iso, [])]
-            if l.update_links('crubadan.org', links):
-                yield l
+        for lang in languoids:
+            links = ["http://crubadan.org/languages/" + c for c in lmap.get(lang.iso, [])]
+            if lang.update_links('crubadan.org', links):
+                yield lang

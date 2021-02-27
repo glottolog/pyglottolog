@@ -2,15 +2,15 @@ import re
 
 from .roman import romanint
 
-ROMAN = '[ivxlcdmIVXLCDM]+'
+ROMAN = r'[ivxlcdmIVXLCDM]+'
 ROMANPATTERN = re.compile(ROMAN + '$')
-ARABIC = '[0-9]+'
+ARABIC = r'[0-9]+'
 ARABICPATTERN = re.compile(ARABIC + '$')
 SEPPAGESPATTERN = re.compile(
-    '(?P<n1>{0}|{1})\s*(,|;|\.|\+|/)\s*(?P<n2>{0}|{1})'.format(ROMAN, ARABIC))
+    r'(?P<n1>{0}|{1})\s*(,|;|\.|\+|/)\s*(?P<n2>{0}|{1})'.format(ROMAN, ARABIC))
 PAGES_PATTERN = re.compile(
-    '(?P<start>{0}|{1})\s*\-\-?\s*(?P<end>{0}|{1})'.format(ROMAN, ARABIC))
-ART_NO_PATTERN = re.compile('\(art\.\s*[0-9]+\)')
+    r'(?P<start>{0}|{1})\s*\-\-?\s*(?P<end>{0}|{1})'.format(ROMAN, ARABIC))
+ART_NO_PATTERN = re.compile(r'\(art\.\s*[0-9]+\)')
 MAX_PAGE = 10000
 
 

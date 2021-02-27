@@ -20,7 +20,7 @@ def register(parser):
 def run(args):
     def highlight(text):
         res, i = '', 0
-        for m in re.finditer('\[\[(?P<m>[^\]]+)\]\]', text):
+        for m in re.finditer(r'\[\[(?P<m>[^]]+)]]', text):
             res += text[i:m.start()]
             res += colored(m.group('m'), 'red', attrs=['bold'])
             i = m.end()

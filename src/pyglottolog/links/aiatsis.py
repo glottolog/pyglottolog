@@ -41,15 +41,15 @@ class AIATSIS(LinkProvider):
                     continue
                 lmap[gc].add(code)
 
-        for l in languoids:
+        for lang in languoids:
             links, names = [], []
-            for c in sorted(lmap.get(l.id, [])):
+            for c in sorted(lmap.get(lang.id, [])):
                 links.append((md[c]['uri'], md[c]['language_name']))
                 if md[c]['language_name']:
                     names.append(md[c]['language_name'])
                 names.extend(nfilter([n.strip() for n in md[c]['language_synonym'].split('|')]))
             if any([
-                l.update_links(DOMAIN, links),
-                l.update_names(names, type_='aiatsis'),
+                lang.update_links(DOMAIN, links),
+                lang.update_names(names, type_='aiatsis'),
             ]):
-                yield l
+                yield lang

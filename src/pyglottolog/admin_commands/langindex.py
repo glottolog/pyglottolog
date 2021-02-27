@@ -32,4 +32,4 @@ def run(args):
 
     langs = list(args.repos.languoids())
     for level in args.repos.languoid_levels.values():
-        make_index(level, [l for l in langs if l.level == level], args.repos)
+        make_index(level, [lang for lang in langs if lang.level == level], args.repos)

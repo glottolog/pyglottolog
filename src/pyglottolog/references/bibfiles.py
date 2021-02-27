@@ -43,8 +43,8 @@ DOCTYPES = collections.OrderedDict((k, k) for k in [
     'bibliographical',
     'unknown',
 ])
-PREF_YEAR_PATTERN = re.compile('\[(?P<year>(1|2)[0-9]{3})(\-[0-9]+)?\]')
-YEAR_PATTERN = re.compile('(?P<year>(1|2)[0-9]{3})')
+PREF_YEAR_PATTERN = re.compile(r'\[(?P<year>(1|2)[0-9]{3})(\-[0-9]+)?\]')
+YEAR_PATTERN = re.compile(r'(?P<year>(1|2)[0-9]{3})')
 
 
 class BibFiles(list):
@@ -117,7 +117,7 @@ class BibFile(object):
             item = item.split(':', 1)[1]
         text = None
         with memorymapped(self.fname) as string:
-            m = re.search(b'@[A-Za-z]+\{' + re.escape(item.encode(self.encoding)), string)
+            m = re.search(b'@[A-Za-z]+{' + re.escape(item.encode(self.encoding)), string)
             if m:
                 next = string.find(b'\n@', m.end())
                 if next >= 0:
@@ -223,9 +223,9 @@ class Entry(object):
 
     # FIXME: add method to apply triggers!
 
-    lgcode_regex = '[a-z0-9]{4}[0-9]{4}|[a-z]{3}|NOCODE_[A-Z][^\s\]]+'
-    lgcode_in_brackets_pattern = re.compile("\[(" + lgcode_regex + ")\]")
-    recomma = re.compile("[,/]\s?")
+    lgcode_regex = r'[a-z0-9]{4}[0-9]{4}|[a-z]{3}|NOCODE_[A-Z][^\s\]]+'
+    lgcode_in_brackets_pattern = re.compile(r"\[(" + lgcode_regex + r")]")
+    recomma = re.compile(r"[,/]\s?")
     lgcode_pattern = re.compile(lgcode_regex + "$")
 
     def __eq__(self, other):
@@ -255,8 +255,8 @@ class Entry(object):
 
         # the number of pages is divided by number of doctypes times number of described languages
         pages = int(math.ceil(
-            float(self.pages_int or 0) /
-            ((len(self.doctypes(doctypes)[0]) or 1) *
+            float(self.pages_int or 0) /  # noqa: W504
+            ((len(self.doctypes(doctypes)[0]) or 1) *  # noqa: W504
              (len(self.lgcodes(self.fields.get('lgcode', ''))) or 1))))
 
         if doctype == 'grammar' and pages >= 300:

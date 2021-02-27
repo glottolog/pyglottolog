@@ -34,8 +34,9 @@ Values for this option must be valid python format strings expecting a single
 template variable `l` which points to the Languoid instance.
 In addition to Languoid attributes and properties specified as "{{l.<attr>}}",
 e.g. "{{l.id}}" for the Glottocode of a Languoid, the following custom format specs
-can be used:""".format(
-            '\n'.join('    l:{0}\t{1[1]}'.format(k, v) for k, v in Languoid._format_specs.items())),
+can be used:
+{}""".format(
+            '\n'.join('"l:{0}": {1[1]}; '.format(k, v) for k, v in Languoid._format_specs.items())),
         default=None,
     )
 

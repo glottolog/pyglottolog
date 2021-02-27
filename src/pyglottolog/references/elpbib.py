@@ -60,12 +60,12 @@ def language_code_from_pdf(url):  # pragma: no cover
             line = line.strip()
             if re.match('[a-z]{4}[0-9]{4}$', line):
                 return line
-            m = re.match('Glottolog Code:\s*(?P<code>[a-z]{4}[0-9]{4})', line)
+            m = re.match(r'Glottolog Code:\s*(?P<code>[a-z]{4}[0-9]{4})', line)
             if m:
                 return m.group('code')
             if re.match('([a-z]{3}|[A-Z]{3})$', line):
                 iso = line.lower()
-            m = re.match('ISO 639-3 Code:\s*(?P<code>[a-z]{3}|[A-Z]{3})$', line)
+            m = re.match(r'ISO 639-3 Code:\s*(?P<code>[a-z]{3}|[A-Z]{3})$', line)
             if m:
                 iso = m.group('code')
     return iso

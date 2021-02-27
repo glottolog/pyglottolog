@@ -31,7 +31,7 @@ def read_cldf_languages(url):  # pragma: no cover
         for member in zip.namelist():
             if member.endswith(lurl):
                 with zip.open(member) as fp:
-                    return reader([l.strip() for l in fp.readlines()], dicts=True), schema
+                    return reader([line.strip() for line in fp.readlines()], dicts=True), schema
         else:
             raise ValueError('LanguageTable url not found in zip')
 
@@ -48,7 +48,7 @@ def read_grouped_cldf_languages(url):  # pragma: no cover
         raise ValueError('No glottocode column in LanguageTable')
 
     for gc, langs in itertools.groupby(sorted(langs, key=lambda d: d[gccol]), lambda d: d[gccol]):
-        yield gc, [{colmap[k]: v for k, v in l.items()} for l in langs]
+        yield gc, [{colmap[k]: v for k, v in lang.items()} for lang in langs]
 
 
 class LinkProvider(object):
@@ -68,9 +68,9 @@ class LinkProvider(object):
                     if self.__label_template__:
                         item = (item, self.__label_template__.format(lang))
                     res[gc].append(item)
-            for l in languoids:
-                if l.update_links(self.__domain__, res.get(l.id, [])):
-                    yield l
+            for lang in languoids:
+                if lang.update_links(self.__domain__, res.get(lang.id, [])):
+                    yield lang
         else:
             raise NotImplementedError()
 
@@ -88,9 +88,9 @@ class PHOIBLE(LinkProvider):  # pragma: no cover
         urls = {}
         for gc, langs in read_grouped_cldf_languages(self.__cldf_dataset_url__):
             urls[gc] = ['https://{0}/languages/{1}'.format(self.__domain__, gc)]
-        for l in languoids:
-            if l.update_links(self.__domain__, urls.get(l.id, [])):
-                yield l
+        for lang in languoids:
+            if lang.update_links(self.__domain__, urls.get(lang.id, [])):
+                yield lang
 
 
 class APICS(LinkProvider):  # pragma: no cover

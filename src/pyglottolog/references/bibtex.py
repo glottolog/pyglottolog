@@ -102,7 +102,7 @@ def dump(entries, fd, sortkey=None, normalize='NFC'):
         items = (
             (bibkey, entries[bibkey])
             for bibkey in sorted(entries, key=lambda bibkey: bibkey.lower()))
-    """Reserved characters (* -> en-/decoded by latexcodec)
+    r"""Reserved characters (* -> en-/decoded by latexcodec)
     * #: \#
       $: \$
       %: \%

@@ -2,7 +2,7 @@
 libmonster.py - mixed support library
 
 # TODO: consider replacing pauthor in keyid with _bibtex.names
-# TODO: enusure \emph is dropped from titles in keyid calculation
+# TODO: enusure \\emph is dropped from titles in keyid calculation
 """
 import re
 from heapq import nsmallest
@@ -33,7 +33,7 @@ def opv(d, func, *args):
     return {i: func(v, *args) for i, v in d.items()}
 
 
-def grp2(l):
+def grp2(list_):
     """
     Turn a list of pairs into a dictionary, mapping first elements to lists of
     co-occurring second elements in pairs.
@@ -42,10 +42,10 @@ def grp2(l):
     :return:
     """
     return {a: [pair[1] for pair in pairs] for a, pairs in
-            groupby(sorted(l, key=itemgetter(0)), itemgetter(0))}
+            groupby(sorted(list_, key=itemgetter(0)), itemgetter(0))}
 
 
-def grp2fd(l):
+def grp2fd(list_):
     """
     Turn a list of pairs into a nested dictionary, thus grouping by the first element in
     the pair.
@@ -53,22 +53,22 @@ def grp2fd(l):
     :param l:
     :return:
     """
-    return {k: {vv: 1 for vv in v} for k, v in grp2(l).items()}
+    return {k: {vv: 1 for vv in v} for k, v in grp2(list_).items()}
 
 
 reauthor = [re.compile(pattern) for pattern in [
-    "(?P<lastname>[^,]+),\s((?P<jr>[JS]r\.|[I]+),\s)?(?P<firstname>[^,]+)$",
-    "(?P<firstname>[^{][\S]+(\s[A-Z][\S]+)*)\s"
-    "(?P<lastname>([a-z]+\s)*[A-Z\\\\][\S]+)(?P<jr>,\s[JS]r\.|[I]+)?$",
-    "(?P<firstname>\\{[\S]+\\}[\S]+(\s[A-Z][\S]+)*)\s"
-    "(?P<lastname>([a-z]+\s)*[A-Z\\\\][\S]+)(?P<jr>,\s[JS]r\.|[I]+)?$",
-    "(?P<firstname>[\s\S]+?)\s\{(?P<lastname>[\s\S]+)\}(?P<jr>,\s[JS]r\.|[I]+)?$",
-    "\{(?P<firstname>[\s\S]+)\}\s(?P<lastname>[\s\S]+?)(?P<jr>,\s[JS]r\.|[I]+)?$",
-    "(?P<lastname>[A-Z][\S]+)$",
-    "\{(?P<lastname>[\s\S]+)\}$",
-    "(?P<lastname>[aA]nonymous)$",
-    "(?P<lastname>\?)$",
-    "(?P<lastname>[\s\S]+)$",
+    r"(?P<lastname>[^,]+),\s((?P<jr>[JS]r\.|[I]+),\s)?(?P<firstname>[^,]+)$",
+    r"(?P<firstname>[^{][\S]+(\s[A-Z][\S]+)*)\s"
+    r"(?P<lastname>([a-z]+\s)*[A-Z\\\\][\S]+)(?P<jr>,\s[JS]r\.|[I]+)?$",
+    r"(?P<firstname>\\{[\S]+\\}[\S]+(\s[A-Z][\S]+)*)\s"
+    r"(?P<lastname>([a-z]+\s)*[A-Z\\\\][\S]+)(?P<jr>,\s[JS]r\.|[I]+)?$",
+    r"(?P<firstname>[\s\S]+?)\s\{(?P<lastname>[\s\S]+)\}(?P<jr>,\s[JS]r\.|[I]+)?$",
+    r"\{(?P<firstname>[\s\S]+)\}\s(?P<lastname>[\s\S]+?)(?P<jr>,\s[JS]r\.|[I]+)?$",
+    r"(?P<lastname>[A-Z][\S]+)$",
+    r"\{(?P<lastname>[\s\S]+)\}$",
+    r"(?P<lastname>[aA]nonymous)$",
+    r"(?P<lastname>\?)$",
+    r"(?P<lastname>[\s\S]+)$",
 ]]
 
 
@@ -91,8 +91,8 @@ def pauthor(s):
     return [a for a in pas if a]
 
 
-relu = re.compile("\s+|(d\')(?=[A-Z])")
-recapstart = re.compile("\[?[A-Z]")
+relu = re.compile(r"\s+|(d\')(?=[A-Z])")
+recapstart = re.compile(r"\[?[A-Z]")
 
 
 def lowerupper(s):
@@ -124,8 +124,8 @@ def rangecomplete(incomplete, complete):
     return incomplete
 
 
-rebracketyear = re.compile("\[([\d\,\-\/]+)\]")
-reyl = re.compile("[\,\-\/\s\[\]]+")
+rebracketyear = re.compile(r"\[([\d,\-/]+)]")
+reyl = re.compile(r"[,\-/\s\[\]]+")
 
 
 def pyear(s):
@@ -163,7 +163,7 @@ def bibord_iteritems(fields):
         yield f, fields[f]
 
 
-resplittit = re.compile("[\(\)\[\]\:\,\.\s\-\?\!\;\/\~\=]+")
+resplittit = re.compile(r"[\(\)\[\]\:\,\.\s\-\?\!\;\/\~\=]+")
 
 
 def wrds(txt):
@@ -221,8 +221,8 @@ def add_inlg_e(e, trigs, verbose=True, return_newtrain=False):
     return t2
 
 
-rerpgs = re.compile("([xivmcl]+)\-?([xivmcl]*)")
-repgs = re.compile("([\d]+)\-?([\d]*)")
+rerpgs = re.compile(r"([xivmcl]+)-?([xivmcl]*)")
+repgs = re.compile(r"([\d]+)-?([\d]*)")
 
 
 def pagecount(pgstr):
@@ -237,8 +237,8 @@ def pagecount(pgstr):
     return '%s' % (rsump + sump)
 
 
-rewrdtok = re.compile("[a-zA-Z].+")
-reokkey = re.compile("[^a-z\d\-\_\[\]]")
+rewrdtok = re.compile(r"[a-zA-Z].+")
+reokkey = re.compile(r"[^a-z\d\-_\[\]]")
 
 
 def keyid(fields, fd, ti=2, infinity=float('inf')):

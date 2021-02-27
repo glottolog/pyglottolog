@@ -23,8 +23,8 @@ def run(args):
             continue
         for nid in res:
             matched = False
-            for l in node.lineage:
-                if l[1] == nid:
+            for lineage in node.lineage:
+                if lineage[1] == nid:
                     res[nid][1].add(node.id)
                     matched = True
                     break

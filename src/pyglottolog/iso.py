@@ -42,7 +42,7 @@ def valid_iso_code(instance, attr, value):
 
 
 def normalize_whitespace(s):
-    return re.sub('\s+', ' ', s).strip()
+    return re.sub(r'\s+', ' ', s).strip()
 
 
 @attr.s
@@ -270,7 +270,7 @@ def retirements(api, log, max_year=None):
         ('Ret_Remedy', 'remedy'),
     ]
     log.info('read languoid info')
-    iso2lang = {l.iso: l for l in api.languoids() if l.iso}
+    iso2lang = {lang.iso: lang for lang in api.languoids() if lang.iso}
     log.info('retrieve retirement info {0}'.format(api.iso))
     with api.cache_dir(CACHE_DIR) as cache_dir:
         rets = get_retirements(

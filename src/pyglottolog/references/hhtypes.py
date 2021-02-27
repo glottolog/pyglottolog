@@ -37,8 +37,8 @@ class HHType(object):
 
 class HHTypes(object):
 
-    _rekillparen = re.compile(" \([^\)]*\)")
-    _respcomsemic = re.compile("[;,]\s?")
+    _rekillparen = re.compile(r" \([^)]*\)")
+    _respcomsemic = re.compile(r"[;,]\s?")
 
     def __init__(self, fpath):
         ini = get_ini(fpath, interpolation=None)

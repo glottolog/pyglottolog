@@ -26,14 +26,15 @@ class Wikidata(LinkProvider):
             headers=dict(Accept='text/csv')
         )
         res = {d['glottocode']: d for d in reader(res.text.split('\n'), dicts=True)}
-        for l in languoids:
+        for lang in languoids:
             urls = {
                 'www.wikidata.org': [
-                    res[l.id]['item'].replace('http:', 'https:')] if l.id in res else [],
-                'en.wikipedia.org': [
-                    res[l.id]['wikipedia']] if (l.id in res) and res[l.id]['wikipedia'] else [],
+                    res[lang.id]['item'].replace('http:', 'https:')] if lang.id in res else [],
+                'en.wikipedia.org':
+                    [res[lang.id]['wikipedia']]
+                    if (lang.id in res) and res[lang.id]['wikipedia'] else [],
             }
-            if any([l.update_links(d, u) for d, u in urls.items()]):
+            if any([lang.update_links(d, u) for d, u in urls.items()]):
                 # Note: We must use list comprehension rather than a generator as first argument
                 # to `any` to make sure `update_links` is called for each item in urls!
-                yield l
+                yield lang

@@ -6,7 +6,7 @@ By default, dialects are assumed to share the macroarea of their language.
 
 
 def run(args):
-    langs = {l.id: l for l in args.repos.languoids()}
+    langs = {lang.id: lang for lang in args.repos.languoids()}
     updated = []
 
     for dialect in langs.values():
@@ -20,7 +20,7 @@ def run(args):
             dialect.macroareas = [ma for ma in language.macroareas]
             updated.append(dialect)
 
-    for l in updated:
-        l.write_info()
+    for lang in updated:
+        lang.write_info()
 
     print('{} dialects updated'.format(len(updated)))

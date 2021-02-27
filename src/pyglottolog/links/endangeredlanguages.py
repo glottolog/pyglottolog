@@ -63,23 +63,24 @@ def read():
 class ElCat(LinkProvider):
     def iterupdated(self, languoids):
         elcat_langs = collections.defaultdict(list)
-        for l in read():
-            for iso in l.isos:
-                elcat_langs[iso].append(l)
+        for line in read():
+            for iso in line.isos:
+                elcat_langs[iso].append(line)
 
-        for l in languoids:
+        for lang in languoids:
             changed = False
-            if l.iso in elcat_langs:
-                if l.update_links(
-                    'endangeredlanguages.com', [(l_.url, l_.name) for l_ in elcat_langs[l.iso]]
+            if lang.iso in elcat_langs:
+                if lang.update_links(
+                    'endangeredlanguages.com', [(l_.url, l_.name) for l_ in elcat_langs[lang.iso]]
                 ):
                     changed = True
-                if len(elcat_langs[l.iso]) == 1:
+                if len(elcat_langs[lang.iso]) == 1:
                     # Only add alternative names, if only one ElCat language matches!
-                    changed = l.update_names(elcat_langs[l.iso][0].names, type_='elcat') or changed
+                    changed = lang.update_names(
+                        elcat_langs[lang.iso][0].names, type_='elcat') or changed
             else:
-                changed = any([l.update_links('endangeredlanguages.com', []),
-                               l.update_names([], type_='elcat')])
+                changed = any([lang.update_links('endangeredlanguages.com', []),
+                               lang.update_names([], type_='elcat')])
 
             if changed:
-                yield l
+                yield lang

@@ -24,6 +24,6 @@ def run(args):  # pragma: no cover
         assert str(Repo(str(args.repos.repos)).active_branch) == 'master', \
             'Command should be run on master branch'
     res = {'language': [], 'family': [], 'dialect': []}
-    for l in args.repos.languoids():
-        res[l.level.name].append(l.id)
+    for lang in args.repos.languoids():
+        res[lang.level.name].append(lang.id)
     jsonlib.dump(res, args.repos.build_path('languoids.json'))
