@@ -151,7 +151,7 @@ def cldf(api, outdir, log):
             value(
                 lang.id,
                 'subclassification',
-                lang.newick_node(nodes=languoids, template="{l.id}").newick,
+                lang.newick_node(nodes=languoids, template="{l.id}").newick + ';',
                 Source=[format_ref(ref) for ref in clf.merged_refs('sub')] if clf else [],
                 Comment=clf.sub if clf else None,
             ),
