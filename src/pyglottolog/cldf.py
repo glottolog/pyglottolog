@@ -73,6 +73,10 @@ def cldf(api, outdir, log):
             ID='category-{0}'.format(level.name.capitalize()),
             Parameter_ID='category',
             Name=level.name.capitalize()))
+        data['CodeTable'].append(dict(
+            ID='category-Pseudo_{0}'.format(level.name.capitalize()),
+            Parameter_ID='category',
+            Name='Pseudo {}'.format(level.name.capitalize())))
     for el in sorted(api.language_types.values()):
         data['CodeTable'].append(dict(
             ID='category-{0}'.format(el.category.replace(' ', '_')),
@@ -140,7 +144,12 @@ def cldf(api, outdir, log):
                 'level',
                 lang.level.name,
                 Code_ID='level-{0}'.format(lang.level.name)),
-            value(lang.id, 'category', lang.category.replace(' ', '_')),
+            value(
+                lang.id,
+                'category',
+                lang.category.replace(' ', '_'),
+                Code_ID='category-{0}'.format(lang.category.replace(' ', '_')),
+            ),
             value(
                 lang.id,
                 'classification',
