@@ -1,5 +1,4 @@
 import shlex
-import pathlib
 
 import pytest
 
@@ -10,6 +9,7 @@ from pyglottolog.__main__ import main
 def _main(api_copy, mocker):
     def f(*args, **kw):
         kw.setdefault('log', mocker.Mock())
+        kw['test'] = True
         if len(args) == 1 and isinstance(args[0], str):
             # Windows: shlex.split() drops backslashes, e.g. in paths
             #          shlex.split(posix=False) does not parse quotes
@@ -104,38 +104,33 @@ def test_tree(capsys, _main):
     assert out.splitlines()[-1] == "('language [abcd1235][abc]-l-':1)'family [abcd1234][aaa]':1;"
 
 
-def test_languoids(capsys, _main, tmpdir):
-    tmppath = pathlib.Path(str(tmpdir))
-    _main('languoids --output={0}'.format(tmppath.as_posix()))
+def test_languoids(capsys, _main, tmp_path):
+    _main('languoids --output={0}'.format(tmp_path.as_posix()))
     out, _ = capsys.readouterr()
     assert '-metadata.json' in out
-    assert tmpdir.join('glottolog-languoids-1.5.csv').ensure()
+    assert tmp_path.glob('*.csv')
 
 
-def test_htmlmap(_main, capsys, tmpdir):
-    tmppath = pathlib.Path(str(tmpdir))
-    _main('htmlmap --output {0} --min-langs-for-legend 1'.format(tmppath.as_posix()))
-    out, _ = capsys.readouterr()
-    assert 'glottolog_map.html' in out
-    tmpdir.join('glottocodes').write_text('abcd1234\nabcd1235\n', encoding='utf8')
-    _main('htmlmap --output {0} --glottocodes {1}'.format(tmppath.as_posix(),
-                                                          (tmppath / 'glottocodes').as_posix()))
+def test_htmlmap(_main, tmp_path):
+    _main('htmlmap --output {0} --min-langs-for-legend 1'.format(tmp_path.as_posix()))
+    assert tmp_path.joinpath('glottolog_map.html').exists()
+    tmp_path.joinpath('glottocodes').write_text('abcd1234\nabcd1235,5,8\n', encoding='utf8')
+    _main('htmlmap --output {0} --glottocodes {1}'.format(tmp_path.as_posix(),
+                                                          (tmp_path / 'glottocodes').as_posix()))
 
     with pytest.raises(SystemExit):
-        _main('htmlmap --output {0}'.format((tmppath /'xyz').as_posix()))
+        _main('htmlmap --output {0}'.format((tmp_path /'xyz').as_posix()))
 
     with pytest.raises(SystemExit):
-        _main('htmlmap --glottocodes {0}'.format(tmpdir.join('xyz')))
+        _main('htmlmap --glottocodes {0}'.format(tmp_path.joinpath('xyz')))
 
 
-def test_iso2codes(_main, tmpdir):
-    tmppath = pathlib.Path(str(tmpdir))
-    _main('iso2codes --output {0}'.format(tmppath.as_posix()))
-    assert tmpdir.join('iso2glottocodes.csv').check()
+def test_iso2codes(_main, tmp_path):
+    _main('iso2codes --output {0}'.format(tmp_path.as_posix()))
+    assert tmp_path.joinpath('iso2glottocodes.csv').exists()
 
 
-def test_cldf(_main, tmpdir):
-    tmppath = pathlib.Path(str(tmpdir))
-    path = (tmppath / 'cldf').as_posix()
+def test_cldf(_main, tmp_path):
+    path = (tmp_path / 'cldf').as_posix()
     _main('cldf {0}'.format(path))
     _main('cldf {0}'.format(path))

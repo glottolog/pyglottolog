@@ -24,7 +24,7 @@ def admin_main(**kw):
     return _main(pyglottolog.admin_commands, **kw)
 
 
-def _main(commands, args=None, catch_all=False, parsed_args=None, log=None):
+def _main(commands, args=None, catch_all=False, parsed_args=None, log=None, test=False):
     try:
         repos = Config.from_file().get_clone('glottolog')
     except KeyError:  # pragma: no cover
@@ -46,6 +46,7 @@ def _main(commands, args=None, catch_all=False, parsed_args=None, log=None):
     register_subcommands(subparsers, commands)
 
     args = parsed_args or parser.parse_args(args=args)
+    args.test = test
 
     if not hasattr(args, "main"):
         parser.print_help()

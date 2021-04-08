@@ -1,8 +1,13 @@
 """
 Create an HTML/Javascript map (using leaflet) of Glottolog languoids.
+
+Languoids to plot can be specified as glottocodes or comma-separated
+"glottocode,latitude,longitude" triples in a file or as stdin.
 """
+import sys
 import json
 import string
+import webbrowser
 import collections
 
 from clldutils.color import qualitative_colors
@@ -26,17 +31,40 @@ def register(parser):
         type=int,
         default=10,
     )
+    parser.add_argument(
+        '--open',
+        action='store_true',
+        default=False,
+        help='open the map in a web browser after',
+    )
+
+
+def get_glottocodes(args):
+    glottocodes = []
+    if args.glottocodes:
+        glottocodes = args.glottocodes.read_text(encoding='utf8').split()
+    elif not args.test:  # pragma: no cover
+        glottocodes = [line.strip() for line in sys.stdin.readlines()]
+    res = {}
+    for gc in glottocodes:
+        if ',' in gc:
+            gc, lat, lon = gc.split(',')
+            res[gc] = (float(lat) if lat else None, float(lon) if lon else None)
+        else:
+            res[gc] = (None, None)
+    return res
 
 
 def run(args):
-    nodes = {n.id: n for n in args.repos.languoids()}
     legend = collections.Counter()
-    glottocodes = args.glottocodes.read_text(encoding='utf8').split() if args.glottocodes else None
+    glottocodes = get_glottocodes(args)
 
+    nodes = {n.id: n for n in args.repos.languoids()}
     langs = []
     for n in nodes.values():
-        if ((glottocodes is None and n.level == args.repos.languoid_levels.language)
-                or (glottocodes and n.id in glottocodes)) and n.latitude != None:  # noqa: W503
+        if ((not glottocodes and n.level == args.repos.languoid_levels.language)
+                or (glottocodes and n.id in glottocodes)) \
+                and (n.latitude != None or glottocodes.get(n.id, (None,))[0] != None):  # noqa: W503
             fid = n.lineage[0][1] if n.lineage else n.id
             if (not nodes[fid].category.startswith('Pseudo')) or fid == n.id:
                 langs.append((n, fid))
@@ -44,11 +72,14 @@ def run(args):
 
     color_map = [fid for fid, _ in legend.most_common()]
     color_map = dict(zip(color_map, qualitative_colors(len(color_map))))
-    print(color_map)
 
     def l2f(t):
         n, fid = t
-        lon, lat = n.longitude, n.latitude
+        lat, lon = glottocodes.get(n.id, (None, None))
+        if lat is None:
+            lat = n.latitude
+        if lon is None:
+            lon = n.longitude
         if lon <= -26:
             lon += 360  # make the map pacific-centered.
 
@@ -98,3 +129,5 @@ def run(args):
             nlangs=len(langs)),
         encoding='utf8')
     print(html.resolve().as_uri())
+    if args.open:
+        webbrowser.open(str(html))  # pragma: no cover

@@ -47,7 +47,7 @@ setup(
     ],
     extras_require={
         'dev': ['tox>=3.14', 'flake8', 'pep8-naming', 'wheel', 'twine'],
-        'test': ['mock>=2', 'pytest>=5', 'pytest-mock', 'pytest-cov'],
+        'test': ['pytest>=5', 'pytest-mock', 'pytest-cov'],
     },
     classifiers=[
         'Programming Language :: Python',
