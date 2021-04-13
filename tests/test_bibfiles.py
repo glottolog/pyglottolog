@@ -2,7 +2,7 @@ import pathlib
 
 import pytest
 
-from pyglottolog.references import Entry
+from pyglottolog.references import Entry, BibFile
 
 
 def test_BibFiles_getitem(bibfiles):
@@ -59,6 +59,20 @@ def test_BibFile(tmpdir, bibfiles):
 def test_BibFile_show_characters(capsys, bibfiles):
     bibfiles['b.bib'].show_characters()
     assert 'CJK UNIFIED IDEOGRAPH' in capsys.readouterr()[0]
+
+
+def test_BibFile_getitem(tmp_path):
+    bib = tmp_path.joinpath('test.bib')
+    bib.write_text("""\
+@book{ab ,
+title={ab}
+}
+@book{a ,
+title={a}
+}
+""", encoding='utf8')
+    bf = BibFile(bib)
+    assert bf['a'].key == 'a'
 
 
 def test_Entry_lgcodes():

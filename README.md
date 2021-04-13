@@ -9,7 +9,7 @@ Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 
 ## Install
 
-To install `pyglottolog` you need a python installation on your system, running python >3.4. Run
+To install `pyglottolog` you need a python installation on your system, running python >3.6. Run
 ```shell script
 pip install pyglottolog
 ```
@@ -18,7 +18,7 @@ This will also install the command line interface `glottolog`.
 
 **Note:** To make use of `pyglottolog` you also need a local copy of the
 [Glottolog data](https://github.com/glottolog/glottolog). This can be
-- a clone of the [glottolog/glottolog](https://github.com/clld/glottolog) repository or your fork of it,
+- a clone of the [glottolog/glottolog](https://github.com/glottolog/glottolog) repository or your fork of it,
 - an unzipped [released version of Glottolog](https://github.com/glottolog/glottolog/releases) from GitHub,
 - or an unzipped download of a [released version of Glottolog](https://doi.org/10.5281/zenodo.596479) from ZENODO.
 
@@ -55,7 +55,7 @@ German [stan1295]
 
 ### Accessing reference data
 ```python
->>> print(api.bibfiles['hh.bib']['s:Karang:Tati-Harzani'])
+>>> print(api.bibfiles['hh:s:Karang:Tati-Harzani'])
 @book{s:Karang:Tati-Harzani,
     author = {'Abd-al-'Ali Kārang},
     title = {Tāti va Harzani},
