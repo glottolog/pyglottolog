@@ -19,6 +19,8 @@ def test_BibFile(tmpdir, bibfiles):
     bf = bibfiles['a.bib']
     assert bf['a:key'].type == 'misc'
     assert bf['s:Andalusi:Turk'].key == 's:Andalusi:Turk'
+    # Test shortcut single item access:
+    assert bibfiles['a:s:Andalusi:Turk'].key == 's:Andalusi:Turk'
 
     for entry in bf.iterentries():
         if entry.key == 'key':

@@ -72,8 +72,17 @@ class BibFiles(list):
         self._map = {b.fname.name: b for b in self}
 
     def __getitem__(self, index_or_filename):
-        """Retrieve a bibfile by index or filename."""
+        """
+        Retrieve a bibfile by index or filename or an entry by qualified key.
+
+        :param index_or_filename: Either an `int` index, or a bibfile name, or a \
+        provider-qualified BibTeX key in the form `<prov>:<key>`.
+        :return: A `BibFile` instance, or an `Entry` instance.
+        """
         if isinstance(index_or_filename, str):
+            if ':' in index_or_filename:
+                stem, key = index_or_filename.split(':', maxsplit=1)
+                return self._map['{}.bib'.format(stem)][key]
             return self._map[index_or_filename]
         return super(BibFiles, self).__getitem__(index_or_filename)
 
