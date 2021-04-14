@@ -422,10 +422,11 @@ class Entry(Model):
 
         select_multiple = sa.select([sa.func.count()], bind=bind)\
             .select_from(
-                sa.select([1])
+                sa.select([sa.literal(1)])
                 .select_from(cls)
                 .group_by(cls.hash)
-                .having(sa.func.count(cls.file_pk.distinct()) > 1))
+                .having(sa.func.count(cls.file_pk.distinct()) > 1)
+                .alias())
         out('%d\tin multiple files' % select_multiple.scalar())
 
     @classmethod
@@ -485,7 +486,7 @@ class Value(Model):
         if with_files:
             select_n = select_n.select_from(sa.join(Value, Entry).join(File))
             files = sa.func.replace(sa.func.group_concat(File.name.distinct()), ',', ', ')
-            select_n.append_column(files.label('files'))
+            select_n = select_n.add_columns(files.label('files'))
             tmpl += '\t%(files)s'
         out('\n'.join(tmpl % r for r in select_n.execute()))
 
@@ -645,7 +646,10 @@ def assign_ids(conn, verbose=False):
             .where(other.hash == Entry.hash)
             .where(other.id != sa.null()))\
         .values(
-            id=sa.select([other.id]).where(other.hash == Entry.hash).where(other.id != sa.null()))
+            id=(sa.select([other.id])
+                .where(other.hash == Entry.hash)
+                .where(other.id != sa.null())
+                .scalar_subquery()))
     print('%d identified (new/separated)' % update_identified.execute().rowcount)
 
     # assign new ids to hash groups of separated/new entries
