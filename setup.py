@@ -33,7 +33,7 @@ setup(
         'csvw>=1.5.6',
         'purl',
         'pycldf>=1.6.4',
-        'sqlalchemy',
+        'sqlalchemy>=1.4',
         'tqdm',
         'latexcodec',
         'unidecode',
