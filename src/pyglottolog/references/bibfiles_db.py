@@ -23,6 +23,8 @@ UNION_FIELDS = {'fn', 'asjp_name', 'isbn'}
 
 IGNORE_FIELDS = {'crossref', 'numnote', 'glotto_id'}
 
+SQLALCHEMY_FUTURE = False
+
 
 log = logging.getLogger('pyglottolog')
 
@@ -42,12 +44,12 @@ class Database(object):
 
         with self.engine.connect() as conn:
             if page_size is not None:
-                conn.execute('PRAGMA page_size = %d' % page_size)
+                conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
             Model.metadata.create_all(conn)
 
         with self.engine.connect() as conn:
-            conn.execute('PRAGMA synchronous = OFF')
-            conn.execute('PRAGMA journal_mode = MEMORY')
+            conn.execute(sa.text('PRAGMA synchronous = OFF'))
+            conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
             conn = conn.execution_options(compiled_cache={})
 
             with conn.begin():
@@ -68,9 +70,10 @@ class Database(object):
         return self
 
     def __init__(self, filepath):
-        filepath = pathlib.Path(filepath)
-        self.filepath = filepath
-        self.engine = sa.create_engine('sqlite:///%s' % filepath, paramstyle='qmark')
+        self.filepath = pathlib.Path(filepath)
+        self.engine = sa.create_engine(f'sqlite:///{self.filepath}',
+                                       future=SQLALCHEMY_FUTURE,
+                                       paramstyle='qmark')
 
     def is_uptodate(self, bibfiles, verbose=False):
         """Does the db have the same filenames, sizes, and mtimes as the given bibfiles?"""
