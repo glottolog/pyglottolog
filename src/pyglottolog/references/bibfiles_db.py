@@ -14,6 +14,7 @@ import sqlalchemy.orm
 from clldutils import jsonlib
 from csvw import dsv
 
+from .. import _compat
 from . import bibtex
 from ..util import unique, group_first
 
@@ -25,7 +26,7 @@ IGNORE_FIELDS = {'crossref', 'numnote', 'glotto_id'}
 
 ENCODING = 'utf-8'
 
-SQLALCHEMY_FUTURE = False
+SQLALCHEMY_FUTURE = True
 
 
 log = logging.getLogger('pyglottolog')
@@ -46,22 +47,23 @@ class Database(object):
 
         with self.connect(page_size=page_size) as conn:
             Model.metadata.create_all(conn)
+            conn.commit()
 
         with self.connect(pragma_bulk_insert=True) as conn:
-            with conn.begin():
-                import_bibfiles(conn, bibfiles)
+            import_bibfiles(conn, bibfiles)
+            conn.commit()
 
-            Entry.stats(conn)
-            Value.fieldstats(conn)
+            Entry.stats(conn=conn)
+            Value.fieldstats(conn=conn)
 
-            with conn.begin():
-                generate_hashes(conn)
+            generate_hashes(conn)
+            conn.commit()
 
-            Entry.hashstats(conn)
-            Entry.hashidstats(conn)
+            Entry.hashstats(conn=conn)
+            Entry.hashidstats(conn=conn)
 
-            with conn.begin():
-                assign_ids(conn, verbose=verbose)
+            assign_ids(conn, verbose=verbose)
+            conn.commit()
 
         return self
 
@@ -83,21 +85,26 @@ class Database(object):
                 conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
             yield conn
 
-    def execute(self, statement, closing=True):
-        cursor = self.engine.execute(statement)
-        if closing:
-            cursor = contextlib.closing(cursor)
-        return cursor
+    @contextlib.contextmanager
+    def execute(self, statement,
+                *, closing: bool = True):
+        with self.connect() as conn:
+            cursor = conn.execute(statement)
+            manager = contextlib.closing if closing else _compat.nullcontext
+            with manager(cursor) as cursor:
+                yield cursor
 
     def is_uptodate(self, bibfiles, verbose=False):
         """Does the db have the same filenames, sizes, and mtimes as the given bibfiles?"""
-        return File.same_as(self.engine, bibfiles, verbose=verbose)
+        with self.connect() as conn:
+            return File.same_as(conn, bibfiles, verbose=verbose)
 
     def stats(self, field_files=False):
-        Entry.stats(self.engine)
-        Value.fieldstats(self.engine, field_files)
-        Entry.hashstats(self.engine)
-        Entry.hashidstats(self.engine)
+        with self.connect() as conn:
+            Entry.stats(conn=conn)
+            Value.fieldstats(conn=conn, with_files=field_files)
+            Entry.hashstats(conn=conn)
+            Entry.hashidstats(conn=conn)
 
     def to_bibfile(self, filepath, encoding=ENCODING):
         bibtex.save(self.merged(), str(filepath), sortkey=None, encoding=encoding)
@@ -129,7 +136,9 @@ class Database(object):
 
     def trickle(self, bibfiles):
         """Write new/changed glottolog_ref_ids back into the given bibfiles."""
-        assert Entry.allid(self.engine)
+        with self.connect() as conn:
+            assert Entry.allid(conn=conn)
+
         if not self.is_uptodate(bibfiles, verbose=True):
             raise RuntimeError('trickle with an outdated db')  # pragma: no cover
         changed = (Entry.id != sa.func.coalesce(Entry.refid, -1))
@@ -144,12 +153,12 @@ class Database(object):
                           .where(Entry.file_pk == sa.bindparam('file_pk'))
                           .where(changed)
                           .order_by(sa.func.lower(Entry.bibkey)))
-        with self.engine.connect() as conn:
+        with self.connect() as conn:
             for file_pk, filename in conn.execute(select_files).fetchall():
                 b = bibfiles[filename]
                 entries = b.load()
                 added = changed = 0
-                for bibkey, refid, new in conn.execute(select_changed, file_pk=file_pk):
+                for bibkey, refid, new in conn.execute(select_changed, {'file_pk': file_pk}):
                     entrytype, fields = entries[bibkey]
                     old = fields.pop('glottolog_ref_id', None)
                     assert old == refid
@@ -169,8 +178,10 @@ class Database(object):
             yield hash, (entrytype, fields)
 
     def __iter__(self, chunksize=100):
-        assert Entry.allid(self.engine)
-        assert Entry.onetoone(self.engine)
+        with self.connect() as conn:
+            assert Entry.allid(conn=conn)
+            assert Entry.onetoone(conn=conn)
+
         select_values = (sa.select([Entry.id, Entry.hash,
                                     Value.field, Value.value,
                                     File.name, Entry.bibkey])
@@ -180,11 +191,14 @@ class Database(object):
                                    Value.field,
                                    File.priority.desc(), File.name,
                                    Entry.bibkey))
+
         get_id_hash = operator.itemgetter(0, 1)
+
         get_field = operator.itemgetter(2)
-        with self.engine.connect() as conn:
+
+        with self.connect() as conn:
             for first, last in Entry.windowed(conn, 'id', chunksize):
-                cursor = conn.execute(select_values, first=first, last=last)
+                cursor = conn.execute(select_values, {'first': first, 'last': last})
                 for id_hash, grp in itertools.groupby(cursor, get_id_hash):
                     yield (
                         id_hash,
@@ -192,26 +206,29 @@ class Database(object):
                             (field, [(vl, fn, bk) for _, _, _, vl, fn, bk in g])
                             for field, g in itertools.groupby(grp, get_field)])
 
-    def __getitem__(self, key, _types=(tuple, int, str)):
+    def __getitem__(self, key):
         """Entry by (fn, bk) or merged entry by refid (old grouping) or hash (current grouping)."""
-        if not isinstance(key, _types):
+        if not isinstance(key, (tuple, int, str)):
             raise ValueError  # pragma: no cover
+
         if isinstance(key, tuple):
             filename, bibkey = key
-            entrytype, fields = self._entry(self.engine, filename, bibkey)
+            with self.connect() as conn:
+                entrytype, fields = self._entry(conn, filename, bibkey)
         else:
-            grp = self._entrygrp(self.engine, key)
+            with self.connect() as conn:
+                grp = self._entrygrp(conn, key)
             entrytype, fields = self._merged_entry(grp)
         return key, (entrytype, fields)
 
     @staticmethod
-    def _entry(bind, filename, bibkey):
+    def _entry(conn, filename, bibkey):
         select_items = (sa.select([Value.field,
-                                   Value.value], bind=bind)
+                                   Value.value])
                         .select_from(sa.join(Value, Entry).join(File))
                         .where(File.name == filename)
                         .where(Entry.bibkey == bibkey))
-        fields = dict(iter(select_items.execute()))
+        fields = dict(iter(conn.execute(select_items)))
         if not fields:
             raise KeyError((filename, bibkey))
         return fields.pop('ENTRYTYPE'), fields
@@ -235,15 +252,15 @@ class Database(object):
         return entrytype, fields
 
     @staticmethod
-    def _entrygrp(bind, key, get_field=operator.itemgetter(0)):
+    def _entrygrp(conn, key, get_field=operator.itemgetter(0)):
         select_values = (sa.select([Value.field,
                                     Value.value,
                                     File.name,
-                                    Entry.bibkey], bind=bind)
+                                    Entry.bibkey])
                          .select_from(sa.join(Entry, File).join(Value))
                          .where((Entry.refid if isinstance(key, int) else Entry.hash) == key)
                          .order_by(Value.field, File.priority.desc(), File.name, Entry.bibkey))
-        grouped = itertools.groupby(select_values.execute(), get_field)
+        grouped = itertools.groupby(conn.execute(select_values), get_field)
         grp = [(field, [(vl, fn, bk) for _, vl, fn, bk in g])
                for field, g in grouped]
         if not grp:
@@ -261,7 +278,7 @@ class Database(object):
                           .where(sa.exists()
                                  .where(other.refid == Entry.refid)
                                  .where(other.hash != Entry.hash)))
-        with self.engine.connect() as conn:
+        with self.connect() as conn:
             for refid, group in group_first(conn.execute(select_entries)):
                 self._print_group(conn, group)
                 old = self._merged_entry(self._entrygrp(conn, refid), raw=True)
@@ -282,7 +299,7 @@ class Database(object):
                           .where(sa.exists()
                                  .where(other.hash == Entry.hash)
                                  .where(other.refid != Entry.refid)))
-        with self.engine.connect() as conn:
+        with self.connect() as conn:
             for hash, group in group_first(conn.execute(select_entries)):
                 self._print_group(conn, group)
                 new = self._merged_entry(self._entrygrp(conn, hash), raw=True)
@@ -299,7 +316,7 @@ class Database(object):
             out('\t%r, %r, %r, %r' % Value.hashfields(conn, row['filename'], row['bibkey']))
 
     def _show(self, sql):
-        with self.engine.connect() as conn:
+        with self.connect() as conn:
             cursor = conn.execute(sql)
             for hash, group in group_first(cursor):
                 self._print_group(conn, group)
@@ -353,11 +370,11 @@ class File(Model):
     priority = sa.Column(sa.Integer, nullable=False)
 
     @classmethod
-    def same_as(cls, bind, bibfiles, verbose=False):
+    def same_as(cls, conn, bibfiles, verbose=False):
         ondisk = {b.fname.name:  (b.size, b.mtime) for b in bibfiles}
-        select_files = (sa.select([cls.name, cls.size, cls.mtime], bind=bind)
+        select_files = (sa.select([cls.name, cls.size, cls.mtime])
                         .order_by(cls.name))
-        indb = {name: (size, mtime) for name, size, mtime in select_files.execute()}
+        indb = {name: (size, mtime) for name, size, mtime in conn.execute(select_files)}
         if ondisk == indb:
             return True
         if verbose:
@@ -395,43 +412,44 @@ class Entry(Model):
     __table_args__ = (sa.UniqueConstraint(file_pk, bibkey),)
 
     @classmethod
-    def allhash(cls, bind):
-        return sa.select([~sa.exists().where(cls.hash == sa.null())], bind=bind).scalar()
+    def allhash(cls, *, conn):
+        query = sa.select([~sa.exists().where(cls.hash == sa.null())])
+        return conn.scalar(query)
 
     @classmethod
-    def allid(cls, bind):
-        return sa.select([~sa.exists().where(cls.id == sa.null())], bind=bind).scalar()
+    def allid(cls, *, conn):
+        query = sa.select([~sa.exists().where(cls.id == sa.null())])
+        return conn.scalar(query)
 
     @classmethod
-    def onetoone(cls, bind):
+    def onetoone(cls, *, conn):
         other = sa.orm.aliased(cls)
-        return (sa.select([~sa.exists()
+        query = sa.select([~sa.exists()
                            .select_from(cls)
                            .where(sa.exists()
                                   .where(sa.or_(sa.and_(other.hash == cls.hash,
                                                         other.id != cls.id),
                                                 sa.and_(other.id == cls.hash,
-                                                        other.hash != cls.hash))))],
-                          bind=bind)
-                .scalar())
+                                                        other.hash != cls.hash))))])
+        return conn.scalar(query)
 
     @classmethod
-    def stats(cls, bind, out=log.info):
+    def stats(cls, *, conn, out=log.info):
         out('entry stats:')
         select_n = (sa.select([File.name.label('filename'),
-                               sa.func.count().label('n')], bind=bind)
+                               sa.func.count().label('n')])
                     .select_from(sa.join(cls, File))
                     .group_by(cls.file_pk))
-        out('\n'.join('%(filename)s %(n)d' % r for r in select_n.execute()))
-        select_total = sa.select([sa.func.count()], bind=bind).select_from(cls)
-        out('%d entries total' % select_total.scalar())
+        out('\n'.join('%(filename)s %(n)d' % r for r in conn.execute(select_n)))
+        select_total = sa.select([sa.func.count()]).select_from(cls)
+        out('%d entries total' % conn.scalar(select_total))
 
     @classmethod
-    def hashstats(cls, bind, out=print):
+    def hashstats(cls, *, conn, out=print):
         select_total = sa.select([sa.func.count(cls.hash.distinct()).label('distinct'),
-                                  sa.func.count(cls.hash).label('total')], bind=bind)
+                                  sa.func.count(cls.hash).label('total')])
         tmpl = '%(distinct)d\tdistinct keyids (from %(total)d total)'
-        out(tmpl % select_total.execute().first())
+        out(tmpl % conn.execute(select_total).first())
 
         sq1 = (sa.select([File.name.label('filename'),
                           sa.func.count(cls.hash.distinct()).label('distinct'),
@@ -451,48 +469,48 @@ class Entry(Model):
         select_files = (sa.select([sa.func.coalesce(sq2.c.unique, 0).label('unique'),
                                    sq1.c.filename,
                                    sq1.c.distinct,
-                                   sq1.c.total], bind=bind)
+                                   sq1.c.total])
                         .select_from(sq1.outerjoin(sq2, sq1.c.filename == sq2.c.filename))
                         .order_by(sq1.c.filename))
         tmpl = '%(unique)d\t%(filename)s (from %(distinct)d distinct of %(total)d total)'
-        out('\n'.join(tmpl % r for r in select_files.execute()))
+        out('\n'.join(tmpl % r for r in conn.execute(select_files)))
 
-        select_multiple = (sa.select([sa.func.count()], bind=bind)
+        select_multiple = (sa.select([sa.func.count()])
                            .select_from(sa.select([sa.literal(1)])
                                         .select_from(cls)
                                         .group_by(cls.hash)
                                         .having(sa.func.count(cls.file_pk.distinct()) > 1)
                                         .alias()))
-        out('%d\tin multiple files' % select_multiple.scalar())
+        out('%d\tin multiple files' % conn.scalar(select_multiple))
 
     @classmethod
-    def hashidstats(cls, bind, out=print):
+    def hashidstats(cls, *, conn, out=print):
         sq = (sa.select([sa.func.count(cls.refid.distinct()).label('hash_nid')])
               .where(cls.hash != sa.null())
               .group_by(cls.hash)
               .having(sa.func.count(cls.refid.distinct()) > 1).alias())
-        select_nid = (sa.select([sq.c.hash_nid, sa.func.count().label('n')], bind=bind)
+        select_nid = (sa.select([sq.c.hash_nid, sa.func.count().label('n')])
                       .group_by(sq.c.hash_nid)
                       .order_by(sa.desc('n')))
         tmpl = '1 keyid %(hash_nid)d glottolog_ref_ids: %(n)d'
-        out('\n'.join(tmpl % r for r in select_nid.execute()))
+        out('\n'.join(tmpl % r for r in conn.execute(select_nid)))
 
         sq = (sa.select([sa.func.count(cls.hash.distinct()).label('id_nhash')])
               .where(cls.refid != sa.null())
               .group_by(cls.refid)
               .having(sa.func.count(cls.hash.distinct()) > 1)
               .alias())
-        select_nhash = (sa.select([sq.c.id_nhash, sa.func.count().label('n')], bind=bind)
+        select_nhash = (sa.select([sq.c.id_nhash, sa.func.count().label('n')])
                         .group_by(sq.c.id_nhash)
                         .order_by(sa.desc('n')))
         tmpl = '1 glottolog_ref_id %(id_nhash)d keyids: %(n)d'
-        out('\n'.join(tmpl % r for r in select_nhash.execute()))
+        out('\n'.join(tmpl % r for r in conn.execute(select_nhash)))
 
     @classmethod
-    def windowed(cls, bind, colname, chunksize):
+    def windowed(cls, conn, colname, chunksize):
         col = cls.__table__.c[colname]
-        select_col = sa.select([col.distinct()], bind=bind).order_by(col)
-        with contextlib.closing(select_col.execute()) as cursor:
+        select_col = sa.select([col.distinct()]).order_by(col)
+        with contextlib.closing(conn.execute(select_col)) as cursor:
             for rows in iter(functools.partial(cursor.fetchmany, chunksize), []):
                 (first,), (last,) = rows[0], rows[-1]
                 yield first, last
@@ -509,19 +527,19 @@ class Value(Model):
     value = sa.Column(sa.Text, nullable=False)
 
     @classmethod
-    def hashfields(cls, bind, filename, bibkey, _fields=('author', 'editor', 'year', 'title')):
+    def hashfields(cls, conn, filename, bibkey, _fields=('author', 'editor', 'year', 'title')):
         # also: extra_hash, volume (if not journal, booktitle, or series)
-        select_items = (sa.select([cls.field, cls.value], bind=bind)
+        select_items = (sa.select([cls.field, cls.value])
                         .select_from(sa.join(Value, Entry).join(File))
                         .where(File.name == filename)
                         .where(Entry.bibkey == bibkey)
                         .where(cls.field.in_(_fields)))
-        fields = dict(iter(select_items.execute()))
+        fields = dict(iter(conn.execute(select_items)))
         return tuple(fields.get(f) for f in _fields)
 
     @classmethod
-    def fieldstats(cls, bind, with_files=False, out=print):
-        select_n = (sa.select([cls.field, sa.func.count().label('n')], bind=bind)
+    def fieldstats(cls, *, conn, with_files: bool = False, out=print):
+        select_n = (sa.select([cls.field, sa.func.count().label('n')])
                     .group_by(cls.field).order_by(sa.desc('n'), cls.field))
         tmpl = '%(n)d\t%(field)s'
         if with_files:
@@ -529,7 +547,7 @@ class Value(Model):
             files = sa.func.replace(sa.func.group_concat(File.name.distinct()), ',', ', ')
             select_n = select_n.add_columns(files.label('files'))
             tmpl += '\t%(files)s'
-        out('\n'.join(tmpl % r for r in select_n.execute()))
+        out('\n'.join(tmpl % r for r in conn.execute(select_n)))
 
 
 def import_bibfiles(conn, bibfiles):
@@ -563,7 +581,7 @@ def generate_hashes(conn):
     from .libmonster import wrds, keyid
 
     words = collections.Counter()
-    cursor = sa.select([Value.value], bind=conn).where(Value.field == 'title').execute()
+    cursor = conn.execute(sa.select([Value.value], ).where(Value.field == 'title'))
     for rows in iter(functools.partial(cursor.fetchmany, 10_000), []):
         for title, in rows:
             words.update(wrds(title))
@@ -571,21 +589,22 @@ def generate_hashes(conn):
     print('%d title words (from %d tokens)' % (len(words), sum(words.values())))
 
     def windowed_entries(chunksize=500):
-        select_files = sa.select([File.pk], bind=conn).order_by(File.name)
-        select_bibkeys = (sa.select([Entry.pk], bind=conn)
+        select_files = sa.select([File.pk]).order_by(File.name)
+        select_bibkeys = (sa.select([Entry.pk])
                           .where(Entry.file_pk == sa.bindparam('file_pk'))
-                          .order_by(Entry.pk).execute)
-        for file_pk, in select_files.execute().fetchall():
-            with contextlib.closing(select_bibkeys(file_pk=file_pk)) as cursor:
+                          .order_by(Entry.pk))
+        for file_pk, in conn.execute(select_files).fetchall():
+            cursor = conn.execute(select_bibkeys, {'file_pk': file_pk})
+            with contextlib.closing(cursor) as cursor:
                 for entry_pks in iter(functools.partial(cursor.fetchmany, chunksize), []):
                     (first,), (last,) = entry_pks[0], entry_pks[-1]
                     yield first, last
 
-    select_bfv = (sa.select([Entry.pk, Value.field, Value.value], bind=conn)
+    select_bfv = (sa.select([Entry.pk, Value.field, Value.value])
                   .select_from(sa.join(Value, Entry))
                   .where(Entry.pk.between(sa.bindparam('first'), sa.bindparam('last')))
                   .where(Value.field != 'ENTRYTYPE')
-                  .order_by(Entry.pk).execute)
+                  .order_by(Entry.pk))
     assert conn.dialect.paramstyle == 'qmark'
     update_entry = (sa.update(Entry, bind=conn)
                     .values(hash=sa.bindparam('hash'))
@@ -594,7 +613,7 @@ def generate_hashes(conn):
     update_entry = functools.partial(conn.connection.executemany, update_entry)
     get_entry_pk = operator.itemgetter(0)
     for first, last in windowed_entries():
-        rows = select_bfv(first=first, last=last)
+        rows = conn.execute(select_bfv, {'first': first, 'last': last})
         update_entry(((keyid({k: v for _, k, v in grp}, words), entry_pk)
                       for entry_pk, grp in itertools.groupby(rows, get_entry_pk)))
 
@@ -603,31 +622,32 @@ def assign_ids(conn, verbose=False):
     merged_entry, entrygrp = Database._merged_entry, Database._entrygrp
     other = sa.orm.aliased(Entry)
 
-    assert Entry.allhash(conn)
+    assert Entry.allhash(conn=conn)
 
-    reset_entries = sa.update(Entry, bind=conn).values(id=sa.null(), srefid=Entry.refid)
-    print('%d entries' % reset_entries.execute().rowcount)
+    reset_entries = sa.update(Entry).values(id=sa.null(), srefid=Entry.refid)
+    print('%d entries' % conn.execute(reset_entries).rowcount)
 
     # resolve splits: srefid = refid only for entries from the most similar hash group
     nsplit = 0
-    select_split = (sa.select([Entry.refid, Entry.hash, File.name, Entry.bibkey], bind=conn)
+    select_split = (sa.select([Entry.refid, Entry.hash, File.name, Entry.bibkey])
                     .select_from(sa.join(Entry, File))
                     .order_by(Entry.refid, Entry.hash, File.name, Entry.bibkey)
                     .where(sa.exists()
                            .where(other.refid == Entry.refid)
                            .where(other.hash != Entry.hash)))
-    update_split = (sa.update(Entry, bind=conn)
+    update_split = (sa.update(Entry)
                     .where(Entry.refid == sa.bindparam('eq_refid'))
                     .where(Entry.hash != sa.bindparam('ne_hash'))
-                    .values(srefid=sa.null())
-                    .execute)
-    for refid, group in group_first(select_split.execute()):
+                    .values(srefid=sa.null()))
+    for refid, group in group_first(conn.execute(select_split)):
         old = merged_entry(entrygrp(conn, refid), raw=True)
         nsplit += len(group)
         cand = [(hs, merged_entry(entrygrp(conn, hs), raw=True))
                 for hs in unique(hs for _, hs, _, _ in group)]
         new = min(cand, key=lambda p: distance(old, p[1]))[0]
-        separated = update_split(eq_refid=refid, ne_hash=new).rowcount
+        separated = conn.execute(update_split,
+                                 {'eq_refid': refid, 'ne_hash': new}
+                                 ).rowcount
         if verbose:
             for row in group:
                 print(row)
@@ -638,13 +658,12 @@ def assign_ids(conn, verbose=False):
     print('%d splitted' % nsplit)
 
     nosplits = sa.select([~sa.exists().select_from(Entry)
-                          .where(sa.exists().where(other.srefid == Entry.srefid).where(other.hash != Entry.hash))],
-                         bind=conn)
-    assert nosplits.scalar()
+                          .where(sa.exists().where(other.srefid == Entry.srefid).where(other.hash != Entry.hash))])
+    assert conn.scalar(nosplits)
 
     # resolve merges: id = srefid of the most similar srefid group
     nmerge = 0
-    select_merge = (sa.select([Entry.hash, Entry.srefid, File.name, Entry.bibkey], bind=conn)
+    select_merge = (sa.select([Entry.hash, Entry.srefid, File.name, Entry.bibkey])
                     .select_from(sa.join(Entry, File))
                     .order_by(Entry.hash, Entry.srefid.desc(), File.name, Entry.bibkey)
                     .where(sa.exists()
@@ -653,15 +672,16 @@ def assign_ids(conn, verbose=False):
     update_merge = (sa.update(Entry, bind=conn)
                     .where(Entry.hash == sa.bindparam('eq_hash'))
                     .where(Entry.srefid != sa.bindparam('ne_srefid'))
-                    .values(id=sa.bindparam('new_id'))
-                    .execute)
-    for hash, group in group_first(select_merge.execute()):
+                    .values(id=sa.bindparam('new_id')))
+    for hash, group in group_first(conn.execute(select_merge)):
         new = merged_entry(entrygrp(conn, hash), raw=True)
         nmerge += len(group)
         cand = [(ri, merged_entry(entrygrp(conn, ri), raw=True))
                 for ri in unique(ri for _, ri, _, _ in group)]
         old = min(cand, key=lambda p: distance(new, p[1]))[0]
-        merged = update_merge(eq_hash=hash, ne_srefid=old, new_id=old).rowcount
+        merged = conn.execute(update_merge,
+                              {'eq_hash': hash, 'ne_srefid': old, 'new_id': old}
+                              ).rowcount
         if verbose:
             for row in group:
                 print(row)
@@ -672,19 +692,18 @@ def assign_ids(conn, verbose=False):
     print('%d merged' % nmerge)
 
     # unchanged entries
-    update_unchanged = (sa.update(Entry, bind=conn)
+    update_unchanged = (sa.update(Entry)
                         .where(Entry.id == sa.null())
                         .where(Entry.srefid != sa.null())
                         .values(id=Entry.srefid))
-    print('%d unchanged' % update_unchanged.execute().rowcount)
+    print('%d unchanged' % conn.execute(update_unchanged).rowcount)
 
     nomerges = sa.select([~sa.exists().select_from(Entry)
-                          .where(sa.exists().where(other.hash == Entry.hash).where(other.id != Entry.id))],
-                         bind=conn)
-    assert nomerges.scalar()
+                          .where(sa.exists().where(other.hash == Entry.hash).where(other.id != Entry.id))])
+    assert conn.scalar(nomerges)
 
     # identified
-    update_identified = (sa.update(Entry, bind=conn)
+    update_identified = (sa.update(Entry)
                          .where(Entry.refid == sa.null())
                          .where(sa.exists()
                                 .where(other.hash == Entry.hash)
@@ -693,11 +712,12 @@ def assign_ids(conn, verbose=False):
                                      .where(other.hash == Entry.hash)
                                      .where(other.id != sa.null())
                                      .scalar_subquery())))
-    print('%d identified (new/separated)' % update_identified.execute().rowcount)
+    print('%d identified (new/separated)' % conn.execute(update_identified).rowcount)
 
     # assign new ids to hash groups of separated/new entries
-    nextid = sa.select([sa.func.coalesce(sa.func.max(Entry.refid), 0) + 1], bind=conn).scalar()
-    select_new = (sa.select([Entry.hash], bind=conn)
+    select_nextid = sa.select([sa.func.coalesce(sa.func.max(Entry.refid), 0) + 1])
+    nextid = conn.scalar(select_nextid)
+    select_new = (sa.select([Entry.hash])
                   .where(Entry.id == sa.null())
                   .group_by(Entry.hash)
                   .order_by(Entry.hash))
@@ -706,18 +726,18 @@ def assign_ids(conn, verbose=False):
                   .values(id=sa.bindparam('new_id'))
                   .where(Entry.hash == sa.bindparam('eq_hash'))
                   .compile().string)
-    params = ((id, hash) for id, (hash,) in enumerate(select_new.execute(), nextid))
+    params = ((id, hash) for id, (hash,) in enumerate(conn.execute(select_new), nextid))
     dbapi_rowcount = conn.connection.executemany(update_new, params).rowcount
     # https://docs.python.org/2/library/sqlite3.html#sqlite3.Cursor.rowcount
     print('%d new ids (new/separated)' % (0 if dbapi_rowcount == -1 else dbapi_rowcount))
 
-    assert Entry.allid(conn)
-    assert Entry.onetoone(conn)
+    assert Entry.allid(conn=conn)
+    assert Entry.onetoone(conn=conn)
 
     # supersede relation
-    select_superseded = (sa.select([sa.func.count()], bind=conn)
+    select_superseded = (sa.select([sa.func.count()])
                          .where(Entry.id != Entry.srefid))
-    print('%d supersede pairs' % select_superseded.scalar())
+    print('%d supersede pairs' % conn.scalar(select_superseded))
 
 
 def distance(left, right, weight={'author': 3, 'year': 3, 'title': 3, 'ENTRYTYPE': 2}):
