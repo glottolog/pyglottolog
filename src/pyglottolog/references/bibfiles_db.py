@@ -23,6 +23,8 @@ UNION_FIELDS = {'fn', 'asjp_name', 'isbn'}
 
 IGNORE_FIELDS = {'crossref', 'numnote', 'glotto_id'}
 
+ENCODING = 'utf-8'
+
 SQLALCHEMY_FUTURE = False
 
 
@@ -81,6 +83,12 @@ class Database(object):
                 conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
             yield conn
 
+    def execute(self, statement, closing=True):
+        cursor = self.engine.execute(statement)
+        if closing:
+            cursor = contextlib.closing(cursor)
+        return cursor
+
     def is_uptodate(self, bibfiles, verbose=False):
         """Does the db have the same filenames, sizes, and mtimes as the given bibfiles?"""
         return File.same_as(self.engine, bibfiles, verbose=verbose)
@@ -91,16 +99,10 @@ class Database(object):
         Entry.hashstats(self.engine)
         Entry.hashidstats(self.engine)
 
-    def execute(self, statement, closing=True):
-        cursor = self.engine.execute(statement)
-        if closing:
-            cursor = contextlib.closing(cursor)
-        return cursor
-
-    def to_bibfile(self, filepath, encoding='utf-8'):
+    def to_bibfile(self, filepath, encoding=ENCODING):
         bibtex.save(self.merged(), str(filepath), sortkey=None, encoding=encoding)
 
-    def to_csvfile(self, filename, encoding='utf-8', dialect='excel'):
+    def to_csvfile(self, filename, encoding=ENCODING, dialect='excel'):
         """Write a CSV file with one row for each entry in each bibfile."""
         select_rows = (sa.select([File.name.label('filename'),
                                   Entry.bibkey, Entry.hash,
@@ -342,9 +344,12 @@ class File(Model):
     __tablename__ = 'file'
 
     pk = sa.Column(sa.Integer, primary_key=True)
+
     name = sa.Column(sa.Text, nullable=False, unique=True)
+
     size = sa.Column(sa.Integer, nullable=False)
     mtime = sa.Column(sa.DateTime, nullable=False)
+
     priority = sa.Column(sa.Integer, nullable=False)
 
     @classmethod
