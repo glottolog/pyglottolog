@@ -50,7 +50,6 @@ class Database(object):
         with self.engine.connect() as conn:
             conn.execute(sa.text('PRAGMA synchronous = OFF'))
             conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
-            conn = conn.execution_options(compiled_cache={})
 
             with conn.begin():
                 import_bibfiles(conn, bibfiles)
