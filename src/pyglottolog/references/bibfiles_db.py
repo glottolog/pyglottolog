@@ -111,10 +111,10 @@ class Database(object):
 
     def to_csvfile(self, filename, encoding=ENCODING, dialect='excel'):
         """Write a CSV file with one row for each entry in each bibfile."""
-        select_rows = (sa.select([File.name.label('filename'),
-                                  Entry.bibkey, Entry.hash,
-                                  sa.cast(Entry.id, sa.Text).label('id')])
-                       .select_from(sa.join(File, Entry))
+        select_rows = (sa.select(File.name.label('filename'),
+                                 Entry.bibkey, Entry.hash,
+                                 sa.cast(Entry.id, sa.Text).label('id'))
+                       .join_from(File, Entry)
                        .order_by(sa.func.lower(File.name),
                                  sa.func.lower(Entry.bibkey),
                                  Entry.hash, Entry.id))
@@ -126,7 +126,8 @@ class Database(object):
 
     def to_replacements(self, filename):
         """Write a JSON file with 301s from merged glottolog_ref_ids."""
-        select_pairs = (sa.select([Entry.refid.label('id'), Entry.id.label('replacement')])
+        select_pairs = (sa.select(Entry.refid.label('id'),
+                                  Entry.id.label('replacement'))
                         .where(Entry.id != Entry.refid)
                         .order_by(Entry.id))
         with self.execute(select_pairs) as cursor:
@@ -142,14 +143,14 @@ class Database(object):
         if not self.is_uptodate(bibfiles, verbose=True):
             raise RuntimeError('trickle with an outdated db')  # pragma: no cover
         changed = (Entry.id != sa.func.coalesce(Entry.refid, -1))
-        select_files = (sa.select([File.pk, File.name])
+        select_files = (sa.select(File.pk, File.name)
                         .where(sa.exists()
                                .where(Entry.file_pk == File.pk)
                                .where(changed))
                         .order_by(File.name))
-        select_changed = (sa.select([Entry.bibkey,
-                                     sa.cast(Entry.refid, sa.Text).label('refid'),
-                                     sa.cast(Entry.id, sa.Text).label('id')])
+        select_changed = (sa.select(Entry.bibkey,
+                                    sa.cast(Entry.refid, sa.Text).label('refid'),
+                                    sa.cast(Entry.id, sa.Text).label('id'))
                           .where(Entry.file_pk == sa.bindparam('file_pk'))
                           .where(changed)
                           .order_by(sa.func.lower(Entry.bibkey)))
@@ -182,10 +183,10 @@ class Database(object):
             assert Entry.allid(conn=conn)
             assert Entry.onetoone(conn=conn)
 
-        select_values = (sa.select([Entry.id, Entry.hash,
-                                    Value.field, Value.value,
-                                    File.name, Entry.bibkey])
-                         .select_from(sa.join(Entry, File).join(Value))
+        select_values = (sa.select(Entry.id, Entry.hash,
+                                   Value.field, Value.value,
+                                   File.name, Entry.bibkey)
+                         .join_from(Entry, File).join(Value)
                          .where(sa.between(Entry.id, sa.bindparam('first'), sa.bindparam('last')))
                          .order_by(Entry.id,
                                    Value.field,
@@ -223,9 +224,9 @@ class Database(object):
 
     @staticmethod
     def _entry(conn, filename, bibkey):
-        select_items = (sa.select([Value.field,
-                                   Value.value])
-                        .select_from(sa.join(Value, Entry).join(File))
+        select_items = (sa.select(Value.field,
+                                  Value.value)
+                        .join_from(Value, Entry).join(File)
                         .where(File.name == filename)
                         .where(Entry.bibkey == bibkey))
         fields = dict(iter(conn.execute(select_items)))
@@ -253,11 +254,11 @@ class Database(object):
 
     @staticmethod
     def _entrygrp(conn, key, get_field=operator.itemgetter(0)):
-        select_values = (sa.select([Value.field,
-                                    Value.value,
-                                    File.name,
-                                    Entry.bibkey])
-                         .select_from(sa.join(Entry, File).join(Value))
+        select_values = (sa.select(Value.field,
+                                   Value.value,
+                                   File.name,
+                                   Entry.bibkey)
+                         .join_from(Entry, File).join(Value)
                          .where((Entry.refid if isinstance(key, int) else Entry.hash) == key)
                          .order_by(Value.field, File.priority.desc(), File.name, Entry.bibkey))
         grouped = itertools.groupby(conn.execute(select_values), get_field)
@@ -269,11 +270,11 @@ class Database(object):
 
     def show_splits(self):
         other = sa.orm.aliased(Entry)
-        select_entries = (sa.select([Entry.refid,
-                                     Entry.hash,
-                                     File.name.label('filename'),
-                                     Entry.bibkey])
-                          .select_from(sa.join(Entry, File))
+        select_entries = (sa.select(Entry.refid,
+                                    Entry.hash,
+                                    File.name.label('filename'),
+                                    Entry.bibkey)
+                          .join_from(Entry, File)
                           .order_by(Entry.refid, Entry.hash, File.name, Entry.bibkey)
                           .where(sa.exists()
                                  .where(other.refid == Entry.refid)
@@ -289,11 +290,11 @@ class Database(object):
 
     def show_merges(self):
         other = sa.orm.aliased(Entry)
-        select_entries = (sa.select([Entry.hash,
-                                     Entry.refid,
-                                     File.name.label('filename'),
-                                     Entry.bibkey])
-                          .select_from(sa.join(Entry, File))
+        select_entries = (sa.select(Entry.hash,
+                                    Entry.refid,
+                                    File.name.label('filename'),
+                                    Entry.bibkey)
+                          .join_from(Entry, File)
                           .order_by(Entry.hash, Entry.refid.desc(),
                                     File.name, Entry.bibkey)
                           .where(sa.exists()
@@ -324,11 +325,11 @@ class Database(object):
 
     def show_identified(self):
         other = sa.orm.aliased(Entry)
-        select_entries = (sa.select([Entry.hash,
-                                     Entry.refid,
-                                     File.name.label('filename'),
-                                     Entry.bibkey])
-                          .select_from(sa.join(Entry, File))
+        select_entries = (sa.select(Entry.hash,
+                                    Entry.refid,
+                                    File.name.label('filename'),
+                                    Entry.bibkey)
+                          .join_from(Entry, File)
                           .order_by(Entry.hash, Entry.refid != sa.null(), Entry.refid,
                                     File.name, Entry.bibkey)
                           .where(sa.exists()
@@ -341,10 +342,10 @@ class Database(object):
 
     def show_combined(self):
         other = sa.orm.aliased(Entry)
-        select_entries = (sa.select([Entry.hash,
-                                     File.name.label('filename'),
-                                     Entry.bibkey])
-                          .select_from(sa.join(Entry, File))
+        select_entries = (sa.select(Entry.hash,
+                                    File.name.label('filename'),
+                                    Entry.bibkey)
+                          .join_from(Entry, File)
                           .order_by(Entry.hash, File.name, Entry.bibkey)
                           .where(Entry.refid == sa.null())
                           .where(sa.exists()
@@ -372,7 +373,7 @@ class File(Model):
     @classmethod
     def same_as(cls, conn, bibfiles, verbose=False):
         ondisk = {b.fname.name:  (b.size, b.mtime) for b in bibfiles}
-        select_files = (sa.select([cls.name, cls.size, cls.mtime])
+        select_files = (sa.select(cls.name, cls.size, cls.mtime)
                         .order_by(cls.name))
         indb = {name: (size, mtime) for name, size, mtime in conn.execute(select_files)}
         if ondisk == indb:
@@ -413,70 +414,70 @@ class Entry(Model):
 
     @classmethod
     def allhash(cls, *, conn):
-        query = sa.select([~sa.exists().where(cls.hash == sa.null())])
+        query = sa.select(~sa.exists().where(cls.hash == sa.null()))
         return conn.scalar(query)
 
     @classmethod
     def allid(cls, *, conn):
-        query = sa.select([~sa.exists().where(cls.id == sa.null())])
+        query = sa.select(~sa.exists().where(cls.id == sa.null()))
         return conn.scalar(query)
 
     @classmethod
     def onetoone(cls, *, conn):
         other = sa.orm.aliased(cls)
-        query = sa.select([~sa.exists()
-                           .select_from(cls)
-                           .where(sa.exists()
-                                  .where(sa.or_(sa.and_(other.hash == cls.hash,
-                                                        other.id != cls.id),
-                                                sa.and_(other.id == cls.hash,
-                                                        other.hash != cls.hash))))])
+        query = sa.select(~sa.exists()
+                          .select_from(cls)
+                          .where(sa.exists()
+                                 .where(sa.or_(sa.and_(other.hash == cls.hash,
+                                                       other.id != cls.id),
+                                               sa.and_(other.id == cls.hash,
+                                                       other.hash != cls.hash)))))
         return conn.scalar(query)
 
     @classmethod
     def stats(cls, *, conn, out=log.info):
         out('entry stats:')
-        select_n = (sa.select([File.name.label('filename'),
-                               sa.func.count().label('n')])
-                    .select_from(sa.join(cls, File))
+        select_n = (sa.select(File.name.label('filename'),
+                              sa.func.count().label('n'))
+                    .join_from(cls, File)
                     .group_by(cls.file_pk))
         out('\n'.join('%(filename)s %(n)d' % r for r in conn.execute(select_n)))
-        select_total = sa.select([sa.func.count()]).select_from(cls)
+        select_total = sa.select(sa.func.count()).select_from(cls)
         out('%d entries total' % conn.scalar(select_total))
 
     @classmethod
     def hashstats(cls, *, conn, out=print):
-        select_total = sa.select([sa.func.count(cls.hash.distinct()).label('distinct'),
-                                  sa.func.count(cls.hash).label('total')])
+        select_total = sa.select(sa.func.count(cls.hash.distinct()).label('distinct'),
+                                 sa.func.count(cls.hash).label('total'))
         tmpl = '%(distinct)d\tdistinct keyids (from %(total)d total)'
         out(tmpl % conn.execute(select_total).first())
 
-        sq1 = (sa.select([File.name.label('filename'),
-                          sa.func.count(cls.hash.distinct()).label('distinct'),
-                          sa.func.count(cls.hash).label('total')])
-               .select_from(sa.join(cls, File))
+        sq1 = (sa.select(File.name.label('filename'),
+                         sa.func.count(cls.hash.distinct()).label('distinct'),
+                         sa.func.count(cls.hash).label('total'))
+               .join_from(cls, File)
                .group_by(cls.file_pk)
                .alias())
         other = sa.orm.aliased(cls)
-        sq2 = (sa.select([File.name.label('filename'),
-                         sa.func.count(cls.hash.distinct()).label('unique')])
-               .select_from(sa.join(cls, File))
+        sq2 = (sa.select(File.name.label('filename'),
+                         sa.func.count(cls.hash.distinct()).label('unique'))
+               .join_from(cls, File)
                .where(~sa.exists()
                       .where(other.hash == cls.hash)
                       .where(other.file_pk != cls.file_pk))
                .group_by(cls.file_pk)
                .alias())
-        select_files = (sa.select([sa.func.coalesce(sq2.c.unique, 0).label('unique'),
-                                   sq1.c.filename,
-                                   sq1.c.distinct,
-                                   sq1.c.total])
+        select_files = (sa.select(sa.func.coalesce(sq2.c.unique, 0).label('unique'),
+                                  sq1.c.filename,
+                                  sq1.c.distinct,
+                                  sq1.c.total)
                         .select_from(sq1.outerjoin(sq2, sq1.c.filename == sq2.c.filename))
                         .order_by(sq1.c.filename))
         tmpl = '%(unique)d\t%(filename)s (from %(distinct)d distinct of %(total)d total)'
         out('\n'.join(tmpl % r for r in conn.execute(select_files)))
 
-        select_multiple = (sa.select([sa.func.count()])
-                           .select_from(sa.select([sa.literal(1)])
+        select_multiple = (sa.select(sa.func.count())
+                           .select_from(sa.select(sa.literal(1))
                                         .select_from(cls)
                                         .group_by(cls.hash)
                                         .having(sa.func.count(cls.file_pk.distinct()) > 1)
@@ -485,22 +486,22 @@ class Entry(Model):
 
     @classmethod
     def hashidstats(cls, *, conn, out=print):
-        sq = (sa.select([sa.func.count(cls.refid.distinct()).label('hash_nid')])
+        sq = (sa.select(sa.func.count(cls.refid.distinct()).label('hash_nid'))
               .where(cls.hash != sa.null())
               .group_by(cls.hash)
               .having(sa.func.count(cls.refid.distinct()) > 1).alias())
-        select_nid = (sa.select([sq.c.hash_nid, sa.func.count().label('n')])
+        select_nid = (sa.select(sq.c.hash_nid, sa.func.count().label('n'))
                       .group_by(sq.c.hash_nid)
                       .order_by(sa.desc('n')))
         tmpl = '1 keyid %(hash_nid)d glottolog_ref_ids: %(n)d'
         out('\n'.join(tmpl % r for r in conn.execute(select_nid)))
 
-        sq = (sa.select([sa.func.count(cls.hash.distinct()).label('id_nhash')])
+        sq = (sa.select(sa.func.count(cls.hash.distinct()).label('id_nhash'))
               .where(cls.refid != sa.null())
               .group_by(cls.refid)
               .having(sa.func.count(cls.hash.distinct()) > 1)
               .alias())
-        select_nhash = (sa.select([sq.c.id_nhash, sa.func.count().label('n')])
+        select_nhash = (sa.select(sq.c.id_nhash, sa.func.count().label('n'))
                         .group_by(sq.c.id_nhash)
                         .order_by(sa.desc('n')))
         tmpl = '1 glottolog_ref_id %(id_nhash)d keyids: %(n)d'
@@ -509,7 +510,7 @@ class Entry(Model):
     @classmethod
     def windowed(cls, conn, colname, chunksize):
         col = cls.__table__.c[colname]
-        select_col = sa.select([col.distinct()]).order_by(col)
+        select_col = sa.select(col.distinct()).order_by(col)
         with contextlib.closing(conn.execute(select_col)) as cursor:
             for rows in iter(functools.partial(cursor.fetchmany, chunksize), []):
                 (first,), (last,) = rows[0], rows[-1]
@@ -529,8 +530,8 @@ class Value(Model):
     @classmethod
     def hashfields(cls, conn, filename, bibkey, _fields=('author', 'editor', 'year', 'title')):
         # also: extra_hash, volume (if not journal, booktitle, or series)
-        select_items = (sa.select([cls.field, cls.value])
-                        .select_from(sa.join(Value, Entry).join(File))
+        select_items = (sa.select(cls.field, cls.value)
+                        .join_from(Value, Entry).join(File)
                         .where(File.name == filename)
                         .where(Entry.bibkey == bibkey)
                         .where(cls.field.in_(_fields)))
@@ -539,11 +540,11 @@ class Value(Model):
 
     @classmethod
     def fieldstats(cls, *, conn, with_files: bool = False, out=print):
-        select_n = (sa.select([cls.field, sa.func.count().label('n')])
+        select_n = (sa.select(cls.field, sa.func.count().label('n'))
                     .group_by(cls.field).order_by(sa.desc('n'), cls.field))
         tmpl = '%(n)d\t%(field)s'
         if with_files:
-            select_n = select_n.select_from(sa.join(Value, Entry).join(File))
+            select_n = select_n.join_from(Value, Entry).join(File)
             files = sa.func.replace(sa.func.group_concat(File.name.distinct()), ',', ', ')
             select_n = select_n.add_columns(files.label('files'))
             tmpl += '\t%(files)s'
@@ -581,7 +582,7 @@ def generate_hashes(conn):
     from .libmonster import wrds, keyid
 
     words = collections.Counter()
-    cursor = conn.execute(sa.select([Value.value], ).where(Value.field == 'title'))
+    cursor = conn.execute(sa.select(Value.value).where(Value.field == 'title'))
     for rows in iter(functools.partial(cursor.fetchmany, 10_000), []):
         for title, in rows:
             words.update(wrds(title))
@@ -589,8 +590,8 @@ def generate_hashes(conn):
     print('%d title words (from %d tokens)' % (len(words), sum(words.values())))
 
     def windowed_entries(chunksize=500):
-        select_files = sa.select([File.pk]).order_by(File.name)
-        select_bibkeys = (sa.select([Entry.pk])
+        select_files = sa.select(File.pk).order_by(File.name)
+        select_bibkeys = (sa.select(Entry.pk)
                           .where(Entry.file_pk == sa.bindparam('file_pk'))
                           .order_by(Entry.pk))
         for file_pk, in conn.execute(select_files).fetchall():
@@ -600,8 +601,8 @@ def generate_hashes(conn):
                     (first,), (last,) = entry_pks[0], entry_pks[-1]
                     yield first, last
 
-    select_bfv = (sa.select([Entry.pk, Value.field, Value.value])
-                  .select_from(sa.join(Value, Entry))
+    select_bfv = (sa.select(Entry.pk, Value.field, Value.value)
+                  .join_from(Value, Entry)
                   .where(Entry.pk.between(sa.bindparam('first'), sa.bindparam('last')))
                   .where(Value.field != 'ENTRYTYPE')
                   .order_by(Entry.pk))
@@ -629,8 +630,8 @@ def assign_ids(conn, verbose=False):
 
     # resolve splits: srefid = refid only for entries from the most similar hash group
     nsplit = 0
-    select_split = (sa.select([Entry.refid, Entry.hash, File.name, Entry.bibkey])
-                    .select_from(sa.join(Entry, File))
+    select_split = (sa.select(Entry.refid, Entry.hash, File.name, Entry.bibkey)
+                    .join_from(Entry, File)
                     .order_by(Entry.refid, Entry.hash, File.name, Entry.bibkey)
                     .where(sa.exists()
                            .where(other.refid == Entry.refid)
@@ -657,14 +658,16 @@ def assign_ids(conn, verbose=False):
             print('%d: %d separated from %s\n' % (refid, separated, new))
     print('%d splitted' % nsplit)
 
-    nosplits = sa.select([~sa.exists().select_from(Entry)
-                          .where(sa.exists().where(other.srefid == Entry.srefid).where(other.hash != Entry.hash))])
+    nosplits = sa.select(~sa.exists().select_from(Entry)
+                         .where(sa.exists()
+                                .where(other.srefid == Entry.srefid)
+                                .where(other.hash != Entry.hash)))
     assert conn.scalar(nosplits)
 
     # resolve merges: id = srefid of the most similar srefid group
     nmerge = 0
-    select_merge = (sa.select([Entry.hash, Entry.srefid, File.name, Entry.bibkey])
-                    .select_from(sa.join(Entry, File))
+    select_merge = (sa.select(Entry.hash, Entry.srefid, File.name, Entry.bibkey)
+                    .join_from(Entry, File)
                     .order_by(Entry.hash, Entry.srefid.desc(), File.name, Entry.bibkey)
                     .where(sa.exists()
                            .where(other.hash == Entry.hash)
@@ -698,8 +701,10 @@ def assign_ids(conn, verbose=False):
                         .values(id=Entry.srefid))
     print('%d unchanged' % conn.execute(update_unchanged).rowcount)
 
-    nomerges = sa.select([~sa.exists().select_from(Entry)
-                          .where(sa.exists().where(other.hash == Entry.hash).where(other.id != Entry.id))])
+    nomerges = sa.select(~sa.exists().select_from(Entry)
+                         .where(sa.exists()
+                                .where(other.hash == Entry.hash)
+                                .where(other.id != Entry.id)))
     assert conn.scalar(nomerges)
 
     # identified
@@ -708,16 +713,16 @@ def assign_ids(conn, verbose=False):
                          .where(sa.exists()
                                 .where(other.hash == Entry.hash)
                                 .where(other.id != sa.null()))
-                         .values(id=(sa.select([other.id])
+                         .values(id=(sa.select(other.id)
                                      .where(other.hash == Entry.hash)
                                      .where(other.id != sa.null())
                                      .scalar_subquery())))
     print('%d identified (new/separated)' % conn.execute(update_identified).rowcount)
 
     # assign new ids to hash groups of separated/new entries
-    select_nextid = sa.select([sa.func.coalesce(sa.func.max(Entry.refid), 0) + 1])
+    select_nextid = sa.select(sa.func.coalesce(sa.func.max(Entry.refid), 0) + 1)
     nextid = conn.scalar(select_nextid)
-    select_new = (sa.select([Entry.hash])
+    select_new = (sa.select(Entry.hash)
                   .where(Entry.id == sa.null())
                   .group_by(Entry.hash)
                   .order_by(Entry.hash))
@@ -735,7 +740,7 @@ def assign_ids(conn, verbose=False):
     assert Entry.onetoone(conn=conn)
 
     # supersede relation
-    select_superseded = (sa.select([sa.func.count()])
+    select_superseded = (sa.select(sa.func.count())
                          .where(Entry.id != Entry.srefid))
     print('%d supersede pairs' % conn.scalar(select_superseded))
 
