@@ -164,8 +164,9 @@ class Glottolog(API):
         :param maxlevel: Numeric maximal nesting depth of languoids, or Languoid.level.
         :return: Generator object, to iterate over languoids.
         """
-        if not isinstance(maxlevel, int):
-            # Non-numeric levels are interpreted as `Languoid.level` descriptors.
+        is_max_level_int = isinstance(maxlevel, int)
+        # Non-numeric levels are interpreted as `Languoid.level` descriptors.
+        if not is_max_level_int:
             maxlevel = self.languoid_levels.get(maxlevel or 'dialect')
 
         # Since we traverse the tree topdown, we can cache a mapping of Languoid.id to triples
@@ -177,8 +178,8 @@ class Glottolog(API):
                     lang = self.cache.add(d, self)
                 else:
                     lang = languoids.Languoid.from_dir(d, nodes=nodes, _api=self)
-                if (isinstance(maxlevel, int) and len(lang.lineage) <= maxlevel) \
-                        or ((not isinstance(maxlevel, int)) and lang.level <= maxlevel):
+                if (is_max_level_int and len(lang.lineage) <= maxlevel) \
+                        or ((not is_max_level_int) and lang.level <= maxlevel):
                     if (not exclude_pseudo_families) or not lang.category.startswith('Pseudo'):
                         yield lang
 
