@@ -3,7 +3,7 @@ from collections import Counter
 
 from clldutils.markup import Table
 
-URL = "https://github.com/lingpy/bibliography/raw/master/evobib-converted.bib"
+URL = 'https://github.com/lingpy/bibliography/raw/master/evobib-converted.bib'
 
 
 def bibtool(bib):  # pragma: no cover

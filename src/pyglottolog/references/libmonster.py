@@ -1,9 +1,9 @@
-"""
-libmonster.py - mixed support library
+r"""libmonster.py - mixed support library
 
 # TODO: consider replacing pauthor in keyid with _bibtex.names
-# TODO: enusure \\emph is dropped from titles in keyid calculation
+# TODO: enusure \emph is dropped from titles in keyid calculation
 """
+
 import re
 from heapq import nsmallest
 from collections import defaultdict
@@ -18,6 +18,8 @@ from .bibtex_undiacritic import undiacritic
 from .roman import roman, romanint
 
 INF = float('inf')
+
+
 lgcodestr = Entry.lgcodes
 
 
@@ -92,6 +94,8 @@ def pauthor(s):
 
 
 relu = re.compile(r"\s+|(d\')(?=[A-Z])")
+
+
 recapstart = re.compile(r"\[?[A-Z]")
 
 
@@ -125,6 +129,8 @@ def rangecomplete(incomplete, complete):
 
 
 rebracketyear = re.compile(r"\[([\d,\-/]+)]")
+
+
 reyl = re.compile(r"[,\-/\s\[\]]+")
 
 
@@ -139,23 +145,21 @@ def pyear(s):
     return my[-1]
 
 
-bibord = {k: i for i, k in enumerate([
-    'author',
-    'editor',
-    'title',
-    'booktitle',
-    'journal',
-    'school',
-    'publisher',
-    'address',
-    'series',
-    'volume',
-    'number',
-    'pages',
-    'year',
-    'issn',
-    'url',
-])}
+bibord = {k: i for i, k in enumerate(['author',
+                                      'editor',
+                                      'title',
+                                      'booktitle',
+                                      'journal',
+                                      'school',
+                                      'publisher',
+                                      'address',
+                                      'series',
+                                      'volume',
+                                      'number',
+                                      'pages',
+                                      'year',
+                                      'issn',
+                                      'url'])}
 
 
 def bibord_iteritems(fields):
@@ -222,6 +226,8 @@ def add_inlg_e(e, trigs, verbose=True, return_newtrain=False):
 
 
 rerpgs = re.compile(r"([xivmcl]+)-?([xivmcl]*)")
+
+
 repgs = re.compile(r"([\d]+)-?([\d]*)")
 
 
@@ -238,6 +244,8 @@ def pagecount(pgstr):
 
 
 rewrdtok = re.compile(r"[a-zA-Z].+")
+
+
 reokkey = re.compile(r"[^a-z\d\-_\[\]]")
 
 

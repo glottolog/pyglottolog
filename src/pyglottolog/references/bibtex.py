@@ -2,7 +2,6 @@
 
 # TODO: make check fail on non-whitespace between entries (bibtex 'comments')
 
-import io
 import functools
 import collections
 import unicodedata
@@ -16,11 +15,9 @@ from pybtex.database import Person
 
 from clldutils.path import memorymapped
 
-FIELDORDER = [
-    'author', 'editor', 'title', 'booktitle', 'journal',
-    'school', 'publisher', 'address',
-    'series', 'volume', 'number', 'pages', 'year', 'issn', 'url',
-]
+FIELDORDER = ['author', 'editor', 'title', 'booktitle', 'journal',
+              'school', 'publisher', 'address',
+              'series', 'volume', 'number', 'pages', 'year', 'issn', 'url']
 
 
 def load(filename, preserve_order=False, encoding=None):
@@ -85,7 +82,7 @@ class Name(collections.namedtuple('Name', 'prelast last given lineage')):
 
 
 def save(entries, filename, sortkey, encoding='utf-8', normalize='NFC'):
-    with io.open(str(filename), 'w', encoding=encoding, errors='strict') as fd:
+    with open(str(filename), 'w', encoding=encoding, errors='strict') as fd:
         dump(entries, fd, sortkey, normalize)
 
 
@@ -164,7 +161,7 @@ class CheckParser(Parser):
     """Unline LowLevelParser also parses names, macros, etc."""
 
     def __init__(self, *args, **kwargs):
-        super(CheckParser, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.error_count = 0
 
     def handle_error(self, error):  # pragma: no cover
@@ -175,7 +172,7 @@ class CheckParser(Parser):
 
     def process_entry(self, *args, **kwargs):
         try:
-            super(CheckParser, self).process_entry(*args, **kwargs)
+            super().process_entry(*args, **kwargs)
         except PybtexError as e:  # pragma: no cover
             print(e)
             self.error_count += 1

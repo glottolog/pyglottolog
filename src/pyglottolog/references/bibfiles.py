@@ -6,7 +6,7 @@ import unicodedata
 import datetime
 import math
 import functools
-from pathlib import Path
+import pathlib
 
 import attr
 
@@ -24,26 +24,28 @@ from .bibfiles_db import Database
 __all__ = ['BibFiles', 'BibFile', 'Entry']
 
 ATTRS_VERSION = tuple(int(v) for v in getattr(attr, '__version__', '20.1').split('.'))
+
 BIBFILES = 'bibfiles.sqlite3'
-DOCTYPES = collections.OrderedDict((k, k) for k in [
-    'grammar',
-    'grammar_sketch',
-    'dictionary',
-    'specific_feature',
-    'phonology',
-    'text',
-    'new_testament',
-    'wordlist',
-    'comparative',
-    'minimal',
-    'socling',
-    'dialectology',
-    'overview',
-    'ethnographic',
-    'bibliographical',
-    'unknown',
-])
+
+DOCTYPES = {k: k for k in ['grammar',
+                           'grammar_sketch',
+                           'dictionary',
+                           'specific_feature',
+                           'phonology',
+                           'text',
+                           'new_testament',
+                           'wordlist',
+                           'comparative',
+                           'minimal',
+                           'socling',
+                           'dialectology',
+                           'overview',
+                           'ethnographic',
+                           'bibliographical',
+                           'unknown']}
+
 PREF_YEAR_PATTERN = re.compile(r'\[(?P<year>(1|2)[0-9]{3})(\-[0-9]+)?\]')
+
 YEAR_PATTERN = re.compile(r'(?P<year>(1|2)[0-9]{3})')
 
 
@@ -53,8 +55,8 @@ class BibFiles(list):
     @classmethod
     def from_path(cls, path, api=None):
         """BibTeX files from `<path>/bibtex/*.bib` if listed in `<path>/BIBFILES.ini`."""
-        if not isinstance(path, Path):
-            path = Path(path)
+        if not isinstance(path, pathlib.Path):
+            path = pathlib.Path(path)
         ini = INI.from_file(path / 'BIBFILES.ini', interpolation=None)
         return cls(cls._iterbibfiles(ini, path / 'bibtex', api=api))
 
@@ -68,7 +70,7 @@ class BibFiles(list):
                 yield BibFile(fname=fpath, api=api, **ini[sec])
 
     def __init__(self, bibfiles):
-        super(BibFiles, self).__init__(bibfiles)
+        super().__init__(bibfiles)
         self._map = {b.fname.name: b for b in self}
 
     def __getitem__(self, index_or_filename):
@@ -84,7 +86,7 @@ class BibFiles(list):
                 stem, key = index_or_filename.split(':', maxsplit=1)
                 return self._map['{}.bib'.format(stem)][key]
             return self._map[index_or_filename]
-        return super(BibFiles, self).__getitem__(index_or_filename)
+        return super().__getitem__(index_or_filename)
 
     def to_sqlite(self, filepath=BIBFILES, rebuild=False, verbose=False):
         """Return a database with the bibfiles loaded."""
@@ -196,7 +198,7 @@ class BibFile(object):
             normalize=self.normalize)
 
     def __str__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.fname.name)
+        return f'<{self.__class__.__name__} {self.fname.name}>'
 
     def check(self, log):
         entries = self.load()  # bare BibTeX syntax

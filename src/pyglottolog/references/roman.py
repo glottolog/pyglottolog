@@ -2,9 +2,9 @@ import re
 
 __all__ = ['introman', 'romanint']
 
-ROMAN_MAP = {'m': 1000, 'd': 500, 'c': 100, 'l': 50, 'x': 10, 'v': 5, 'i': 1}
+ROMAN_MAP = {'m': 1_000, 'd': 500, 'c': 100, 'l': 50, 'x': 10, 'v': 5, 'i': 1}
 
-REROM = re.compile(r"(\d+)")
+REROM = re.compile(r'(\d+)')
 
 
 def introman(i):
@@ -22,7 +22,7 @@ def introman(i):
 
 def romanint(r):
     i = 0
-    prev = 10000
+    prev = 10_000
     for c in r:
         zc = ROMAN_MAP[c]
         if zc > prev:

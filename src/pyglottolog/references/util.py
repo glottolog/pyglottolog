@@ -3,15 +3,22 @@ import re
 from .roman import romanint
 
 ROMAN = r'[ivxlcdmIVXLCDM]+'
+
 ROMANPATTERN = re.compile(ROMAN + '$')
+
 ARABIC = r'[0-9]+'
+
 ARABICPATTERN = re.compile(ARABIC + '$')
+
 SEPPAGESPATTERN = re.compile(
     r'(?P<n1>{0}|{1})\s*(,|;|\.|\+|/)\s*(?P<n2>{0}|{1})'.format(ROMAN, ARABIC))
+
 PAGES_PATTERN = re.compile(
     r'(?P<start>{0}|{1})\s*\-\-?\s*(?P<end>{0}|{1})'.format(ROMAN, ARABIC))
+
 ART_NO_PATTERN = re.compile(r'\(art\.\s*[0-9]+\)')
-MAX_PAGE = 10000
+
+MAX_PAGE = 10_000
 
 
 def get_int(s):
@@ -25,22 +32,31 @@ def get_int(s):
 
 def compute_pages(pages):
     """
+
     >>> compute_pages('x+23')
     (None, None, 33)
+
     >>> compute_pages('x + 23')
     (None, None, 33)
+
     >>> compute_pages('x. 23')
     (None, None, 33)
+
     >>> compute_pages('23,xi')
     (None, None, 34)
+
     >>> compute_pages('23,ix')
     (None, None, 32)
+
     >>> compute_pages('ix')
     (1, 9, 9)
+
     >>> compute_pages('12-45')
     (12, 45, 34)
+
     >>> compute_pages('125-9')
     (125, 129, 5)
+
     >>> compute_pages('7-3')
     (3, 7, 5)
     """

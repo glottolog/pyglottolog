@@ -26,7 +26,7 @@ class HHType(object):
                          for t in p.get(s, 'triggers').strip().splitlines() or []]
 
     def __repr__(self):
-        return '<%s %s rank=%s>' % (self.__class__.__name__, self.id, self.rank)
+        return f'<{self.__class__.__name__} {self.id} rank={self.rank}>'
 
     def __eq__(self, other):
         return self.rank == other.rank
@@ -38,6 +38,7 @@ class HHType(object):
 class HHTypes(object):
 
     _rekillparen = re.compile(r" \([^)]*\)")
+
     _respcomsemic = re.compile(r"[;,]\s?")
 
     def __init__(self, fpath):

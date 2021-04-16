@@ -11,6 +11,7 @@ except ImportError:  # pragma: no cover
     bs = None
 
 LS_INDEX = 'http://www.elpublishing.org/language-snapshots'
+
 LC_INDEX = 'http://www.elpublishing.org/language-contexts'
 
 
