@@ -236,9 +236,10 @@ class Database(object):
     def _entry(conn, filename, bibkey):
         select_items = (sa.select(Value.field,
                                   Value.value)
-                        .join_from(Value, Entry).join(File)
-                        .where(File.name == filename)
-                        .where(Entry.bibkey == bibkey))
+                        .join_from(Value, Entry)
+                        .filter_by(bibkey=bibkey)
+                        .join(File)
+                        .filter_by(name=filename))
 
         fields = dict(iter(conn.execute(select_items)))
 
@@ -580,9 +581,10 @@ class Value(Model):
                    _fields=('author', 'editor', 'year', 'title')):
         # also: extra_hash, volume (if not journal, booktitle, or series)
         select_items = (sa.select(cls.field, cls.value)
-                        .join_from(Value, Entry).join(File)
-                        .where(File.name == filename)
-                        .where(Entry.bibkey == bibkey)
+                        .join_from(Value, Entry)
+                        .filter_by(bibkey=bibkey)
+                        .join(File)
+                        .filter_by(name=filename)
                         .where(cls.field.in_(_fields)))
 
         fields = dict(iter(conn.execute(select_items)))
@@ -635,7 +637,8 @@ def generate_hashes(conn):
     from .libmonster import wrds, keyid
 
     words = collections.Counter()
-    cursor = conn.execute(sa.select(Value.value).where(Value.field == 'title'))
+    cursor = conn.execute(sa.select(Value.value)
+                          .filter_by(field='title'))
     for rows in iter(functools.partial(cursor.fetchmany, 10_000), []):
         for title, in rows:
             words.update(wrds(title))
@@ -646,7 +649,7 @@ def generate_hashes(conn):
         select_files = sa.select(File.pk).order_by(File.name)
 
         select_bibkeys = (sa.select(Entry.pk)
-                          .where(Entry.file_pk == sa.bindparam('file_pk'))
+                          .filter_by(file_pk=sa.bindparam('file_pk'))
                           .order_by(Entry.pk))
 
         for file_pk, in conn.execute(select_files).fetchall():
