@@ -74,8 +74,7 @@ class BibFiles(list):
         self._map = {b.fname.name: b for b in self}
 
     def __getitem__(self, index_or_filename):
-        """
-        Retrieve a bibfile by index or filename or an entry by qualified key.
+        """Retrieve a bibfile by index or filename or an entry by qualified key.
 
         :param index_or_filename: Either an `int` index, or a bibfile name, or a \
         provider-qualified BibTeX key in the form `<prov>:<key>`.
@@ -323,9 +322,7 @@ class Entry(object):
         return p, self.fields.get('address')
 
     def __str__(self):
-        """
-        :return: BibTeX representation of the entry.
-        """
+        """Return the BibTeX representation of the entry."""
         res = "@%s{%s" % (self.type, self.key)
         for k, v in bibtex.fieldorder.itersorted(self.fields):
             res += ',\n    %s = {%s}' % (k, v.strip() if hasattr(v, 'strip') else v)
@@ -333,9 +330,7 @@ class Entry(object):
         return res
 
     def text(self):
-        """
-        :return: Text linearization of the entry.
-        """
+        """Return the text linearization of the entry."""
         return Source(self.type, self.key, _check_id=False, **self.fields).text()
 
     @property
@@ -371,8 +366,7 @@ class Entry(object):
         return res, self.parse_ca(self.fields.get('lgcode'))
 
     def doctypes(self, hhtypes):
-        """
-        Ordered doctypes assigned to this entry.
+        """Ordered doctypes assigned to this entry.
 
         :param hhtypes: `OrderedDict` mapping doctype names to doctypes
         :return: `list` of values of `hhtypes` which apply to the entry, ordered by occurrence in\
