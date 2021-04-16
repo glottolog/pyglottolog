@@ -42,15 +42,10 @@ class Database(object):
                 return self
             self.filepath.unlink()
 
-        with self.engine.connect() as conn:
-            if page_size is not None:
-                conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
+        with self.connect(page_size=page_size) as conn:
             Model.metadata.create_all(conn)
 
-        with self.engine.connect() as conn:
-            conn.execute(sa.text('PRAGMA synchronous = OFF'))
-            conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
-
+        with self.connect(pragma_bulk_insert=True) as conn:
             with conn.begin():
                 import_bibfiles(conn, bibfiles)
 
@@ -73,6 +68,18 @@ class Database(object):
         self.engine = sa.create_engine(f'sqlite:///{self.filepath}',
                                        future=SQLALCHEMY_FUTURE,
                                        paramstyle='qmark')
+
+    @contextlib.contextmanager
+    def connect(self, *,
+                pragma_bulk_insert: bool = False,
+                page_size: int = None):
+        with self.engine.connect() as conn:
+            if pragma_bulk_insert:
+                conn.execute(sa.text('PRAGMA synchronous = OFF'))
+                conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
+            if page_size is not None:
+                conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
+            yield conn
 
     def is_uptodate(self, bibfiles, verbose=False):
         """Does the db have the same filenames, sizes, and mtimes as the given bibfiles?"""
