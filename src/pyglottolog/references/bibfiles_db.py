@@ -647,24 +647,29 @@ class Value:
             out(tmpl.format_map(r))
 
 
+def dbapi_insert(conn, model, *, column_keys: typing.List[str],
+                 executemany: bool = False):
+    assert conn.dialect.paramstyle == 'qmark'
+
+    insert_model = sa.insert(model, bind=conn)
+    insert_compiled = insert_model.compile(column_keys=column_keys)
+
+    dbapi_conn = conn.connection
+    method = dbapi_conn.executemany if executemany else dbapi_conn.execute
+    return functools.partial(method, insert_compiled.string)
+
+
 def import_bibfiles(conn, bibfiles):
     """Import bibfiles with raw dbapi using ``.executemany(<iterable>)``."""
     log.info('importing bibfiles into a new db')
 
-    assert conn.dialect.paramstyle == 'qmark'
-    file_columns = ['name', 'size', 'mtime', 'priority']
-    entry_columns = ['file_pk', 'bibkey', 'refid']
-    value_columns = ['entry_pk', 'field', 'value']
-
-    insert_file = functools.partial(conn.connection.execute,
-                                    sa.insert(File, bind=conn)
-                                    .compile(column_keys=file_columns).string)
-    insert_entry = functools.partial(conn.connection.execute,
-                                     sa.insert(Entry, bind=conn)
-                                     .compile(column_keys=entry_columns).string)
-    insert_values = functools.partial(conn.connection.executemany,
-                                      sa.insert(Value, bind=conn)
-                                      .compile(column_keys=value_columns).string)
+    insert_file =  dbapi_insert(conn, File,
+                                column_keys=['name', 'size', 'mtime', 'priority'])
+    insert_entry = dbapi_insert(conn, Entry,
+                                column_keys=['file_pk', 'bibkey', 'refid'])
+    insert_values = dbapi_insert(conn, Value,
+                                 column_keys=['entry_pk', 'field', 'value'],
+                                 executemany=True)
 
     for b in bibfiles:
         file = (b.fname.name, b.size, b.mtime, b.priority)
