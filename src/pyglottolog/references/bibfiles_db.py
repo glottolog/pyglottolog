@@ -38,7 +38,40 @@ log = logging.getLogger('pyglottolog')
 registry = sa.orm.registry()
 
 
-class Database(object):
+class Connectable:
+
+    def __init__(self, filepath):
+        self.filepath = pathlib.Path(filepath)
+        self._engine = sa.create_engine(f'sqlite:///{self.filepath}',
+                                        future=SQLALCHEMY_FUTURE,
+                                        paramstyle='qmark')
+
+    def connect(self,
+                *, pragma_bulk_insert: bool = False,
+                page_size: typing.Optional[int] = None):
+        """Connect to engine, optionally apply SQLite PRAGMAs, return conn."""
+        conn = self._engine.connect()
+
+        if page_size is not None:
+            conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
+
+        if pragma_bulk_insert:
+            conn.execute(sa.text('PRAGMA synchronous = OFF'))
+            conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
+
+        return conn
+
+    @contextlib.contextmanager
+    def execute(self, statement, *, closing: bool = True):
+        """Connect to engine, execute ``statement``, return ``CursorResult``, close."""
+        with self.connect() as conn:
+            result = conn.execute(statement)
+            manager = contextlib.closing if closing else _compat.nullcontext
+            with manager(result) as result:
+                yield result
+
+
+class BaseDatabase(Connectable):
     """Collection of parsed .bib files loaded into a SQLite database."""
 
     @classmethod
@@ -74,47 +107,51 @@ class Database(object):
 
         return self
 
-    def __init__(self, filepath):
-        self.filepath = pathlib.Path(filepath)
-        self._engine = sa.create_engine(f'sqlite:///{self.filepath}',
-                                        future=SQLALCHEMY_FUTURE,
-                                        paramstyle='qmark')
-
-    def connect(self,
-                *, pragma_bulk_insert: bool = False,
-                page_size: typing.Optional[int] = None):
-        """Connect to engine, optionally apply SQLite PRAGMAs, return conn."""
-        conn = self._engine.connect()
-
-        if page_size is not None:
-            conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
-
-        if pragma_bulk_insert:
-            conn.execute(sa.text('PRAGMA synchronous = OFF'))
-            conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
-
-        return conn
-
-    @contextlib.contextmanager
-    def execute(self, statement, *, closing: bool = True):
-        """Connect to engine, execute ``statement``, return ``CursorResult``, close."""
-        with self.connect() as conn:
-            result = conn.execute(statement)
-            manager = contextlib.closing if closing else _compat.nullcontext
-            with manager(result) as result:
-                yield result
-
     def is_uptodate(self, bibfiles, *, verbose: bool = False):
         """Does the db have the same filenames, sizes, and mtimes as ``bibfiles``?"""
         with self.connect() as conn:
             return File.same_as(conn, bibfiles, verbose=verbose)
 
-    def stats(self, *, field_files: bool = False):
+    def __iter__(self, *, chunksize: int = 100):
         with self.connect() as conn:
-            Entry.stats(conn=conn)
-            Value.fieldstats(conn=conn, with_files=field_files)
-            Entry.hashstats(conn=conn)
-            Entry.hashidstats(conn=conn)
+            assert Entry.allid(conn=conn)
+            assert Entry.onetoone(conn=conn)
+
+        select_values = (sa.select(Entry.id,
+                                   Entry.hash,
+                                   Value.field,
+                                   Value.value,
+                                   File.name.label('filename'),
+                                   Entry.bibkey)
+                         .join_from(Entry, File).join(Value)
+                         .where(sa.between(Entry.id, sa.bindparam('first'), sa.bindparam('last')))
+                         .order_by('id',
+                                   'field',
+                                   File.priority.desc(),
+                                   'filename', 'bibkey'))
+
+        get_id_hash = operator.itemgetter(0, 1)
+
+        get_field = operator.itemgetter(2)
+
+        with self.connect() as conn:
+            for first, last in Entry.windowed(conn, key_column='id', size=chunksize):
+                result = conn.execute(select_values, {'first': first, 'last': last})
+                for id_hash, grp in itertools.groupby(result, key=get_id_hash):
+                    fields = [(field,
+                               [(r.value, r.filename, r.bibkey) for r in g])
+                              for field, g in itertools.groupby(grp, key=get_field)]
+                    yield id_hash, fields
+
+    def merged(self):
+        """Yield merged ``(bibkey, (entrytype, fields))`` entries."""
+        for (id, hash), grp in self:
+            entrytype, fields = self._merged_entry(grp)
+            fields['glottolog_ref_id'] = f'{id:d}'
+            yield hash, (entrytype, fields)
+
+
+class Exportable:
 
     def to_bibfile(self, filepath, *, encoding: str = ENCODING):
         bibtex.save(self.merged(), str(filepath), sortkey=None, encoding=encoding)
@@ -196,43 +233,8 @@ class Database(object):
                 print(f'{changed:d} changed {added:d} added in {bf.id}')
                 bf.save(entries)
 
-    def merged(self):
-        """Yield merged ``(bibkey, (entrytype, fields))`` entries."""
-        for (id, hash), grp in self:
-            entrytype, fields = self._merged_entry(grp)
-            fields['glottolog_ref_id'] = f'{id:d}'
-            yield hash, (entrytype, fields)
 
-    def __iter__(self, *, chunksize: int = 100):
-        with self.connect() as conn:
-            assert Entry.allid(conn=conn)
-            assert Entry.onetoone(conn=conn)
-
-        select_values = (sa.select(Entry.id,
-                                   Entry.hash,
-                                   Value.field,
-                                   Value.value,
-                                   File.name.label('filename'),
-                                   Entry.bibkey)
-                         .join_from(Entry, File).join(Value)
-                         .where(sa.between(Entry.id, sa.bindparam('first'), sa.bindparam('last')))
-                         .order_by('id',
-                                   'field',
-                                   File.priority.desc(),
-                                   'filename', 'bibkey'))
-
-        get_id_hash = operator.itemgetter(0, 1)
-
-        get_field = operator.itemgetter(2)
-
-        with self.connect() as conn:
-            for first, last in Entry.windowed(conn, key_column='id', size=chunksize):
-                result = conn.execute(select_values, {'first': first, 'last': last})
-                for id_hash, grp in itertools.groupby(result, key=get_id_hash):
-                    fields = [(field,
-                               [(r.value, r.filename, r.bibkey) for r in g])
-                              for field, g in itertools.groupby(grp, key=get_field)]
-                    yield id_hash, fields
+class Indexable:
 
     def __getitem__(self, key: typing.Union[typing.Tuple[str, str], int, str]):
         """Entry by (fn, bk) or merged entry by refid (old grouping) or hash (current grouping)."""
@@ -315,6 +317,16 @@ class Database(object):
             raise KeyError(key)
         return grp
 
+
+class Debugable:
+
+    def stats(self, *, field_files: bool = False):
+        with self.connect() as conn:
+            Entry.stats(conn=conn)
+            Value.fieldstats(conn=conn, with_files=field_files)
+            Entry.hashstats(conn=conn)
+            Entry.hashidstats(conn=conn)
+
     def show_splits(self):
         other = sa.orm.aliased(Entry)
 
@@ -363,22 +375,6 @@ class Database(object):
                 old = min(cand, key=lambda p: distance(new, p[1]))[0]
                 print(f'-> {old}\n')
 
-    @staticmethod
-    def _print_group(conn, group, *, out=print):
-        for row in group:
-            out(row)
-        for row in group:
-            hashfields = Value.hashfields(conn,
-                                          filename=row.filename,
-                                          bibkey=row.bibkey)
-            out('\t%r, %r, %r, %r' % hashfields)
-
-    def _show(self, sql):
-        with self.connect() as conn:
-            result = conn.execute(sql)
-            for hash, group in group_first(result):
-                self._print_group(conn, group)
-                print()
 
     def show_identified(self):
         other = sa.orm.aliased(Entry)
@@ -414,6 +410,27 @@ class Database(object):
                           .order_by('hash', 'filename', 'bibkey'))
 
         self._show(select_entries)
+
+    def _show(self, sql):
+        with self.connect() as conn:
+            result = conn.execute(sql)
+            for hash, group in group_first(result):
+                self._print_group(conn, group)
+                print()
+
+    @staticmethod
+    def _print_group(conn, group, *, out=print):
+        for row in group:
+            out(row)
+        for row in group:
+            hashfields = Value.hashfields(conn,
+                                          filename=row.filename,
+                                          bibkey=row.bibkey)
+            out('\t%r, %r, %r, %r' % hashfields)
+
+
+class Database(Debugable, Indexable, Exportable, BaseDatabase):
+    """Collection of parsed .bib files loaded into a SQLite database."""
 
 
 @registry.mapped
