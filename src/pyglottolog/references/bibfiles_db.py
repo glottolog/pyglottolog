@@ -1,23 +1,24 @@
 """Load bibfiles into sqlite3, hash, assign ids (split/merge)."""
 
-import typing
-import logging
+import collections
+import contextlib
 import difflib
-import pathlib
-import operator
 import functools
 import itertools
-import contextlib
-import collections
+import logging
+import operator
+import pathlib
+import typing
 
-import sqlalchemy as sa
-import sqlalchemy.orm
 from clldutils import jsonlib
 from csvw import dsv
+import sqlalchemy as sa
+import sqlalchemy.orm
 
 from .. import _compat
+from ..util import (unique,
+                    group_first as groupby_first)
 from . import bibtex
-from ..util import unique, group_first
 
 __all__ = ['Database']
 
@@ -130,17 +131,19 @@ class BaseDatabase(Connectable):
                                    File.priority.desc(),
                                    'filename', 'bibkey'))
 
-        get_id_hash = operator.itemgetter(0, 1)
+        groupby_id_hash = functools.partial(itertools.groupby,
+                                            key=operator.itemgetter(0, 1))
 
-        get_field = operator.itemgetter(2)
+        groupby_field = functools.partial(itertools.groupby,
+                                          key=operator.itemgetter(2))
 
         with self.connect() as conn:
             for first, last in Entry.windowed(conn, key_column='id', size=chunksize):
                 result = conn.execute(select_values, {'first': first, 'last': last})
-                for id_hash, grp in itertools.groupby(result, key=get_id_hash):
+                for id_hash, grp in groupby_id_hash(result):
                     fields = [(field,
                                [(r.value, r.filename, r.bibkey) for r in g])
-                              for field, g in itertools.groupby(grp, key=get_field)]
+                              for field, g in groupby_field(grp)]
                     yield id_hash, fields
 
     def merged(self):
@@ -342,7 +345,7 @@ class Debugable:
 
         with self.connect() as conn:
             result = conn.execute(select_entries)
-            for refid, group in group_first(result):
+            for refid, group in groupby_first(result):
                 self._print_group(conn, group)
                 old = self._merged_entry(self._entrygrp(conn, refid), raw=True)
                 cand = [(hs, self._merged_entry(self._entrygrp(conn, hs), raw=True))
@@ -367,7 +370,7 @@ class Debugable:
 
         with self.connect() as conn:
             result = conn.execute(select_entries)
-            for hash_, group in group_first(result):
+            for hash_, group in groupby_first(result):
                 self._print_group(conn, group)
                 new = self._merged_entry(self._entrygrp(conn, hash_), raw=True)
                 cand = [(ri, self._merged_entry(self._entrygrp(conn, ri), raw=True))
@@ -414,7 +417,7 @@ class Debugable:
     def _show(self, sql):
         with self.connect() as conn:
             result = conn.execute(sql)
-            for hash, group in group_first(result):
+            for hash, group in groupby_first(result):
                 self._print_group(conn, group)
                 print()
 
@@ -745,13 +748,13 @@ def generate_hashes(conn):
                     .compile().string)
     update_entry = functools.partial(conn.connection.executemany, update_entry)
 
-    get_entry_pk = operator.itemgetter(0)
+    groupby_entry_pk = functools.partial(itertools.groupby,
+                                         key=operator.itemgetter(0))
 
     for first, last in windowed_entries():
         result = conn.execute(select_bfv, {'first': first, 'last': last})
-        grouped = itertools.groupby(result, key=get_entry_pk)
         update_entry(((keyid({r.field: r.value for r in grp}, words), entry_pk)
-                      for entry_pk, grp in grouped))
+                      for entry_pk, grp in groupby_entry_pk(result)))
 
 
 def assign_ids(conn, *, verbose: bool = False):
@@ -783,7 +786,7 @@ def assign_ids(conn, *, verbose: bool = False):
                     .where(Entry.hash != sa.bindparam('ne_hash'))
                     .values(srefid=sa.null()))
 
-    for refid, group in group_first(conn.execute(select_split)):
+    for refid, group in groupby_first(conn.execute(select_split)):
         old = merged_entry(entrygrp(conn, refid), raw=True)
         nsplit += len(group)
         cand = [(hs, merged_entry(entrygrp(conn, hs), raw=True))
@@ -830,7 +833,7 @@ def assign_ids(conn, *, verbose: bool = False):
                     .where(Entry.srefid != sa.bindparam('ne_srefid'))
                     .values(id=sa.bindparam('new_id')))
 
-    for hash, group in group_first(conn.execute(select_merge)):
+    for hash, group in groupby_first(conn.execute(select_merge)):
         new = merged_entry(entrygrp(conn, hash), raw=True)
         nmerge += len(group)
         cand = [(ri, merged_entry(entrygrp(conn, ri), raw=True))
