@@ -368,8 +368,8 @@ class Database(object):
             out(row)
         for row in group:
             hashfields = Value.hashfields(conn,
-                                          filename=row['filename'],
-                                          bibkey=row['bibkey'])
+                                          filename=row.filename,
+                                          bibkey=row.bibkey)
             out('\t%r, %r, %r, %r' % hashfields)
 
     def _show(self, sql):
@@ -595,7 +595,7 @@ class Entry:
     def windowed(cls, conn, *, key_column: str, size: int):
         key_column = cls.__table__.c[key_column]
         select_keys = (sa.select(key_column.distinct())
-                      .order_by(key_column))
+                       .order_by(key_column))
 
         result = conn.execute(select_keys)
         for keys in result.scalars().partitions(size):
@@ -664,8 +664,8 @@ def import_bibfiles(conn, bibfiles):
     """Import bibfiles with raw dbapi using ``.executemany(<iterable>)``."""
     log.info('importing bibfiles into a new db')
 
-    insert_file =  dbapi_insert(conn, File,
-                                column_keys=['name', 'size', 'mtime', 'priority'])
+    insert_file = dbapi_insert(conn, File,
+                               column_keys=['name', 'size', 'mtime', 'priority'])
     insert_entry = dbapi_insert(conn, Entry,
                                 column_keys=['file_pk', 'bibkey', 'refid'])
     insert_values = dbapi_insert(conn, Value,
