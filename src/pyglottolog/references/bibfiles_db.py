@@ -128,7 +128,7 @@ class Database(object):
                        .join_from(File, Entry)
                        .order_by(sa.func.lower(File.name),
                                  sa.func.lower(Entry.bibkey),
-                                 Entry.hash,
+                                 'hash',
                                  Entry.id))
 
         with self.execute(select_rows) as result,\
@@ -142,7 +142,7 @@ class Database(object):
         select_pairs = (sa.select(Entry.refid.label('id'),
                                   Entry.id.label('replacement'))
                         .where(Entry.id != Entry.refid)
-                        .order_by(Entry.id))
+                        .order_by('replacement'))
 
         with self.execute(select_pairs) as result:
             pairs = result.mappings().all()
@@ -162,11 +162,11 @@ class Database(object):
         changed = (Entry.id != sa.func.coalesce(Entry.refid, -1))
 
         select_files = (sa.select(File.pk,
-                                  File.name)
+                                  File.name.label('filename'))
                         .where(sa.exists()
                                .where(Entry.file_pk == File.pk)
                                .where(changed))
-                        .order_by(File.name))
+                        .order_by('filename'))
 
         select_changed = (sa.select(Entry.bibkey,
                                     sa.cast(Entry.refid, sa.Text).label('refid'),
@@ -212,15 +212,14 @@ class Database(object):
                                    Entry.hash,
                                    Value.field,
                                    Value.value,
-                                   File.name,
+                                   File.name.label('filename'),
                                    Entry.bibkey)
                          .join_from(Entry, File).join(Value)
                          .where(sa.between(Entry.id, sa.bindparam('first'), sa.bindparam('last')))
-                         .order_by(Entry.id,
-                                   Value.field,
+                         .order_by('id',
+                                   'field',
                                    File.priority.desc(),
-                                   File.name,
-                                   Entry.bibkey))
+                                   'filename', 'bibkey'))
 
         get_id_hash = operator.itemgetter(0, 1)
 
@@ -297,14 +296,13 @@ class Database(object):
                   *, get_field=operator.itemgetter(0)):
         select_values = (sa.select(Value.field,
                                    Value.value,
-                                   File.name,
+                                   File.name.label('filename'),
                                    Entry.bibkey)
                          .join_from(Entry, File).join(Value)
                          .where((Entry.refid if isinstance(key, int) else Entry.hash) == key)
-                         .order_by(Value.field,
+                         .order_by('field',
                                    File.priority.desc(),
-                                   File.name,
-                                   Entry.bibkey))
+                                   'filename', 'bibkey'))
 
         result = conn.execute(select_values)
         grouped = itertools.groupby(result, key=get_field)
@@ -327,10 +325,7 @@ class Database(object):
                           .where(sa.exists()
                                  .where(other.refid == Entry.refid)
                                  .where(other.hash != Entry.hash))
-                          .order_by(Entry.refid,
-                                    Entry.hash,
-                                    File.name,
-                                    Entry.bibkey))
+                          .order_by('refid', 'hash', 'filename', 'bibkey'))
 
         with self.connect() as conn:
             result = conn.execute(select_entries)
@@ -353,10 +348,9 @@ class Database(object):
                           .where(sa.exists()
                                  .where(other.hash == Entry.hash)
                                  .where(other.refid != Entry.refid))
-                          .order_by(Entry.hash,
+                          .order_by('hash',
                                     Entry.refid.desc(),
-                                    File.name,
-                                    Entry.bibkey))
+                                    'filename', 'bibkey'))
 
         with self.connect() as conn:
             result = conn.execute(select_entries)
@@ -399,11 +393,9 @@ class Database(object):
                           .where(sa.exists()
                                  .where(other.refid != sa.null())
                                  .where(other.hash == Entry.hash))
-                          .order_by(Entry.hash,
+                          .order_by('hash',
                                     Entry.refid != sa.null(),
-                                    Entry.refid,
-                                    File.name,
-                                    Entry.bibkey))
+                                    'refid', 'filename', 'bibkey'))
 
         self._show(select_entries)
 
@@ -418,9 +410,7 @@ class Database(object):
                           .where(sa.exists()
                                  .where(other.refid == sa.null())
                                  .where(other.hash == Entry.hash))
-                          .order_by(Entry.hash,
-                                    File.name,
-                                    Entry.bibkey))
+                          .order_by('hash', 'filename', 'bibkey'))
 
         self._show(select_entries)
 
@@ -444,7 +434,7 @@ class File:
         ondisk = {b.fname.name: (b.size, b.mtime) for b in bibfiles}
 
         select_files = (sa.select(cls.name, cls.size, cls.mtime)
-                        .order_by(cls.name))
+                        .order_by('name'))
         result = conn.execute(select_files)
         indb = {name: (size, mtime) for name, size, mtime in result}
 
@@ -644,8 +634,7 @@ class Value:
         select_n = (sa.select(cls.field,
                               sa.func.count().label('n'))
                     .group_by(cls.field)
-                    .order_by(sa.desc('n'),
-                              cls.field))
+                    .order_by(sa.desc('n'), 'field'))
 
         if with_files:
             tmpl += '\t{files}'
@@ -710,7 +699,7 @@ def generate_hashes(conn):
 
         select_bibkeys = (sa.select(Entry.pk)
                           .filter_by(file_pk=sa.bindparam('file_pk'))
-                          .order_by(Entry.pk))
+                          .order_by('pk'))
 
         for file_pk in files:
             result = conn.execute(select_bibkeys, {'file_pk': file_pk})
@@ -723,7 +712,7 @@ def generate_hashes(conn):
                   .join_from(Value, Entry)
                   .where(Entry.pk.between(sa.bindparam('first'), sa.bindparam('last')))
                   .where(Value.field != ENTRYTYPE)
-                  .order_by(Entry.pk))
+                  .order_by('pk'))
 
     assert conn.dialect.paramstyle == 'qmark'
     update_entry = (sa.update(Entry, bind=conn)
@@ -757,16 +746,13 @@ def assign_ids(conn, *, verbose: bool = False):
 
     select_split = (sa.select(Entry.refid,
                               Entry.hash,
-                              File.name,
+                              File.name.label('filename'),
                               Entry.bibkey)
                     .join_from(Entry, File)
                     .where(sa.exists()
                            .where(other.refid == Entry.refid)
                            .where(other.hash != Entry.hash))
-                    .order_by(Entry.refid,
-                              Entry.hash,
-                              File.name,
-                              Entry.bibkey))
+                    .order_by('refid', 'hash', 'filename', 'bibkey'))
 
     update_split = (sa.update(Entry)
                     .where(Entry.refid == sa.bindparam('eq_refid'))
@@ -803,16 +789,15 @@ def assign_ids(conn, *, verbose: bool = False):
 
     select_merge = (sa.select(Entry.hash,
                               Entry.srefid,
-                              File.name,
+                              File.name.label('filename'),
                               Entry.bibkey)
                     .join_from(Entry, File)
                     .where(sa.exists()
                            .where(other.hash == Entry.hash)
                            .where(other.srefid != Entry.srefid))
-                    .order_by(Entry.hash,
+                    .order_by('hash',
                               Entry.srefid.desc(),
-                              File.name,
-                              Entry.bibkey))
+                              'filename', 'bibkey'))
 
     update_merge = (sa.update(Entry, bind=conn)
                     .where(Entry.hash == sa.bindparam('eq_hash'))
@@ -872,7 +857,7 @@ def assign_ids(conn, *, verbose: bool = False):
     select_new = (sa.select(Entry.hash)
                   .where(Entry.id == sa.null())
                   .group_by(Entry.hash)
-                  .order_by(Entry.hash))
+                  .order_by('hash'))
 
     assert conn.dialect.paramstyle == 'qmark'
     update_new = (sa.update(Entry, bind=conn)
