@@ -614,6 +614,8 @@ class Value:
 
     value = sa.Column(sa.Text, nullable=False)
 
+    __table_args__ = ({'info': {'without_rowid': True}},)
+
     @classmethod
     def hashfields(cls, conn, *, filename, bibkey,
                    _fields=('author', 'editor', 'year', 'title')):
