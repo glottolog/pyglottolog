@@ -472,7 +472,6 @@ class Entry:
     srefid = sa.Column(sa.Integer, index=True)
 
     # new glottolog_ref_id save to bibfiles (current hash groupings):
-
     id = sa.Column(sa.Integer, index=True)
 
     __table_args__ = (sa.UniqueConstraint(file_pk, bibkey),)
