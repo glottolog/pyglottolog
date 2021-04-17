@@ -80,20 +80,20 @@ class Database(object):
                                         future=SQLALCHEMY_FUTURE,
                                         paramstyle='qmark')
 
-    @contextlib.contextmanager
     def connect(self,
                 *, pragma_bulk_insert: bool = False,
                 page_size: typing.Optional[int] = None):
-        """Connect to engine, optionally apply SQLite PRAGMAs."""
-        with self._engine.connect() as conn:
-            if page_size is not None:
-                conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
+        """Connect to engine, optionally apply SQLite PRAGMAs, return conn."""
+        conn = self._engine.connect()
 
-            if pragma_bulk_insert:
-                conn.execute(sa.text('PRAGMA synchronous = OFF'))
-                conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
+        if page_size is not None:
+            conn.execute(sa.text(f'PRAGMA page_size = {page_size:d}'))
 
-            yield conn
+        if pragma_bulk_insert:
+            conn.execute(sa.text('PRAGMA synchronous = OFF'))
+            conn.execute(sa.text('PRAGMA journal_mode = MEMORY'))
+
+        return conn
 
     @contextlib.contextmanager
     def execute(self, statement, *, closing: bool = True):
