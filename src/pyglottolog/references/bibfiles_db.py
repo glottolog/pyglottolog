@@ -132,10 +132,10 @@ class BaseDatabase(Connectable):
                                    'filename', 'bibkey'))
 
         groupby_id_hash = functools.partial(itertools.groupby,
-                                            key=operator.itemgetter(0, 1))
+                                            key=operator.attrgetter('id', 'hash'))
 
         groupby_field = functools.partial(itertools.groupby,
-                                          key=operator.itemgetter(2))
+                                          key=operator.attrgetter('field'))
 
         with self.connect() as conn:
             for first, last in Entry.windowed(conn, key_column='id', size=chunksize):
@@ -299,7 +299,7 @@ class Indexable:
 
     @staticmethod
     def _entrygrp(conn, key,
-                  *, get_field=operator.itemgetter(0)):
+                  *, _get_field=operator.attrgetter('field')):
         select_values = (sa.select(Value.field,
                                    Value.value,
                                    File.name.label('filename'),
@@ -311,7 +311,7 @@ class Indexable:
                                    'filename', 'bibkey'))
 
         result = conn.execute(select_values)
-        grouped = itertools.groupby(result, key=get_field)
+        grouped = itertools.groupby(result, key=_get_field)
         grp = [(field,
                 [(r.value, r.filename, r.bibkey) for r in g])
                for field, g in grouped]
@@ -749,7 +749,7 @@ def generate_hashes(conn):
     update_entry = functools.partial(conn.connection.executemany, update_entry)
 
     groupby_entry_pk = functools.partial(itertools.groupby,
-                                         key=operator.itemgetter(0))
+                                         key=operator.attrgetter('pk'))
 
     for first, last in windowed_entries():
         result = conn.execute(select_bfv, {'first': first, 'last': last})
