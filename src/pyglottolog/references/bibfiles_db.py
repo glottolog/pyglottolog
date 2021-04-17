@@ -654,8 +654,8 @@ def dbapi_insert(conn, model, *, column_keys: typing.List[str],
     insert_model = sa.insert(model, bind=conn)
     insert_compiled = insert_model.compile(column_keys=column_keys)
 
-    dbapi_conn = conn.connection
-    method = dbapi_conn.executemany if executemany else dbapi_conn.execute
+    dbapi_fairy = conn.connection
+    method = dbapi_fairy.executemany if executemany else dbapi_fairy.execute
     return functools.partial(method, insert_compiled.string)
 
 
