@@ -399,17 +399,23 @@ class Debugable:
 
         self._show(select_entries)
 
-    def show_combined(self):
+    def show_combined(self, *, show_new: bool = False):
         other = sa.orm.aliased(Entry)
+
+        whereclause = (sa.exists()
+                       .where(other.refid == sa.null())
+                       .where(other.hash == Entry.hash)
+                       .where(other.pk != Entry.pk))
+
+        if show_new:
+            whereclause = ~whereclause
 
         select_entries = (sa.select(Entry.hash,
                                     File.name.label('filename'),
                                     Entry.bibkey)
                           .join_from(Entry, File)
                           .where(Entry.refid == sa.null())
-                          .where(sa.exists()
-                                 .where(other.refid == sa.null())
-                                 .where(other.hash == Entry.hash))
+                          .where(whereclause)
                           .order_by('hash', 'filename', 'bibkey'))
 
         self._show(select_entries)

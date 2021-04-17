@@ -2,6 +2,11 @@ import pytest
 
 from pyglottolog.references.bibfiles_db import Database, distance
 
+DL = {'ENTRYTYPE': 'article',
+      'author': 'An Author',
+      'year': '1998',
+      'title': 'The Title'}
+
 
 def test_Database(capsys, tmpdir, bibfiles_copy):
     fpath = str(tmpdir / 'test.sqlite3')
@@ -49,24 +54,18 @@ def test_Database(capsys, tmpdir, bibfiles_copy):
     db.show_identified()
 
     db.show_combined()
-
-
-d1 = {
-    'ENTRYTYPE': 'article',
-    'author': 'An Author',
-    'year': '1998',
-    'title': 'The Title',
-}
+    db.show_combined(show_new=True)
 
 
 @pytest.mark.parametrize('left, right, expected', [
     ({}, {}, 0.0),
-    (d1, d1, 0.0),
-    (d1, {}, 1.0),
-    ({}, d1, 1.0),
-    (d1, {'author': 'An Author'}, 0.0),
-    (d1, {'author': 'Another Author'}, pytest.approx(0.2173, rel=.001)),
-    (d1, {'author': 'An Author', 'title': 'Another Title'}, pytest.approx(0.13636, rel=.001)),
-])
+    (DL, DL, 0.0),
+    (DL, {}, 1.0),
+    ({}, DL, 1.0),
+    (DL, {'author': 'An Author'}, 0.0),
+    (DL, {'author': 'Another Author'},
+     pytest.approx(0.2173, rel=.001)),
+    (DL, {'author': 'An Author', 'title': 'Another Title'},
+     pytest.approx(0.13636, rel=.001))])
 def test_distance(left, right, expected):
     assert distance(left, right) == expected
