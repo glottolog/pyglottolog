@@ -230,7 +230,7 @@ class Database(object):
                 result = conn.execute(select_values, {'first': first, 'last': last})
                 for id_hash, grp in itertools.groupby(result, key=get_id_hash):
                     fields = [(field,
-                               [(vl, fn, bk) for _, _, _, vl, fn, bk in g])
+                               [(r.value, r.filename, r.bibkey) for r in g])
                               for field, g in itertools.groupby(grp, key=get_field)]
                     yield id_hash, fields
 
@@ -276,14 +276,15 @@ class Database(object):
                   else ', '.join(unique(vl for vl, _, _ in values))
                   for field, values in grp if field not in ignore}
 
-        src = {fn.rpartition('.bib')[0] or fn
+        src = {filename.rpartition('.bib')[0] or filename
                for _, values in grp
-               for _, fn, _ in values}
+               for _, filename, _ in values}
         fields['src'] = ', '.join(sorted(src))
 
-        srctrickle = {'%s#%s' % (fn.rpartition('.bib')[0] or fn, bk)
+        srctrickle = {'%s#%s' % (filename.rpartition('.bib')[0] or filename,
+                                 bibkey)
                       for _, values in grp
-                      for _, fn, bk in values}
+                      for _, filename, bibkey in values}
         fields['srctrickle'] = ', '.join(sorted(srctrickle))
 
         if raw:
@@ -307,7 +308,7 @@ class Database(object):
         result = conn.execute(select_values)
         grouped = itertools.groupby(result, key=get_field)
         grp = [(field,
-                [(vl, fn, bk) for _, vl, fn, bk in g])
+                [(r.value, r.filename, r.bibkey) for r in g])
                for field, g in grouped]
 
         if not grp:
@@ -333,7 +334,7 @@ class Database(object):
                 self._print_group(conn, group)
                 old = self._merged_entry(self._entrygrp(conn, refid), raw=True)
                 cand = [(hs, self._merged_entry(self._entrygrp(conn, hs), raw=True))
-                        for hs in unique(hs for _, hs, _, _ in group)]
+                        for hs in unique(r.hash for r in group)]
                 new = min(cand, key=lambda p: distance(old, p[1]))[0]
                 print(f'-> {new}\n')
 
@@ -358,7 +359,7 @@ class Database(object):
                 self._print_group(conn, group)
                 new = self._merged_entry(self._entrygrp(conn, hash_), raw=True)
                 cand = [(ri, self._merged_entry(self._entrygrp(conn, ri), raw=True))
-                        for ri in unique(ri for _, ri, _, _ in group)]
+                        for ri in unique(r.refid for r in group)]
                 old = min(cand, key=lambda p: distance(new, p[1]))[0]
                 print(f'-> {old}\n')
 
@@ -732,7 +733,7 @@ def generate_hashes(conn):
     for first, last in windowed_entries():
         result = conn.execute(select_bfv, {'first': first, 'last': last})
         grouped = itertools.groupby(result, key=get_entry_pk)
-        update_entry(((keyid({k: v for _, k, v in grp}, words), entry_pk)
+        update_entry(((keyid({r.field: r.value for r in grp}, words), entry_pk)
                       for entry_pk, grp in grouped))
 
 
@@ -769,15 +770,17 @@ def assign_ids(conn, *, verbose: bool = False):
         old = merged_entry(entrygrp(conn, refid), raw=True)
         nsplit += len(group)
         cand = [(hs, merged_entry(entrygrp(conn, hs), raw=True))
-                for hs in unique(hs for _, hs, _, _ in group)]
+                for hs in unique(r.hash for r in group)]
         new = min(cand, key=lambda p: distance(old, p[1]))[0]
         params = {'eq_refid': refid, 'ne_hash': new}
         separated = conn.execute(update_split, params).rowcount
         if verbose:
             for row in group:
                 print(row)
-            for _, _, fn, bk in group:
-                hashfields = Value.hashfields(conn, filename=fn, bibkey=bk)
+            for row in group:
+                hashfields = Value.hashfields(conn,
+                                              filename=row.filename,
+                                              bibkey=row.bibkey)
                 print('\t%r, %r, %r, %r' % hashfields)
             print(f'-> {new}')
             print(f'{refid:d}: {separated:d} separated from {new}\n')
@@ -814,17 +817,18 @@ def assign_ids(conn, *, verbose: bool = False):
         new = merged_entry(entrygrp(conn, hash), raw=True)
         nmerge += len(group)
         cand = [(ri, merged_entry(entrygrp(conn, ri), raw=True))
-                for ri in unique(ri for _, ri, _, _ in group)]
+                for ri in unique(r.srefid for r in group)]
         old = min(cand, key=lambda p: distance(new, p[1]))[0]
         params = {'eq_hash': hash, 'ne_srefid': old, 'new_id': old}
         merged = conn.execute(update_merge, params).rowcount
         if verbose:
             for row in group:
                 print(row)
-            for _, _, fn, bk in group:
-                print('\t%r, %r, %r, %r' % Value.hashfields(conn,
-                                                            filename=fn,
-                                                            bibkey=bk))
+            for row in group:
+                hashfields = Value.hashfields(conn,
+                                              filename=row.filename,
+                                              bibkey=row.bibkey)
+                print('\t%r, %r, %r, %r' % hashfields)
             print(f'-> {old}')
             print(f'{hash}: {merged:d} merged into {old:d}\n')
     print(f'{nmerge:d} merged')
