@@ -598,8 +598,8 @@ class Entry:
                                  sa.func.count(cls.hash).label('total'))
 
         result = conn.execute(select_total).one()
-        out(f'{result.distinct:6d}\tdistinct keyids'
-            f' (from {result.total:d} total)')
+        out(f'{result.distinct:6d}'
+            f'distinct keyids (from {result.total:d} total)', sep='\t')
 
         sq_1 = (sa.select(File.name.label('filename'),
                           sa.func.count(cls.hash.distinct()).label('distinct'),
@@ -628,8 +628,9 @@ class Entry:
 
         result = conn.execute(select_files)
         for r in result:
-            out(f'{r.unique:6d}\t{r.filename}'
-                f' (from {r.distinct:d} distinct of {r.total:d} total)')
+            out(f'{r.unique:6d}'
+                f'{r.filename} (from {r.distinct:d} distinct'
+                f' of {r.total:d} total)', sep='\t')
 
         select_multiple = (sa.select(sa.func.count())
                            .select_from(sa.select(sa.literal(1))
@@ -639,7 +640,7 @@ class Entry:
                                         .alias()))
 
         multiple = conn.scalar(select_multiple)
-        out(f'{multiple:6d}\tin multiple files')
+        out(f'{multiple:6d}', 'in multiple files', sep='\t')
 
     @classmethod
     def hashidstats(cls, *, conn, out=print, ref_id_field: str = REF_ID_FIELD):
@@ -787,7 +788,8 @@ def generate_hashes(conn):
         for title in titles:
             words.update(wrds(title))
     # TODO: consider dropping stop words/hapaxes from freq. distribution
-    print(f'{len(words):6d}\ttitle words (from {sum(words.values()):d} tokens)')
+    print(f'{len(words):6d}'
+          f'title words (from {sum(words.values()):d} tokens)', sep='\t')
 
     def windowed_entries(chunksize: int = 500):
         select_files = (sa.select(File.pk)
