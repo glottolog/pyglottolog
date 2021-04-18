@@ -245,12 +245,13 @@ class Indexable:
                           raw: bool = True,
                           _get_field=operator.attrgetter('field')):
         """Return merged entry from old or new grouping."""
+        keycol = Entry.refid if isinstance(key, int) else Entry.hash
         select_values = (sa.select(Value.field,
                                    Value.value,
                                    File.name.label('filename'),
                                    Entry.bibkey)
                          .join_from(Entry, File).join(Value)
-                         .where((Entry.refid if isinstance(key, int) else Entry.hash) == key)
+                         .where(keycol == key)
                          .order_by('field',
                                    File.priority.desc(),
                                    'filename', 'bibkey'))
