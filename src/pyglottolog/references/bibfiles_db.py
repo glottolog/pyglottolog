@@ -40,6 +40,22 @@ ENTRYTYPE = 'ENTRYTYPE'
 log = logging.getLogger('pyglottolog')
 
 
+def distance(left, right,
+             *, weight={'author': 3, 'year': 3, 'title': 3, ENTRYTYPE: 2}):
+    """Simple measure of the difference between two BibTeX field dicts."""
+    if not (left or right):
+        return 0.0
+
+    keys = left.keys() & right.keys()
+    if not keys:
+        return 1.0
+
+    weights = {k: weight.get(k, 1) for k in keys}
+    ratios = (w * difflib.SequenceMatcher(None, left[k], right[k]).ratio()
+              for k, w in weights.items())
+    return 1 - (sum(ratios) / sum(weights.values()))
+
+
 registry = sa.orm.registry()
 
 
@@ -189,6 +205,66 @@ class BaseDatabase(Connectable):
         return entrytype, fields
 
 
+class Indexable:
+    """Retrieve entry from individual .bib file, or merged entry from old or new grouping."""
+
+    def __getitem__(self, key: typing.Union[typing.Tuple[str, str], int, str]):
+        """Entry by ``(filename, bibkey)`` or merged entry by ``refid`` (old grouping) or ``hash`` (current grouping)."""
+        if not isinstance(key, (tuple, int, str)):
+            raise TypeError(f'key must be tuple, int, or str: {key!r}')  # pragma: no cover
+
+        with self.connect() as conn:
+            if isinstance(key, tuple):
+                filename, bibkey = key
+                entry = self._get_file_entry(conn, filename, bibkey)
+            else:
+                entry = self._get_merged_entry(conn, key=key, raw=False)
+
+        entrytype, fields = entry
+        return key, (entrytype, fields)
+
+    @staticmethod
+    def _get_file_entry(conn, filename: str, bibkey: str):
+        """Return entry from individual .bib file."""
+        select_items = (sa.select(Value.field,
+                                  Value.value)
+                        .join_from(Value, Entry)
+                        .filter_by(bibkey=bibkey)
+                        .join(File)
+                        .filter_by(name=filename))
+
+        result = conn.execute(select_items)
+        fields = dict(iter(result))
+
+        if not fields:
+            raise KeyError((filename, bibkey))
+        return fields.pop(ENTRYTYPE), fields
+
+    @classmethod
+    def _get_merged_entry(cls, conn, *, key: typing.Union[int, str],
+                          raw: bool = True,
+                          _get_field=operator.attrgetter('field')):
+        """Return merged entry from old or new grouping."""
+        select_values = (sa.select(Value.field,
+                                   Value.value,
+                                   File.name.label('filename'),
+                                   Entry.bibkey)
+                         .join_from(Entry, File).join(Value)
+                         .where((Entry.refid if isinstance(key, int) else Entry.hash) == key)
+                         .order_by('field',
+                                   File.priority.desc(),
+                                   'filename', 'bibkey'))
+
+        result = conn.execute(select_values)
+        grouped = itertools.groupby(result, key=_get_field)
+        grp = [(field, [(r.value, r.filename, r.bibkey) for r in g])
+               for field, g in grouped]
+
+        if not grp:
+            raise KeyError(key)
+        return cls._merged_entry(grp, raw=raw)
+
+
 class Exportable:
     """Write merged references into .bib file, ``bibfiles``, etc."""
 
@@ -278,66 +354,6 @@ class Exportable:
 
                 print(f'{changed:d} changed {added:d} added in {bf.id}')
                 bf.save(entries)
-
-
-class Indexable:
-    """Retrieve entry from individual .bib file, or merged entry from old or new grouping."""
-
-    def __getitem__(self, key: typing.Union[typing.Tuple[str, str], int, str]):
-        """Entry by ``(filename, bibkey)`` or merged entry by ``refid`` (old grouping) or ``hash`` (current grouping)."""
-        if not isinstance(key, (tuple, int, str)):
-            raise TypeError(f'key must be tuple, int, or str: {key!r}')  # pragma: no cover
-
-        with self.connect() as conn:
-            if isinstance(key, tuple):
-                filename, bibkey = key
-                entry = self._get_file_entry(conn, filename, bibkey)
-            else:
-                entry = self._get_merged_entry(conn, key=key, raw=False)
-
-        entrytype, fields = entry
-        return key, (entrytype, fields)
-
-    @staticmethod
-    def _get_file_entry(conn, filename: str, bibkey: str):
-        """Return entry from individual .bib file."""
-        select_items = (sa.select(Value.field,
-                                  Value.value)
-                        .join_from(Value, Entry)
-                        .filter_by(bibkey=bibkey)
-                        .join(File)
-                        .filter_by(name=filename))
-
-        result = conn.execute(select_items)
-        fields = dict(iter(result))
-
-        if not fields:
-            raise KeyError((filename, bibkey))
-        return fields.pop(ENTRYTYPE), fields
-
-    @classmethod
-    def _get_merged_entry(cls, conn, *, key: typing.Union[int, str],
-                          raw: bool = True,
-                          _get_field=operator.attrgetter('field')):
-        """Return merged entry from old or new grouping."""
-        select_values = (sa.select(Value.field,
-                                   Value.value,
-                                   File.name.label('filename'),
-                                   Entry.bibkey)
-                         .join_from(Entry, File).join(Value)
-                         .where((Entry.refid if isinstance(key, int) else Entry.hash) == key)
-                         .order_by('field',
-                                   File.priority.desc(),
-                                   'filename', 'bibkey'))
-
-        result = conn.execute(select_values)
-        grouped = itertools.groupby(result, key=_get_field)
-        grp = [(field, [(r.value, r.filename, r.bibkey) for r in g])
-               for field, g in grouped]
-
-        if not grp:
-            raise KeyError(key)
-        return cls._merged_entry(grp, raw=raw)
 
 
 class Debugable:
@@ -469,7 +485,7 @@ class Debugable:
             out('\t%r, %r, %r, %r' % hashfields)
 
 
-class Database(Debugable, Indexable, Exportable, BaseDatabase):
+class Database(Debugable, Exportable, Indexable, BaseDatabase):
     """Collection of parsed .bib files loaded into a SQLite database."""
 
 
@@ -965,19 +981,3 @@ def assign_ids(conn, *, verbose: bool = False):
                          .where(Entry.id != Entry.srefid))
     superseded = conn.scalar(select_superseded)
     print(f'{superseded:d} supersede pairs')
-
-
-def distance(left, right,
-             *, weight={'author': 3, 'year': 3, 'title': 3, ENTRYTYPE: 2}):
-    """Simple measure of the difference between two BibTeX field dicts."""
-    if not (left or right):
-        return 0.0
-
-    keys = left.keys() & right.keys()
-    if not keys:
-        return 1.0
-
-    weights = {k: weight.get(k, 1) for k in keys}
-    ratios = (w * difflib.SequenceMatcher(None, left[k], right[k]).ratio()
-              for k, w in weights.items())
-    return 1 - (sum(ratios) / sum(weights.values()))
