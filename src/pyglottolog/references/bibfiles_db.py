@@ -836,13 +836,62 @@ def assign_ids(conn, *, verbose: bool = False):
     """Assign ``Entry.id`` to all .bib entries to establish new grouping."""
     assert Entry.allhash(conn=conn)
 
-    reset_entries = sa.update(Entry).values(id=sa.null(), srefid=Entry.refid)
-    reset = conn.execute(reset_entries).rowcount
+    other = sa.orm.aliased(Entry)
+
+    reset = reset_entries(conn)
     print(f'{reset:d} entries')
 
-    # resolve splits: srefid = refid only for entries from the most similar hash group
-    nsplit = 0
+    n_split = resolve_splits(conn, verbose=verbose)
+    print(f'{n_split:d} splitted')
 
+    no_splits = sa.select(~sa.exists()
+                          .select_from(Entry)
+                          .where(sa.exists()
+                                 .where(other.srefid == Entry.srefid)
+                                 .where(other.hash != Entry.hash)))
+
+    assert conn.scalar(no_splits)
+
+    n_merged = resolve_merges(conn, verbose=verbose)
+    print(f'{n_merged:d} merged')
+
+    unchanged = update_unchanged(conn)
+    print(f'{unchanged:d} unchanged')
+
+    no_merges = sa.select(~sa.exists()
+                          .select_from(Entry)
+                          .where(sa.exists()
+                                 .where(other.hash == Entry.hash)
+                                 .where(other.id != Entry.id)))
+
+    assert conn.scalar(no_merges)
+
+    identified = update_identified(conn)
+    print(f'{identified:d} identified (new/separated)')
+
+    new = assign_new_and_separated(conn)
+    print(f'{new:d} new ids (new/separated)')
+
+    assert Entry.allid(conn=conn)
+    assert Entry.onetoone(conn=conn)
+
+    select_superseded = (sa.select(sa.func.count())
+                         .where(Entry.id != Entry.srefid))
+
+    superseded = conn.scalar(select_superseded)
+    print(f'{superseded:d} supersede pairs')
+
+
+def reset_entries(conn):
+    update_entries = (sa.update(Entry)
+                      .values(id=sa.null(),
+                              srefid=Entry.refid))
+
+    return conn.execute(update_entries).rowcount
+
+
+def resolve_splits(conn, *, verbose: bool = False):
+    """Set srefid = refid only for entries from the most similar hash group."""
     other = sa.orm.aliased(Entry)
 
     select_split = (sa.select(Entry.refid,
@@ -855,21 +904,28 @@ def assign_ids(conn, *, verbose: bool = False):
                            .where(other.hash != Entry.hash))
                     .order_by('refid', 'hash', 'filename', 'bibkey'))
 
+    get_merged_entry = Database._get_merged_entry
+
     update_split = (sa.update(Entry)
                     .where(Entry.refid == sa.bindparam('eq_refid'))
                     .where(Entry.hash != sa.bindparam('ne_hash'))
                     .values(srefid=sa.null()))
 
-    get_merged_entry = Database._get_merged_entry
+    n_split = 0
 
     for refid, group in groupby_first(conn.execute(select_split)):
+        n_split += len(group)
+
         old = get_merged_entry(conn, key=refid)
-        nsplit += len(group)
+
         cand = [(hash_, get_merged_entry(conn, key=hash_))
                 for hash_ in unique(r.hash for r in group)]
+
         new = min(cand, key=lambda p: distance(old, p[1]))[0]
+
         params = {'eq_refid': refid, 'ne_hash': new}
         separated = conn.execute(update_split, params).rowcount
+
         if verbose:
             for row in group:
                 print(row)
@@ -880,17 +936,13 @@ def assign_ids(conn, *, verbose: bool = False):
                 print('\t%r, %r, %r, %r' % hashfields)
             print(f'-> {new}')
             print(f'{refid:d}: {separated:d} separated from {new}\n')
-    print(f'{nsplit:d} splitted')
 
-    nosplits = sa.select(~sa.exists()
-                         .select_from(Entry)
-                         .where(sa.exists()
-                                .where(other.srefid == Entry.srefid)
-                                .where(other.hash != Entry.hash)))
-    assert conn.scalar(nosplits)
+    return n_split
 
-    # resolve merges: id = srefid of the most similar srefid group
-    nmerge = 0
+
+def resolve_merges(conn, *, verbose: bool = False):
+    """Set id = srefid of the most similar srefid group."""
+    other = sa.orm.aliased(Entry)
 
     select_merge = (sa.select(Entry.hash,
                               Entry.srefid,
@@ -904,19 +956,28 @@ def assign_ids(conn, *, verbose: bool = False):
                               Entry.srefid.desc(),
                               'filename', 'bibkey'))
 
+    get_merged_entry = Database._get_merged_entry
+
     update_merge = (sa.update(Entry, bind=conn)
                     .where(Entry.hash == sa.bindparam('eq_hash'))
                     .where(Entry.srefid != sa.bindparam('ne_srefid'))
                     .values(id=sa.bindparam('new_id')))
 
+    n_merged = 0
+
     for hash_, group in groupby_first(conn.execute(select_merge)):
+        n_merged += len(group)
+
         new = get_merged_entry(conn, key=hash_)
-        nmerge += len(group)
+
         cand = [(srefid, get_merged_entry(conn, key=srefid))
                 for srefid in unique(r.srefid for r in group)]
+
         old = min(cand, key=lambda p: distance(new, p[1]))[0]
+
         params = {'eq_hash': hash_, 'ne_srefid': old, 'new_id': old}
         merged = conn.execute(update_merge, params).rowcount
+
         if verbose:
             for row in group:
                 print(row)
@@ -927,23 +988,22 @@ def assign_ids(conn, *, verbose: bool = False):
                 print('\t%r, %r, %r, %r' % hashfields)
             print(f'-> {old}')
             print(f'{hash_}: {merged:d} merged into {old:d}\n')
-    print(f'{nmerge:d} merged')
 
-    # unchanged entries
+    return n_merged
+
+
+def update_unchanged(conn):
     update_unchanged = (sa.update(Entry)
                         .where(Entry.id == sa.null())
                         .where(Entry.srefid != sa.null())
                         .values(id=Entry.srefid))
-    unchanged = conn.execute(update_unchanged).rowcount
-    print(f'{unchanged:d} unchanged')
 
-    nomerges = sa.select(~sa.exists().select_from(Entry)
-                         .where(sa.exists()
-                                .where(other.hash == Entry.hash)
-                                .where(other.id != Entry.id)))
-    assert conn.scalar(nomerges)
+    return conn.execute(update_unchanged).rowcount
+    
 
-    # identified
+def update_identified(conn):
+    other = sa.orm.aliased(Entry)
+
     update_identified = (sa.update(Entry)
                          .where(Entry.refid == sa.null())
                          .where(sa.exists()
@@ -953,12 +1013,13 @@ def assign_ids(conn, *, verbose: bool = False):
                                      .where(other.hash == Entry.hash)
                                      .where(other.id != sa.null())
                                      .scalar_subquery())))
-    identified = conn.execute(update_identified).rowcount
-    print(f'{identified:d} identified (new/separated)')
 
-    # assign new ids to hash groups of separated/new entries
+    return conn.execute(update_identified).rowcount
+
+
+def assign_new_and_separated(conn):
+    """Assign new ids to hash groups of new/separated entries."""
     select_nextid = sa.select(sa.func.coalesce(sa.func.max(Entry.refid), 0) + 1)
-    nextid = conn.scalar(select_nextid)
 
     select_new = (sa.select(Entry.hash)
                   .where(Entry.id == sa.null())
@@ -971,17 +1032,12 @@ def assign_ids(conn, *, verbose: bool = False):
                   .where(Entry.hash == sa.bindparam('eq_hash'))
                   .compile().string)
 
-    params = ((id_, hash_) for id_, (hash_,) in enumerate(conn.execute(select_new), nextid))
-    dbapi_rowcount = conn.connection.executemany(update_new, params).rowcount
-    # https://docs.python.org/2/library/sqlite3.html#sqlite3.Cursor.rowcount
-    new = 0 if dbapi_rowcount == -1 else dbapi_rowcount
-    print(f'{new:d} new ids (new/separated)')
+    nextid = conn.scalar(select_nextid)
 
-    assert Entry.allid(conn=conn)
-    assert Entry.onetoone(conn=conn)
+    new_hashes = conn.execute(select_new)
 
-    # supersede relation
-    select_superseded = (sa.select(sa.func.count())
-                         .where(Entry.id != Entry.srefid))
-    superseded = conn.scalar(select_superseded)
-    print(f'{superseded:d} supersede pairs')
+    params = ((id_, hash_) for id_, (hash_,) in enumerate(new_hashes, nextid))
+
+    dbapi_cursor = conn.connection.executemany(update_new, params)
+    # https://docs.python.org/3/library/sqlite3.html#sqlite3.Cursor.rowcount
+    return 0 if dbapi_cursor.rowcount == -1 else dbapi_cursor.rowcount
