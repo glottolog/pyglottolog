@@ -24,7 +24,7 @@ if sys.version_info < (3, 9):
         >>> removesuffix('spam.bib', '.bib')
         'spam'
         """
-        if suffix and self.endswith(suffix):
+        if suffix and s.endswith(suffix):
             return s[:-len(suffix)]
         else:
             return s
