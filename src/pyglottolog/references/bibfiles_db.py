@@ -832,13 +832,13 @@ def assign_ids(conn, *, verbose: bool = False):
     """Assign ``Entry.id`` to all .bib entries to establish new grouping."""
     assert Entry.allhash(conn=conn)
 
-    other = sa.orm.aliased(Entry)
-
     reset = reset_entries(conn)
     print(f'{reset:d} entries')
 
     n_split = resolve_splits(conn, verbose=verbose)
     print(f'{n_split:d} splitted')
+
+    other = sa.orm.aliased(Entry)
 
     no_splits = sa.select(~sa.exists()
                           .select_from(Entry)
@@ -851,7 +851,7 @@ def assign_ids(conn, *, verbose: bool = False):
     n_merged = resolve_merges(conn, verbose=verbose)
     print(f'{n_merged:d} merged')
 
-    n_unchanged = update_unchanged(conn)
+    n_unchanged = assign_unchanged(conn)
     print(f'{n_unchanged:d} unchanged')
 
     no_merges = sa.select(~sa.exists()
@@ -871,14 +871,15 @@ def assign_ids(conn, *, verbose: bool = False):
     assert Entry.allid(conn=conn)
     assert Entry.onetoone(conn=conn)
 
-    select_superseded = (sa.select(sa.func.count())
-                         .where(Entry.id != Entry.srefid))
+    count_superseded = (sa.select(sa.func.count())
+                        .where(Entry.id != Entry.srefid))
 
-    n_superseded = conn.scalar(select_superseded)
+    n_superseded = conn.scalar(count_superseded)
     print(f'{n_superseded:d} supersede pairs')
 
 
 def reset_entries(conn):
+    """Set srefid = refid and id = NULL on all entries."""
     update_entries = (sa.update(Entry)
                       .values(id=sa.null(),
                               srefid=Entry.refid))
@@ -887,7 +888,7 @@ def reset_entries(conn):
 
 
 def resolve_splits(conn, *, verbose: bool = False):
-    """Set srefid = refid only for entries from the most similar hash group."""
+    """Keep srefid = refid only for entries from the most similar hash group."""
     other = sa.orm.aliased(Entry)
 
     select_split = (sa.select(Entry.refid,
@@ -1001,7 +1002,8 @@ def merge_new_cand_old(conn, group, *, hash_: str, keyfunc,
     return new, cand, old
 
 
-def update_unchanged(conn):
+def assign_unchanged(conn):
+    """Set id = srefid on unchanged entries."""
     update_unchanged = (sa.update(Entry)
                         .where(Entry.id == sa.null())
                         .where(Entry.srefid != sa.null())
@@ -1011,6 +1013,7 @@ def update_unchanged(conn):
 
 
 def update_identified(conn):
+    """Set id on identified entries."""
     other = sa.orm.aliased(Entry)
 
     update_identified = (sa.update(Entry)
