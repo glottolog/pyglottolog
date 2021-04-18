@@ -742,7 +742,10 @@ def dbapi_insert(conn, model, *, column_keys: typing.List[str],
 
     Support for ``sqlite3.Cursor.executemany(<iterator>)``.
     """
-    assert conn.dialect.paramstyle == paramstyle
+    if conn.dialect.paramstyle != paramstyle:  # pragma: no cover
+        raise RuntimeError('connection dialect bad paramstyle:'
+                           f' {conn.dialect.paramstyle!r}'
+                           f' (require: {paramstyle!r})')
 
     insert_model = sa.insert(model, bind=conn)
     insert_compiled = insert_model.compile(column_keys=column_keys)
