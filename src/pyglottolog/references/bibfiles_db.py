@@ -417,7 +417,6 @@ class Debugable:
                 old = min(cand, key=lambda p: distance(new, p[1]))[0]
                 print(f'-> {old}\n')
 
-
     def show_identified(self):
         """Print details about new bibitems that have been merged with present ones."""
         other = sa.orm.aliased(Entry)
@@ -855,8 +854,8 @@ def assign_ids(conn, *, verbose: bool = False):
     n_merged = resolve_merges(conn, verbose=verbose)
     print(f'{n_merged:d} merged')
 
-    unchanged = update_unchanged(conn)
-    print(f'{unchanged:d} unchanged')
+    n_unchanged = update_unchanged(conn)
+    print(f'{n_unchanged:d} unchanged')
 
     no_merges = sa.select(~sa.exists()
                           .select_from(Entry)
@@ -866,11 +865,11 @@ def assign_ids(conn, *, verbose: bool = False):
 
     assert conn.scalar(no_merges)
 
-    identified = update_identified(conn)
-    print(f'{identified:d} identified (new/separated)')
+    n_identified = update_identified(conn)
+    print(f'{n_identified:d} identified (new/separated)')
 
-    new = assign_new_and_separated(conn)
-    print(f'{new:d} new ids (new/separated)')
+    n_new = assign_new_and_separated(conn)
+    print(f'{n_new:d} new ids (new/separated)')
 
     assert Entry.allid(conn=conn)
     assert Entry.onetoone(conn=conn)
@@ -878,8 +877,8 @@ def assign_ids(conn, *, verbose: bool = False):
     select_superseded = (sa.select(sa.func.count())
                          .where(Entry.id != Entry.srefid))
 
-    superseded = conn.scalar(select_superseded)
-    print(f'{superseded:d} supersede pairs')
+    n_superseded = conn.scalar(select_superseded)
+    print(f'{n_superseded:d} supersede pairs')
 
 
 def reset_entries(conn):
@@ -999,7 +998,7 @@ def update_unchanged(conn):
                         .values(id=Entry.srefid))
 
     return conn.execute(update_unchanged).rowcount
-    
+
 
 def update_identified(conn):
     other = sa.orm.aliased(Entry)
