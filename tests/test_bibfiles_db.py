@@ -54,7 +54,8 @@ def test_Database(capsys, tmpdir, bibfiles_copy):
     db.show_identified()
 
     db.show_combined()
-    db.show_combined(show_new=True)
+
+    db.show_new()
 
 
 @pytest.mark.parametrize('left, right, expected', [

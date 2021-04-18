@@ -1,4 +1,4 @@
-"""Load bibfiles into sqlite3, hash, assign ids (split/merge)."""
+"""Load references from .bib files into sqlite3, hash, assign ids (split/merge)."""
 
 import collections
 import contextlib
@@ -40,6 +40,7 @@ registry = sa.orm.registry()
 
 
 class Connectable:
+    """SQLite database."""
 
     def __init__(self, filepath):
         self.filepath = pathlib.Path(filepath)
@@ -114,6 +115,7 @@ class BaseDatabase(Connectable):
             return File.same_as(conn, bibfiles, verbose=verbose)
 
     def __iter__(self, *, chunksize: int = 100):
+        """Yield pairs of ``(Entry.id, Entry.hash)`` and unmerged field values."""
         with self.connect() as conn:
             assert Entry.allid(conn=conn)
             assert Entry.onetoone(conn=conn)
@@ -141,26 +143,54 @@ class BaseDatabase(Connectable):
             for first, last in Entry.windowed(conn, key_column='id', size=chunksize):
                 result = conn.execute(select_values, {'first': first, 'last': last})
                 for id_hash, grp in groupby_id_hash(result):
-                    fields = [(field,
-                               [(r.value, r.filename, r.bibkey) for r in g])
+                    fields = [(field, [(r.value, r.filename, r.bibkey) for r in g])
                               for field, g in groupby_field(grp)]
                     yield id_hash, fields
 
     def merged(self):
-        """Yield merged ``(bibkey, (entrytype, fields))`` entries."""
-        for (id, hash), grp in self:
+        """Yield ``(bibkey, (entrytype, fields))`` entries merged by ``Entry.id``."""
+        for (id_, hash_), grp in self:
             entrytype, fields = self._merged_entry(grp)
-            fields['glottolog_ref_id'] = f'{id:d}'
-            yield hash, (entrytype, fields)
+            fields['glottolog_ref_id'] = f'{id_:d}'
+            yield hash_, (entrytype, fields)
+
+    @staticmethod
+    def _merged_entry(grp,
+                      *, union=UNION_FIELDS, ignore=IGNORE_FIELDS,
+                      raw: bool = False):
+        # TODO: consider implementing (a subset of?) onlyifnot logic:
+        # {'address': 'publisher', 'lgfamily': 'lgcode', 'publisher': 'school',
+        # 'journal': 'booktitle'}
+        fields = {field: values[0][0] if field not in union
+                  else ', '.join(unique(vl for vl, _, _ in values))
+                  for field, values in grp if field not in ignore}
+
+        src = {filename.rpartition('.bib')[0] or filename
+               for _, values in grp
+               for _, filename, _ in values}
+        fields['src'] = ', '.join(sorted(src))
+
+        srctrickle = {'%s#%s' % (filename.rpartition('.bib')[0] or filename,
+                                 bibkey)
+                      for _, values in grp
+                      for _, filename, bibkey in values}
+        fields['srctrickle'] = ', '.join(sorted(srctrickle))
+
+        if raw:
+            return fields
+        entrytype = fields.pop(ENTRYTYPE)
+        return entrytype, fields
 
 
 class Exportable:
+    """Write merged references into .bib file, ``bibfiles``, etc."""
 
     def to_bibfile(self, filepath, *, encoding: str = ENCODING):
+        """Write merged references into combined .bib file at ``filepath``."""
         bibtex.save(self.merged(), str(filepath), sortkey=None, encoding=encoding)
 
     def to_csvfile(self, filename, *, dialect='excel', encoding: str = ENCODING):
-        """Write a CSV file with one row for each entry in each bibfile."""
+        """Write a CSV file with one row for each entry in each .bib file."""
         select_rows = (sa.select(File.name.label('filename'),
                                  Entry.bibkey,
                                  Entry.hash,
@@ -178,7 +208,7 @@ class Exportable:
             writer.writerows(result)
 
     def to_replacements(self, filename):
-        """Write a JSON file with 301s from merged glottolog_ref_ids."""
+        """Write a JSON file with 301s from merged ``glottolog_ref_id``s."""
         select_pairs = (sa.select(Entry.refid.label('id'),
                                   Entry.id.label('replacement'))
                         .where(Entry.id != Entry.refid)
@@ -192,7 +222,7 @@ class Exportable:
             repls.extend(map(dict, pairs))
 
     def trickle(self, bibfiles):
-        """Write new/changed glottolog_ref_ids back into ``bibfiles``."""
+        """Write new/changed ``glottolog_ref_id``s back into ``bibfiles``."""
         with self.connect() as conn:
             assert Entry.allid(conn=conn)
 
@@ -238,9 +268,10 @@ class Exportable:
 
 
 class Indexable:
+    """Retrieve .bib entry from individual file, or merged entry from old or new grouping."""
 
     def __getitem__(self, key: typing.Union[typing.Tuple[str, str], int, str]):
-        """Entry by (fn, bk) or merged entry by refid (old grouping) or hash (current grouping)."""
+        """Entry by ``(filename, bibkey)`` or merged entry by ``refid`` (old grouping) or ``hash`` (current grouping)."""
         if not isinstance(key, (tuple, int, str)):
             raise TypeError(f'key must be tuple, int, or str: {key!r}')  # pragma: no cover
 
@@ -271,34 +302,7 @@ class Indexable:
         return fields.pop(ENTRYTYPE), fields
 
     @staticmethod
-    def _merged_entry(grp,
-                      *, union=UNION_FIELDS, ignore=IGNORE_FIELDS,
-                      raw: bool = False):
-        # TODO: consider implementing (a subset of?) onlyifnot logic:
-        # {'address': 'publisher', 'lgfamily': 'lgcode', 'publisher': 'school',
-        # 'journal': 'booktitle'}
-        fields = {field: values[0][0] if field not in union
-                  else ', '.join(unique(vl for vl, _, _ in values))
-                  for field, values in grp if field not in ignore}
-
-        src = {filename.rpartition('.bib')[0] or filename
-               for _, values in grp
-               for _, filename, _ in values}
-        fields['src'] = ', '.join(sorted(src))
-
-        srctrickle = {'%s#%s' % (filename.rpartition('.bib')[0] or filename,
-                                 bibkey)
-                      for _, values in grp
-                      for _, filename, bibkey in values}
-        fields['srctrickle'] = ', '.join(sorted(srctrickle))
-
-        if raw:
-            return fields
-        entrytype = fields.pop(ENTRYTYPE)
-        return entrytype, fields
-
-    @staticmethod
-    def _entrygrp(conn, key,
+    def _entrygrp(conn, key: typing.Union[int, str],
                   *, _get_field=operator.attrgetter('field')):
         select_values = (sa.select(Value.field,
                                    Value.value,
@@ -312,8 +316,7 @@ class Indexable:
 
         result = conn.execute(select_values)
         grouped = itertools.groupby(result, key=_get_field)
-        grp = [(field,
-                [(r.value, r.filename, r.bibkey) for r in g])
+        grp = [(field, [(r.value, r.filename, r.bibkey) for r in g])
                for field, g in grouped]
 
         if not grp:
@@ -322,6 +325,7 @@ class Indexable:
 
 
 class Debugable:
+    """Show details about splitted and combined references."""
 
     def stats(self, *, field_files: bool = False):
         with self.connect() as conn:
@@ -331,6 +335,7 @@ class Debugable:
             Entry.hashidstats(conn=conn)
 
     def show_splits(self):
+        """Print details about bibitems that have been splitted."""
         other = sa.orm.aliased(Entry)
 
         select_entries = (sa.select(Entry.refid,
@@ -354,6 +359,7 @@ class Debugable:
                 print(f'-> {new}\n')
 
     def show_merges(self):
+        """Print details about bibitems that have been merged."""
         other = sa.orm.aliased(Entry)
 
         select_entries = (sa.select(Entry.hash,
@@ -380,6 +386,7 @@ class Debugable:
 
 
     def show_identified(self):
+        """Print details about new bibitems that have been merged with present ones."""
         other = sa.orm.aliased(Entry)
 
         select_entries = (sa.select(Entry.hash,
@@ -399,7 +406,15 @@ class Debugable:
 
         self._show(select_entries)
 
-    def show_combined(self, *, show_new: bool = False):
+    def show_combined(self):
+        """Print details about new bibitems that have been merged with each other."""
+        self._show_new(combined=True)
+
+    def show_new(self):
+        """Print details about new bibitems that have not been merged."""
+        self._show_new(combined=False)
+
+    def _show_new(self, *, combined: bool = False):
         other = sa.orm.aliased(Entry)
 
         whereclause = (sa.exists()
@@ -407,7 +422,7 @@ class Debugable:
                        .where(other.hash == Entry.hash)
                        .where(other.pk != Entry.pk))
 
-        if show_new:
+        if not combined:
             whereclause = ~whereclause
 
         select_entries = (sa.select(Entry.hash,
@@ -423,7 +438,7 @@ class Debugable:
     def _show(self, sql):
         with self.connect() as conn:
             result = conn.execute(sql)
-            for hash, group in groupby_first(result):
+            for _, group in groupby_first(result):
                 self._print_group(conn, group)
                 print()
 
@@ -444,6 +459,7 @@ class Database(Debugable, Indexable, Exportable, BaseDatabase):
 
 @registry.mapped
 class File:
+    """Filesystem metadata and priority setting of a .bib file."""
 
     __tablename__ = 'file'
 
@@ -458,6 +474,7 @@ class File:
 
     @classmethod
     def same_as(cls, conn, bibfiles, *, verbose: bool = False):
+        """Return whether all sizes and mtimes are the same as in ``bibfiles``."""
         ondisk = {b.fname.name: (b.size, b.mtime) for b in bibfiles}
 
         select_files = (sa.select(cls.name, cls.size, cls.mtime)
@@ -480,6 +497,7 @@ class File:
 
 @registry.mapped
 class Entry:
+    """Source location and old/new grouping of a .bib entry."""
 
     __tablename__ = 'entry'
 
@@ -489,16 +507,16 @@ class Entry:
 
     bibkey = sa.Column(sa.Text, nullable=False)
 
-    # old glottolog_ref_id from bibfiles (previous hash groupings)
+    # old glottolog_ref_id from bibfiles (previous hash grouping)
     refid = sa.Column(sa.Integer, index=True)
 
-    # current groupings, m:n with refid (splits/merges):
+    # current grouping, m:n with refid (splits/merges)
     hash = sa.Column(sa.Text, index=True)
 
-    # split-resolved refid (every srefid maps to exactly one hash):
+    # split-resolved refid (every srefid maps to exactly one hash)
     srefid = sa.Column(sa.Integer, index=True)
 
-    # new glottolog_ref_id save to bibfiles (current hash groupings):
+    # new glottolog_ref_id save to bibfiles (current hash grouping)
     id = sa.Column(sa.Integer, index=True)
 
     __table_args__ = (sa.UniqueConstraint(file_pk, bibkey),)
@@ -631,6 +649,7 @@ class Entry:
 
 @registry.mapped
 class Value:
+    """Field contents (including ENTRYTYPE) of a .bib entry."""
 
     __tablename__ = 'value'
 
@@ -677,6 +696,10 @@ class Value:
 
 def dbapi_insert(conn, model, *, column_keys: typing.List[str],
                  executemany: bool = False):
+    """Return callable for raw dbapi insertion of ``column_keys`` into ``model``.
+
+    Support for ``sqlite3.Cursor.executemany(<iterator>)``.
+    """
     assert conn.dialect.paramstyle == 'qmark'
 
     insert_model = sa.insert(model, bind=conn)
@@ -688,7 +711,7 @@ def dbapi_insert(conn, model, *, column_keys: typing.List[str],
 
 
 def import_bibfiles(conn, bibfiles):
-    """Import bibfiles with raw dbapi using ``.executemany(<iterable>)``."""
+    """Import bibfiles with raw dbapi."""
     log.info('importing bibfiles into a new db')
 
     insert_file = dbapi_insert(conn, File,
@@ -712,6 +735,7 @@ def import_bibfiles(conn, bibfiles):
 
 
 def generate_hashes(conn):
+    """Assign ``Entry.hash`` to all .bib entries for grouping."""
     from .libmonster import wrds, keyid
 
     words = collections.Counter()
@@ -764,6 +788,7 @@ def generate_hashes(conn):
 
 
 def assign_ids(conn, *, verbose: bool = False):
+    """Assign ``Entry.id`` to all .bib entries to establish new grouping."""
     assert Entry.allhash(conn=conn)
 
     merged_entry = Database._merged_entry
@@ -839,13 +864,13 @@ def assign_ids(conn, *, verbose: bool = False):
                     .where(Entry.srefid != sa.bindparam('ne_srefid'))
                     .values(id=sa.bindparam('new_id')))
 
-    for hash, group in groupby_first(conn.execute(select_merge)):
-        new = merged_entry(entrygrp(conn, hash), raw=True)
+    for hash_, group in groupby_first(conn.execute(select_merge)):
+        new = merged_entry(entrygrp(conn, hash_), raw=True)
         nmerge += len(group)
         cand = [(ri, merged_entry(entrygrp(conn, ri), raw=True))
                 for ri in unique(r.srefid for r in group)]
         old = min(cand, key=lambda p: distance(new, p[1]))[0]
-        params = {'eq_hash': hash, 'ne_srefid': old, 'new_id': old}
+        params = {'eq_hash': hash_, 'ne_srefid': old, 'new_id': old}
         merged = conn.execute(update_merge, params).rowcount
         if verbose:
             for row in group:
@@ -856,7 +881,7 @@ def assign_ids(conn, *, verbose: bool = False):
                                               bibkey=row.bibkey)
                 print('\t%r, %r, %r, %r' % hashfields)
             print(f'-> {old}')
-            print(f'{hash}: {merged:d} merged into {old:d}\n')
+            print(f'{hash_}: {merged:d} merged into {old:d}\n')
     print(f'{nmerge:d} merged')
 
     # unchanged entries
@@ -901,7 +926,7 @@ def assign_ids(conn, *, verbose: bool = False):
                   .where(Entry.hash == sa.bindparam('eq_hash'))
                   .compile().string)
 
-    params = ((id, hash) for id, (hash,) in enumerate(conn.execute(select_new), nextid))
+    params = ((id_, hash_) for id_, (hash_,) in enumerate(conn.execute(select_new), nextid))
     dbapi_rowcount = conn.connection.executemany(update_new, params).rowcount
     # https://docs.python.org/2/library/sqlite3.html#sqlite3.Cursor.rowcount
     new = 0 if dbapi_rowcount == -1 else dbapi_rowcount
@@ -919,7 +944,7 @@ def assign_ids(conn, *, verbose: bool = False):
 
 def distance(left, right,
              *, weight={'author': 3, 'year': 3, 'title': 3, ENTRYTYPE: 2}):
-    """Simple measure of the difference between two bibtex-field dicts."""
+    """Simple measure of the difference between two BibTeX field dicts."""
     if not (left or right):
         return 0.0
 
