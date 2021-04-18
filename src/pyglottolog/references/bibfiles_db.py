@@ -26,9 +26,13 @@ UNION_FIELDS = {'fn', 'asjp_name', 'isbn'}
 
 IGNORE_FIELDS = {'crossref', 'numnote', 'glotto_id'}
 
+REF_ID_FIELD = 'glottolog_ref_id'
+
 ENCODING = 'utf-8'
 
 SQLALCHEMY_FUTURE = True
+
+PAGE_SIZE = 32_768
 
 ENTRYTYPE = 'ENTRYTYPE'
 
@@ -42,11 +46,13 @@ registry = sa.orm.registry()
 class Connectable:
     """SQLite database."""
 
-    def __init__(self, filepath):
+    def __init__(self, filepath,
+                 *, future: bool = SQLALCHEMY_FUTURE,
+                 paramstyle: typing.Optional[str] = 'qmark'):
         self.filepath = pathlib.Path(filepath)
         self._engine = sa.create_engine(f'sqlite:///{self.filepath}',
-                                        future=SQLALCHEMY_FUTURE,
-                                        paramstyle='qmark')
+                                        future=future,
+                                        paramstyle=paramstyle)
 
     def connect(self,
                 *, pragma_bulk_insert: bool = False,
@@ -78,7 +84,7 @@ class BaseDatabase(Connectable):
 
     @classmethod
     def from_bibfiles(cls, bibfiles, filepath, *, rebuild: bool = False,
-                      page_size: typing.Optional[int] = 32_768,
+                      page_size: typing.Optional[int] = PAGE_SIZE,
                       verbose: bool = False):
         """Load ``bibfiles`` if needed, hash, split/merge, return the database."""
         self = cls(filepath)
@@ -147,17 +153,18 @@ class BaseDatabase(Connectable):
                               for field, g in groupby_field(grp)]
                     yield id_hash, fields
 
-    def merged(self):
+    def merged(self, *, ref_id_field: str = REF_ID_FIELD):
         """Yield ``(bibkey, (entrytype, fields))`` entries merged by ``Entry.id``."""
         for (id_, hash_), grp in self:
             entrytype, fields = self._merged_entry(grp)
-            fields['glottolog_ref_id'] = f'{id_:d}'
+            fields[ref_id_field] = f'{id_:d}'
             yield hash_, (entrytype, fields)
 
     @staticmethod
     def _merged_entry(grp,
                       *, union=UNION_FIELDS, ignore=IGNORE_FIELDS,
-                      raw: bool = False):
+                      raw: bool = False,
+                      _removesuffix=_compat.removesuffix):
         # TODO: consider implementing (a subset of?) onlyifnot logic:
         # {'address': 'publisher', 'lgfamily': 'lgcode', 'publisher': 'school',
         # 'journal': 'booktitle'}
@@ -165,13 +172,12 @@ class BaseDatabase(Connectable):
                   else ', '.join(unique(vl for vl, _, _ in values))
                   for field, values in grp if field not in ignore}
 
-        src = {filename.rpartition('.bib')[0] or filename
+        src = {_removesuffix(filename, '.bib')
                for _, values in grp
                for _, filename, _ in values}
         fields['src'] = ', '.join(sorted(src))
 
-        srctrickle = {'%s#%s' % (filename.rpartition('.bib')[0] or filename,
-                                 bibkey)
+        srctrickle = {f"{_removesuffix(filename, '.bib')}#{bibkey}"
                       for _, values in grp
                       for _, filename, bibkey in values}
         fields['srctrickle'] = ', '.join(sorted(srctrickle))
@@ -185,11 +191,16 @@ class BaseDatabase(Connectable):
 class Exportable:
     """Write merged references into .bib file, ``bibfiles``, etc."""
 
-    def to_bibfile(self, filepath, *, encoding: str = ENCODING):
+    def to_bibfile(self, filepath,
+                   *, sortkey: typing.Optional[str] = None,
+                   encoding: str = ENCODING):
         """Write merged references into combined .bib file at ``filepath``."""
-        bibtex.save(self.merged(), str(filepath), sortkey=None, encoding=encoding)
+        bibtex.save(self.merged(), str(filepath),
+                    sortkey=sortkey, encoding=encoding)
 
-    def to_csvfile(self, filename, *, dialect='excel', encoding: str = ENCODING):
+    def to_csvfile(self, filename,
+                   *, dialect: str = 'excel',
+                   encoding: str = ENCODING):
         """Write a CSV file with one row for each entry in each .bib file."""
         select_rows = (sa.select(File.name.label('filename'),
                                  Entry.bibkey,
@@ -207,7 +218,8 @@ class Exportable:
             writer.writerow(header)
             writer.writerows(result)
 
-    def to_replacements(self, filename):
+    def to_replacements(self, filename,
+                        *, indent: typing.Optional[int] = 4):
         """Write a JSON file with 301s from merged ``glottolog_ref_id``s."""
         select_pairs = (sa.select(Entry.refid.label('id'),
                                   Entry.id.label('replacement'))
@@ -217,11 +229,11 @@ class Exportable:
         with self.execute(select_pairs) as result:
             pairs = result.mappings().all()
 
-        with jsonlib.update(filename, default=[], indent=4) as repls:
+        with jsonlib.update(filename, default=[], indent=indent) as repls:
             # RowMapping is not JSON serializable
             repls.extend(map(dict, pairs))
 
-    def trickle(self, bibfiles):
+    def trickle(self, bibfiles, *, ref_id_field: str = REF_ID_FIELD):
         """Write new/changed ``glottolog_ref_id``s back into ``bibfiles``."""
         with self.connect() as conn:
             assert Entry.allid(conn=conn)
@@ -255,13 +267,13 @@ class Exportable:
                 changed_entries = conn.execute(select_changed, {'file_pk': file_pk})
                 for bibkey, refid, new in changed_entries:
                     entrytype, fields = entries[bibkey]
-                    old = fields.pop('glottolog_ref_id', None)
+                    old = fields.pop(ref_id_field, None)
                     assert old == refid
                     if old is None:
                         added += 1
                     else:
                         changed += 1
-                    fields['glottolog_ref_id'] = new
+                    fields[ref_id_field] = new
 
                 print(f'{changed:d} changed {added:d} added in {bf.id}')
                 bf.save(entries)
@@ -465,9 +477,10 @@ class File:
 
     pk = sa.Column(sa.Integer, primary_key=True)
 
-    name = sa.Column(sa.Text, nullable=False, unique=True)
+    name = sa.Column(sa.Text, sa.CheckConstraint("name != ''"), nullable=False,
+                     unique=True)
 
-    size = sa.Column(sa.Integer, nullable=False)
+    size = sa.Column(sa.Integer, sa.CheckConstraint('size > 0'), nullable=False)
     mtime = sa.Column(sa.DateTime, nullable=False)
 
     priority = sa.Column(sa.Integer, nullable=False)
@@ -505,19 +518,24 @@ class Entry:
 
     file_pk = sa.Column(sa.ForeignKey('file.pk'), nullable=False)
 
-    bibkey = sa.Column(sa.Text, nullable=False)
+    bibkey = sa.Column(sa.Text, sa.CheckConstraint("bibkey != ''"),
+                       nullable=False)
 
-    # old glottolog_ref_id from bibfiles (previous hash grouping)
-    refid = sa.Column(sa.Integer, index=True)
+    # old REF_ID_FIELD from bibfiles (previous hash grouping)
+    refid = sa.Column(sa.Integer, sa.CheckConstraint('refid > 0'),
+                      index=True)
 
-    # current grouping, m:n with refid (splits/merges)
-    hash = sa.Column(sa.Text, index=True)
+    # current grouping: m:n with refid (splits/merges)
+    hash = sa.Column(sa.Text, sa.CheckConstraint("hash != ''"),
+                     index=True)
 
-    # split-resolved refid (every srefid maps to exactly one hash)
-    srefid = sa.Column(sa.Integer, index=True)
+    # split-resolved refid: every srefid maps to exactly one hash
+    srefid = sa.Column(sa.Integer, sa.CheckConstraint('srefid > 0'),
+                       index=True)
 
-    # new glottolog_ref_id save to bibfiles (current hash grouping)
-    id = sa.Column(sa.Integer, index=True)
+    # new REF_ID_FIELD to ``trickle()`` into bibfiles (current hash grouping)
+    id = sa.Column(sa.Integer, sa.CheckConstraint('id > 0'),
+                   index=True)
 
     __table_args__ = (sa.UniqueConstraint(file_pk, bibkey),)
 
@@ -606,7 +624,7 @@ class Entry:
         out(f'{multiple:d}\tin multiple files')
 
     @classmethod
-    def hashidstats(cls, *, conn, out=print):
+    def hashidstats(cls, *, conn, out=print, ref_id_field: str = REF_ID_FIELD):
         sq = (sa.select(sa.func.count(cls.refid.distinct()).label('hash_nid'))
               .where(cls.hash != sa.null())
               .group_by(cls.hash)
@@ -619,7 +637,7 @@ class Entry:
 
         result = conn.execute(select_nid)
         for r in result:
-            out(f'1 keyid {r.hash_nid:d} glottolog_ref_ids: {r.n:d}')
+            out(f'1 keyid {r.hash_nid:d} {ref_id_field}s: {r.n:d}')
 
         sq = (sa.select(sa.func.count(cls.hash.distinct()).label('id_nhash'))
               .where(cls.refid != sa.null())
@@ -634,7 +652,7 @@ class Entry:
 
         result = conn.execute(select_nhash)
         for r in result:
-            out(f'1 glottolog_ref_id {r.id_nhash:d} keyids: {r.n:d}')
+            out(f'1 {ref_id_field} {r.id_nhash:d} keyids: {r.n:d}')
 
     @classmethod
     def windowed(cls, conn, *, key_column: str, size: int):
@@ -655,7 +673,8 @@ class Value:
 
     entry_pk = sa.Column(sa.ForeignKey('entry.pk'), primary_key=True)
 
-    field = sa.Column(sa.Text, primary_key=True)
+    field = sa.Column(sa.Text, sa.CheckConstraint("field != ''"),
+                      primary_key=True)
 
     value = sa.Column(sa.Text, nullable=False)
 
@@ -695,12 +714,13 @@ class Value:
 
 
 def dbapi_insert(conn, model, *, column_keys: typing.List[str],
-                 executemany: bool = False):
+                 executemany: bool = False,
+                 paramstyle: str = 'qmark'):
     """Return callable for raw dbapi insertion of ``column_keys`` into ``model``.
 
     Support for ``sqlite3.Cursor.executemany(<iterator>)``.
     """
-    assert conn.dialect.paramstyle == 'qmark'
+    assert conn.dialect.paramstyle == paramstyle
 
     insert_model = sa.insert(model, bind=conn)
     insert_compiled = insert_model.compile(column_keys=column_keys)
@@ -710,7 +730,7 @@ def dbapi_insert(conn, model, *, column_keys: typing.List[str],
     return functools.partial(method, insert_compiled.string)
 
 
-def import_bibfiles(conn, bibfiles):
+def import_bibfiles(conn, bibfiles, *, ref_id_field=REF_ID_FIELD):
     """Import bibfiles with raw dbapi."""
     log.info('importing bibfiles into a new db')
 
@@ -726,7 +746,7 @@ def import_bibfiles(conn, bibfiles):
         file = (b.fname.name, b.size, b.mtime, b.priority)
         file_pk = insert_file(file).lastrowid
         for e in b.iterentries():
-            entry = (file_pk, e.key, e.fields.get('glottolog_ref_id'))
+            entry = (file_pk, e.key, e.fields.get(ref_id_field))
             entry_pk = insert_entry(entry).lastrowid
 
             fields = itertools.chain([(ENTRYTYPE, e.type)], e.fields.items())
