@@ -291,11 +291,11 @@ class Indexable:
         with self.connect() as conn:
             if isinstance(key, tuple):
                 filename, bibkey = key
-                entrytype, fields = self._entry(conn, filename, bibkey)
+                entry = self._entry(conn, filename, bibkey)
             else:
-                grp = self._entrygrp(conn, key)
-                entrytype, fields = self._merged_entry(grp)
+                entry = self._merged_entrygrp(conn, key=key, raw=False)
 
+        entrytype, fields = entry
         return key, (entrytype, fields)
 
     @staticmethod
@@ -314,9 +314,10 @@ class Indexable:
             raise KeyError((filename, bibkey))
         return fields.pop(ENTRYTYPE), fields
 
-    @staticmethod
-    def _entrygrp(conn, key: typing.Union[int, str],
-                  *, _get_field=operator.attrgetter('field')):
+    @classmethod
+    def _merged_entrygrp(cls, conn, *, key: typing.Union[int, str],
+                         raw: bool = True,
+                         _get_field=operator.attrgetter('field')):
         select_values = (sa.select(Value.field,
                                    Value.value,
                                    File.name.label('filename'),
@@ -334,7 +335,7 @@ class Indexable:
 
         if not grp:
             raise KeyError(key)
-        return grp
+        return cls._merged_entry(grp, raw=raw)
 
 
 class Debugable:
@@ -365,9 +366,9 @@ class Debugable:
             result = conn.execute(select_entries)
             for refid, group in groupby_first(result):
                 self._print_group(conn, group)
-                old = self._merged_entry(self._entrygrp(conn, refid), raw=True)
-                cand = [(hs, self._merged_entry(self._entrygrp(conn, hs), raw=True))
-                        for hs in unique(r.hash for r in group)]
+                old = self._merged_entrygrp(conn, key=refid)
+                cand = [(hash_, self._merged_entrygrp(conn, key=hash_))
+                        for hash_ in unique(r.hash for r in group)]
                 new = min(cand, key=lambda p: distance(old, p[1]))[0]
                 print(f'-> {new}\n')
 
@@ -391,9 +392,9 @@ class Debugable:
             result = conn.execute(select_entries)
             for hash_, group in groupby_first(result):
                 self._print_group(conn, group)
-                new = self._merged_entry(self._entrygrp(conn, hash_), raw=True)
-                cand = [(ri, self._merged_entry(self._entrygrp(conn, ri), raw=True))
-                        for ri in unique(r.refid for r in group)]
+                new = self._merged_entrygrp(conn, key=hash_)
+                cand = [(refid, self._merged_entrygrp(conn, key=refid))
+                        for refid in unique(r.refid for r in group)]
                 old = min(cand, key=lambda p: distance(new, p[1]))[0]
                 print(f'-> {old}\n')
 
@@ -813,16 +814,14 @@ def assign_ids(conn, *, verbose: bool = False):
     """Assign ``Entry.id`` to all .bib entries to establish new grouping."""
     assert Entry.allhash(conn=conn)
 
-    merged_entry = Database._merged_entry
-    entrygrp = Database._entrygrp
-    other = sa.orm.aliased(Entry)
-
     reset_entries = sa.update(Entry).values(id=sa.null(), srefid=Entry.refid)
     reset = conn.execute(reset_entries).rowcount
     print(f'{reset:d} entries')
 
     # resolve splits: srefid = refid only for entries from the most similar hash group
     nsplit = 0
+
+    other = sa.orm.aliased(Entry)
 
     select_split = (sa.select(Entry.refid,
                               Entry.hash,
@@ -839,11 +838,13 @@ def assign_ids(conn, *, verbose: bool = False):
                     .where(Entry.hash != sa.bindparam('ne_hash'))
                     .values(srefid=sa.null()))
 
+    merged_entrygrp = Database._merged_entrygrp
+
     for refid, group in groupby_first(conn.execute(select_split)):
-        old = merged_entry(entrygrp(conn, refid), raw=True)
+        old = merged_entrygrp(conn, key=refid)
         nsplit += len(group)
-        cand = [(hs, merged_entry(entrygrp(conn, hs), raw=True))
-                for hs in unique(r.hash for r in group)]
+        cand = [(hash_, merged_entrygrp(conn, key=hash_))
+                for hash_ in unique(r.hash for r in group)]
         new = min(cand, key=lambda p: distance(old, p[1]))[0]
         params = {'eq_refid': refid, 'ne_hash': new}
         separated = conn.execute(update_split, params).rowcount
@@ -887,10 +888,10 @@ def assign_ids(conn, *, verbose: bool = False):
                     .values(id=sa.bindparam('new_id')))
 
     for hash_, group in groupby_first(conn.execute(select_merge)):
-        new = merged_entry(entrygrp(conn, hash_), raw=True)
+        new = merged_entrygrp(conn, key=hash_)
         nmerge += len(group)
-        cand = [(ri, merged_entry(entrygrp(conn, ri), raw=True))
-                for ri in unique(r.srefid for r in group)]
+        cand = [(srefid, merged_entrygrp(conn, key=srefid))
+                for srefid in unique(r.srefid for r in group)]
         old = min(cand, key=lambda p: distance(new, p[1]))[0]
         params = {'eq_hash': hash_, 'ne_srefid': old, 'new_id': old}
         merged = conn.execute(update_merge, params).rowcount
