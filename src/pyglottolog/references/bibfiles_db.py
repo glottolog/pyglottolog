@@ -164,23 +164,24 @@ class BaseDatabase(Connectable):
     def _merged_entry(grp,
                       *, union=UNION_FIELDS, ignore=IGNORE_FIELDS,
                       raw: bool = False,
-                      _removesuffix=_compat.removesuffix):
+                      _sep: str = ', ', _removesuffix=_compat.removesuffix):
         # TODO: consider implementing (a subset of?) onlyifnot logic:
         # {'address': 'publisher', 'lgfamily': 'lgcode', 'publisher': 'school',
         # 'journal': 'booktitle'}
         fields = {field: values[0][0] if field not in union
-                  else ', '.join(unique(vl for vl, _, _ in values))
+                  else _sep.join(unique(vl for vl, _, _ in values))
                   for field, values in grp if field not in ignore}
 
         src = {_removesuffix(filename, '.bib')
                for _, values in grp
                for _, filename, _ in values}
-        fields['src'] = ', '.join(sorted(src))
 
         srctrickle = {f"{_removesuffix(filename, '.bib')}#{bibkey}"
                       for _, values in grp
                       for _, filename, bibkey in values}
-        fields['srctrickle'] = ', '.join(sorted(srctrickle))
+
+        fields.update(src=_sep.join(sorted(src)),
+                      srctrickle=_sep.join(sorted(srctrickle)))
 
         if raw:
             return fields
@@ -568,7 +569,8 @@ class Entry:
                     .join_from(cls, File)
                     .group_by(cls.file_pk))
         result = conn.execute(select_n)
-        out('\n'.join(f'{r.filename} {r.n:d}' for r in result))
+        for r in result:
+            out(f'{r.filename} {r.n:d}')
 
         select_total = sa.select(sa.func.count()).select_from(cls)
         total = conn.scalar(select_total)
@@ -580,7 +582,7 @@ class Entry:
                                  sa.func.count(cls.hash).label('total'))
 
         result = conn.execute(select_total).one()
-        out(f'{result.distinct:d}\tdistinct keyids'
+        out(f'{result.distinct:6d}\tdistinct keyids'
             f' (from {result.total:d} total)')
 
         sq_1 = (sa.select(File.name.label('filename'),
@@ -610,7 +612,7 @@ class Entry:
 
         result = conn.execute(select_files)
         for r in result:
-            out(f'{r.unique:d}\t{r.filename}'
+            out(f'{r.unique:6d}\t{r.filename}'
                 f' (from {r.distinct:d} distinct of {r.total:d} total)')
 
         select_multiple = (sa.select(sa.func.count())
@@ -621,7 +623,7 @@ class Entry:
                                         .alias()))
 
         multiple = conn.scalar(select_multiple)
-        out(f'{multiple:d}\tin multiple files')
+        out(f'{multiple:6d}\tin multiple files')
 
     @classmethod
     def hashidstats(cls, *, conn, out=print, ref_id_field: str = REF_ID_FIELD):
@@ -696,7 +698,7 @@ class Value:
 
     @classmethod
     def fieldstats(cls, *, conn, with_files: bool = False, out=print):
-        tmpl = '{n:d}\t{field}'
+        tmpl = '{n:6d}\t{field}'
         select_n = (sa.select(cls.field,
                               sa.func.count().label('n'))
                     .group_by(cls.field)
@@ -766,7 +768,7 @@ def generate_hashes(conn):
         for title in titles:
             words.update(wrds(title))
     # TODO: consider dropping stop words/hapaxes from freq. distribution
-    print(f'{len(words):d} title words (from {sum(words.values()):d} tokens)')
+    print(f'{len(words):6d}\ttitle words (from {sum(words.values()):d} tokens)')
 
     def windowed_entries(chunksize: int = 500):
         select_files = (sa.select(File.pk)
