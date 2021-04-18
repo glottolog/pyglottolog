@@ -559,12 +559,12 @@ class Entry:
     @classmethod
     def allhash(cls, *, conn):
         select_allhash = sa.select(~sa.exists().where(cls.hash == sa.null()))
-        return conn.scalar(select_allhash)
+        return conn.execute(select_allhash).scalar_one()
 
     @classmethod
     def allid(cls, *, conn):
         select_allid = sa.select(~sa.exists().where(cls.id == sa.null()))
-        return conn.scalar(select_allid)
+        return conn.execute(select_allid).scalar_one()
 
     @classmethod
     def onetoone(cls, *, conn):
@@ -575,7 +575,7 @@ class Entry:
                                     .select_from(cls)
                                     .where(sa.exists()
                                            .where(sa.or_(diff_id, diff_hash))))
-        return conn.scalar(select_onetoone)
+        return conn.execute(select_onetoone).scalar_one()
 
     @classmethod
     def stats(cls, *, conn, out=log.info):
@@ -589,7 +589,7 @@ class Entry:
             out(f'{r.filename} {r.n:d}')
 
         select_total = sa.select(sa.func.count()).select_from(cls)
-        total = conn.scalar(select_total)
+        total = conn.execute(select_total).scalar_one()
         out(f'{total:d} entries total')
 
     @classmethod
@@ -598,7 +598,7 @@ class Entry:
                                  sa.func.count(cls.hash).label('total'))
 
         result = conn.execute(select_total).one()
-        out(f'{result.distinct:6d}'
+        out(f'{result.distinct:6d}',
             f'distinct keyids (from {result.total:d} total)', sep='\t')
 
         sq_1 = (sa.select(File.name.label('filename'),
@@ -628,7 +628,7 @@ class Entry:
 
         result = conn.execute(select_files)
         for r in result:
-            out(f'{r.unique:6d}'
+            out(f'{r.unique:6d}',
                 f'{r.filename} (from {r.distinct:d} distinct'
                 f' of {r.total:d} total)', sep='\t')
 
@@ -639,7 +639,7 @@ class Entry:
                                         .having(sa.func.count(cls.file_pk.distinct()) > 1)
                                         .alias()))
 
-        multiple = conn.scalar(select_multiple)
+        multiple = conn.execute(select_multiple).scalar_one()
         out(f'{multiple:6d}', 'in multiple files', sep='\t')
 
     @classmethod
@@ -788,7 +788,7 @@ def generate_hashes(conn):
         for title in titles:
             words.update(wrds(title))
     # TODO: consider dropping stop words/hapaxes from freq. distribution
-    print(f'{len(words):6d}'
+    print(f'{len(words):6d}',
           f'title words (from {sum(words.values()):d} tokens)', sep='\t')
 
     def windowed_entries(chunksize: int = 500):
@@ -848,7 +848,7 @@ def assign_ids(conn, *, verbose: bool = False):
                                  .where(other.srefid == Entry.srefid)
                                  .where(other.hash != Entry.hash)))
 
-    assert conn.scalar(no_splits)
+    assert conn.execute(no_splits).scalar_one()
 
     n_merged = resolve_merges(conn, verbose=verbose)
     print(f'{n_merged:d} merged')
@@ -862,7 +862,7 @@ def assign_ids(conn, *, verbose: bool = False):
                                  .where(other.hash == Entry.hash)
                                  .where(other.id != Entry.id)))
 
-    assert conn.scalar(no_merges)
+    assert conn.execute(no_merges).scalar_one()
 
     n_identified = update_identified(conn)
     print(f'{n_identified:d} identified (new/separated)')
@@ -876,7 +876,7 @@ def assign_ids(conn, *, verbose: bool = False):
     count_superseded = (sa.select(sa.func.count())
                         .where(Entry.id != Entry.srefid))
 
-    n_superseded = conn.scalar(count_superseded)
+    n_superseded = conn.execute(count_superseded).scalar_one()
     print(f'{n_superseded:d} supersede pairs')
 
 
@@ -1046,7 +1046,7 @@ def assign_new_and_separated(conn):
                   .where(Entry.hash == sa.bindparam('eq_hash'))
                   .compile().string)
 
-    nextid = conn.scalar(select_nextid)
+    nextid = conn.execute(select_nextid).scalar_one()
 
     new_hashes = conn.execute(select_new)
 
