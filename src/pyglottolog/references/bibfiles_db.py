@@ -180,12 +180,13 @@ class BaseDatabase(Connectable):
     def _merged_entry(grp,
                       *, union=UNION_FIELDS, ignore=IGNORE_FIELDS,
                       raw: bool = False,
-                      _sep: str = ', ', _removesuffix=_compat.removesuffix):
+                      _sep_join=', '.join,
+                      _removesuffix=_compat.removesuffix):
         # TODO: consider implementing (a subset of?) onlyifnot logic:
         # {'address': 'publisher', 'lgfamily': 'lgcode', 'publisher': 'school',
         # 'journal': 'booktitle'}
         fields = {field: values[0][0] if field not in union
-                  else _sep.join(unique(vl for vl, _, _ in values))
+                  else _sep_join(unique(vl for vl, _, _ in values))
                   for field, values in grp if field not in ignore}
 
         src = {_removesuffix(filename, '.bib')
@@ -196,8 +197,8 @@ class BaseDatabase(Connectable):
                       for _, values in grp
                       for _, filename, bibkey in values}
 
-        fields.update(src=_sep.join(sorted(src)),
-                      srctrickle=_sep.join(sorted(srctrickle)))
+        fields.update(src=_sep_join(sorted(src)),
+                      srctrickle=_sep_join(sorted(srctrickle)))
 
         if raw:
             return fields
@@ -270,11 +271,11 @@ class Exportable:
     """Write merged references into .bib file, ``bibfiles``, etc."""
 
     def to_bibfile(self, filepath,
-                   *, sortkey: typing.Optional[str] = None,
-                   encoding: str = ENCODING):
+                   *, encoding: str = ENCODING,
+                   _sortkey: typing.Optional[str] = None):
         """Write merged references into combined .bib file at ``filepath``."""
         bibtex.save(self.merged(), str(filepath),
-                    sortkey=sortkey, encoding=encoding)
+                    sortkey=_sortkey, encoding=encoding)
 
     def to_csvfile(self, filename,
                    *, dialect: str = 'excel',
@@ -385,10 +386,7 @@ class Debugable:
             result = conn.execute(select_entries)
             for refid, group in groupby_first(result):
                 self._print_group(conn, group)
-                old = self._get_merged_entry(conn, key=refid)
-                cand = [(hash_, self._get_merged_entry(conn, key=hash_))
-                        for hash_ in unique(r.hash for r in group)]
-                new = min(cand, key=lambda p: distance(old, p[1]))[0]
+                _, _, new = split_old_cand_new(conn, group, refid=refid)
                 print(f'-> {new}\n')
 
     def show_merges(self):
@@ -408,13 +406,12 @@ class Debugable:
                                     'filename', 'bibkey'))
 
         with self.connect() as conn:
+            merge = functools.partial(merge_new_cand_old, conn,
+                                      keyfunc=operator.attrgetter('refid'))
             result = conn.execute(select_entries)
             for hash_, group in groupby_first(result):
                 self._print_group(conn, group)
-                new = self._get_merged_entry(conn, key=hash_)
-                cand = [(refid, self._get_merged_entry(conn, key=refid))
-                        for refid in unique(r.refid for r in group)]
-                old = min(cand, key=lambda p: distance(new, p[1]))[0]
+                new, _, old = merge(group, hash_=hash_)
                 print(f'-> {old}\n')
 
     def show_identified(self):
@@ -903,8 +900,6 @@ def resolve_splits(conn, *, verbose: bool = False):
                            .where(other.hash != Entry.hash))
                     .order_by('refid', 'hash', 'filename', 'bibkey'))
 
-    get_merged_entry = Database._get_merged_entry
-
     update_split = (sa.update(Entry)
                     .where(Entry.refid == sa.bindparam('eq_refid'))
                     .where(Entry.hash != sa.bindparam('ne_hash'))
@@ -915,12 +910,7 @@ def resolve_splits(conn, *, verbose: bool = False):
     for refid, group in groupby_first(conn.execute(select_split)):
         n_split += len(group)
 
-        old = get_merged_entry(conn, key=refid)
-
-        cand = [(hash_, get_merged_entry(conn, key=hash_))
-                for hash_ in unique(r.hash for r in group)]
-
-        new = min(cand, key=lambda p: distance(old, p[1]))[0]
+        _, _, new = split_old_cand_new(conn, group, refid=refid)
 
         params = {'eq_refid': refid, 'ne_hash': new}
         separated = conn.execute(update_split, params).rowcount
@@ -939,6 +929,18 @@ def resolve_splits(conn, *, verbose: bool = False):
     return n_split
 
 
+def split_old_cand_new(conn, group, *, refid: int,
+                       _get_merged_entry=Database._get_merged_entry):
+    old = _get_merged_entry(conn, key=refid)
+
+    cand = [(hash_, _get_merged_entry(conn, key=hash_))
+            for hash_ in unique(r.hash for r in group)]
+
+    new = min(cand, key=lambda p: distance(old, p[1]))[0]
+
+    return old, cand, new
+
+
 def resolve_merges(conn, *, verbose: bool = False):
     """Set id = srefid of the most similar srefid group."""
     other = sa.orm.aliased(Entry)
@@ -955,7 +957,8 @@ def resolve_merges(conn, *, verbose: bool = False):
                               Entry.srefid.desc(),
                               'filename', 'bibkey'))
 
-    get_merged_entry = Database._get_merged_entry
+    merge = functools.partial(merge_new_cand_old, conn,
+                              keyfunc=operator.attrgetter('srefid'))
 
     update_merge = (sa.update(Entry, bind=conn)
                     .where(Entry.hash == sa.bindparam('eq_hash'))
@@ -967,12 +970,7 @@ def resolve_merges(conn, *, verbose: bool = False):
     for hash_, group in groupby_first(conn.execute(select_merge)):
         n_merged += len(group)
 
-        new = get_merged_entry(conn, key=hash_)
-
-        cand = [(srefid, get_merged_entry(conn, key=srefid))
-                for srefid in unique(r.srefid for r in group)]
-
-        old = min(cand, key=lambda p: distance(new, p[1]))[0]
+        _, _, old = merge(group, hash_=hash_)
 
         params = {'eq_hash': hash_, 'ne_srefid': old, 'new_id': old}
         merged = conn.execute(update_merge, params).rowcount
@@ -989,6 +987,18 @@ def resolve_merges(conn, *, verbose: bool = False):
             print(f'{hash_}: {merged:d} merged into {old:d}\n')
 
     return n_merged
+
+
+def merge_new_cand_old(conn, group, *, hash_: str, keyfunc,
+                       _get_merged_entry=Database._get_merged_entry):
+    new = _get_merged_entry(conn, key=hash_)
+
+    cand = [(key, _get_merged_entry(conn, key=key))
+            for key in unique(keyfunc(r) for r in group)]
+
+    old = min(cand, key=lambda p: distance(new, p[1]))[0]
+
+    return new, cand, old
 
 
 def update_unchanged(conn):
