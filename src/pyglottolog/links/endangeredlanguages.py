@@ -69,7 +69,6 @@ class ElCat(LinkProvider):
 
         for lang in languoids:
             changed = False
-            changed = False
             id_ = None
             # check for glottocode as ElCat.iso
             if lang.id in elcat_langs:
