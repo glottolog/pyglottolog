@@ -69,15 +69,23 @@ class ElCat(LinkProvider):
 
         for lang in languoids:
             changed = False
-            if lang.iso in elcat_langs:
+            changed = False
+            id_ = None
+            # check for glottocode as ElCat.iso
+            if lang.id in elcat_langs:
+                id_ = lang.id
+            # check for ISO code as ElCat.iso
+            elif lang.iso in elcat_langs:
+                id_ = lang.iso
+            if id_ is not None:
                 if lang.update_links(
-                    'endangeredlanguages.com', [(l_.url, l_.name) for l_ in elcat_langs[lang.iso]]
+                    'endangeredlanguages.com', [(l_.url, l_.name) for l_ in elcat_langs[id_]]
                 ):
                     changed = True
-                if len(elcat_langs[lang.iso]) == 1:
+                if len(elcat_langs[id_]) == 1:
                     # Only add alternative names, if only one ElCat language matches!
                     changed = lang.update_names(
-                        elcat_langs[lang.iso][0].names, type_='elcat') or changed
+                        elcat_langs[id_][0].names, type_='elcat') or changed
             else:
                 changed = any([lang.update_links('endangeredlanguages.com', []),
                                lang.update_names([], type_='elcat')])
