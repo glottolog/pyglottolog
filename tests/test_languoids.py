@@ -54,6 +54,8 @@ def test_pattern(input_, valid, _match=Glottocode.pattern.match):
 @pytest.mark.parametrize('text, expected_id, expected_str', [
     ('Germany', 'DE', 'DE'),
     ('Russian Federation (RU)', 'RU', 'RU'),
+    ('Laos', 'LA', 'LA'),
+    ('Iran', 'IR', 'IR'),
     ('RU', 'RU', 'RU'),
 ])
 def test_Country_from_text(text, expected_id, expected_str):

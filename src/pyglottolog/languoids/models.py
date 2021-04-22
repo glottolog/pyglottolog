@@ -186,7 +186,31 @@ class Country(object):
 
     @classmethod
     def from_name(cls, name):
+        # some additional common names
+        _code_map = {
+            'burma': 'MM', 'cameroun': 'CM', 'czech republic': 'CZ',
+            'democratic republic of the congo': 'CD', 'drc': 'CD',
+            'east timor': 'TL', 'fsm': 'FM', 'laos': 'LA',
+            'macedonia': 'MK', 'north korea': 'KP',
+            'republic of the congo': 'CG', 'south korea': 'KR',
+            'swaziland': 'SZ', 'trindad and tobago': 'TT',
+            'uae': 'AE', 'uk': 'GB', 'usa': 'US',
+        }
+        if name.lower() in _code_map:
+            res = pycountry.countries.get(alpha_2=_code_map[name.lower()])
+            return cls(id=res.alpha_2, name=res.name)
+
         res = pycountry.countries.get(name=name)
+        if res is None:
+            res = pycountry.countries.get(common_name=name)
+        if res is None:
+            try:
+                for r in pycountry.countries.search_fuzzy(name):
+                    if r.name.startswith(name):
+                        res = r
+                        break
+            except LookupError:
+                pass
         if res:
             return cls(id=res.alpha_2, name=res.name)
 
