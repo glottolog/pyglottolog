@@ -13,8 +13,10 @@ from .util import LinkProvider
 from ..languoids import Country
 
 
-
 BASE_URL = "http://endangeredlanguages.com"
+DOMAIN = "endangeredlanguages.com"
+CFG_ID_NAME = "endangeredlanguages"
+LINK_TYPE = "elcat"
 CSV_URL = BASE_URL + "/userquery/download/"
 
 GLOTTOCODE_MAP = {
@@ -137,13 +139,13 @@ class ElCat(LinkProvider):
                 id_ = lang.iso
             if id_ is not None:
                 if lang.update_links(
-                    'endangeredlanguages.com', [(l_.url, l_.name) for l_ in elcat_langs[id_]]
+                    DOMAIN, [(l_.url, l_.name) for l_ in elcat_langs[id_]]
                 ):
                     changed = True
                 if len(elcat_langs[id_]) == 1:
                     # Only add alternative names, if only one ElCat language matches!
                     changed = lang.update_names(
-                        elcat_langs[id_][0].names, type_='elcat') or changed
+                        elcat_langs[id_][0].names, type_=LINK_TYPE) or changed
 
                     # Add missing coordinates
                     if not lang.latitude:
@@ -163,9 +165,27 @@ class ElCat(LinkProvider):
                         if new_countries:
                             lang.countries = new_countries
                             changed = True
+
+                    # Sync ElCat links and identifier
+                    new_identifiers = []
+                    all_elcat_link_ids = [int(li.url.split('/')[-1]) for li in lang.links
+                                          if li.domain == DOMAIN]
+                    for id_ in all_elcat_link_ids:
+                        if id_ in elcat_langs:
+                            new_identifiers.append(str(id_))
+                        else:
+                            print('Sync ElCat links [{}]: ElCat ID {} not known'.format(
+                                lang.id, id_))
+                    if new_identifiers:
+                        changed = True
+                        if len(new_identifiers) == 1:
+                            new_identifiers = new_identifiers[0]
+                        if not lang.identifier:
+                            lang.cfg['identifier'] = {}
+                        lang.cfg['identifier'][CFG_ID_NAME] = new_identifiers
             else:
-                changed = any([lang.update_links('endangeredlanguages.com', []),
-                               lang.update_names([], type_='elcat')])
+                changed = any([lang.update_links(DOMAIN, []),
+                               lang.update_names([], type_=LINK_TYPE)])
 
             if changed:
                 yield lang
