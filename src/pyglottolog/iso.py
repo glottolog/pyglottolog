@@ -118,10 +118,13 @@ class ChangeRequest(object):
         while year < (max_year or datetime.date.today().year):
             while True:
                 i = 0
-                for i, cr in enumerate(
-                        list(_iter_tables(
-                            read_url(path.format(year, page), cache_dir=cache_dir, log=log)))[0]):
-                    yield cls(**{k.replace(' ', '_'): v for k, v in cr.items()})
+                tables = list(_iter_tables(
+                    read_url(path.format(year, page), cache_dir=cache_dir, log=log)))
+                if not tables:
+                    print('no crs for {}, page {}'.format(year, page))
+                else:
+                    for i, cr in enumerate(tables[0]):
+                        yield cls(**{k.replace(' ', '_'): v for k, v in cr.items()})
                 if i < 99:
                     break
                 page += 1  # pragma: no cover
