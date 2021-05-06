@@ -30,8 +30,6 @@ if sys.version_info < (3, 9):
             return s
 
 else:
-    import operator
-
     def removesuffix(s: str, suffix: str) -> str:
         """See https://www.python.org/dev/peps/pep-0616/
 

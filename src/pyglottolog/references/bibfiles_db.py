@@ -210,7 +210,10 @@ class Indexable:
     """Retrieve entry from individual .bib file, or merged entry from old or new grouping."""
 
     def __getitem__(self, key: typing.Union[typing.Tuple[str, str], int, str]):
-        """Entry by ``(filename, bibkey)`` or merged entry by ``refid`` (old grouping) or ``hash`` (current grouping)."""
+        """
+        Entry by ``(filename, bibkey)`` or merged entry by ``refid`` (old grouping)
+        or ``hash`` (current grouping).
+        """
         if not isinstance(key, (tuple, int, str)):
             raise TypeError(f'key must be tuple, int, or str: {key!r}')  # pragma: no cover
 

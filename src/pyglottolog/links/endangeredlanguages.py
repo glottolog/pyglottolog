@@ -222,4 +222,5 @@ class ElCat(LinkProvider):
         print('Non-matches:')
         for elcat_id in list(elcat_ids - seen_elcat_ids):
             for el in elcat_langs[elcat_id]:
-                print('\t'.join([el.name, ','.join(el.isos), '{}/lang/{}'.format(BASE_URL, elcat_id)]))
+                print('\t'.join(
+                    [el.name, ','.join(el.isos), '{}/lang/{}'.format(BASE_URL, elcat_id)]))
