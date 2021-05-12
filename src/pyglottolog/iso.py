@@ -56,7 +56,7 @@ class Retirement(object):
     }
     Id = attr.ib(validator=valid_iso_code)
     Ref_Name = attr.ib()
-    Ret_Reason = attr.ib(converter=lambda v: Retirement.RET_REASON[v])
+    Ret_Reason = attr.ib(converter=lambda v: Retirement.RET_REASON.get(v))
     Change_To = attr.ib(
         converter=lambda v: v or None,
         validator=attr.validators.optional(valid_iso_code))
@@ -247,7 +247,8 @@ def get_retirements(table=None, max_year=None, cache_dir=None, log=None):
     rets = [ret for ret in rets if ret.Id != 'lcq']
 
     # fill Change_To from Ret_Remedy for splits and make it a list for others
-    assert all(bool(r.Change_To) == (r.Ret_Reason not in ('split', 'non-existent')) for r in rets)
+    assert all(
+        bool(r.Change_To) == (r.Ret_Reason not in ('split', 'non-existent', None)) for r in rets)
     assert all(bool(r.Ret_Remedy) == (r.Ret_Reason == 'split') for r in rets)
     iso = re.compile(r'\[([a-z]{3})\]')
     for r in rets:

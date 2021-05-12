@@ -1,9 +1,6 @@
 import collections
 
-from pycldf import StructureDataset, Source
-from pycldf.dataset import GitRepository
-
-import pyglottolog
+from pycldf import Source
 
 
 def value(lid, pid, value, **kw):
@@ -17,43 +14,7 @@ def value(lid, pid, value, **kw):
     return res
 
 
-def repos(name, **kw):
-    return GitRepository('https://github.com/glottolog/{0}'.format(name), **kw)
-
-
-def cldf(api, outdir, log):
-    if not outdir.exists():
-        outdir.mkdir()
-    for p in outdir.iterdir():
-        if p.suffix in ['.bib', '.csv', '.json']:
-            p.unlink()
-    ds = StructureDataset.in_dir(outdir)
-    ds.add_provenance(
-        wasDerivedFrom=repos('glottolog', clone=api.repos),
-        wasGeneratedBy=repos('pyglottolog', version=pyglottolog.__version__),
-    )
-    ds.add_component('ParameterTable', {'name': 'type', 'default': None})
-    ds.add_component('CodeTable', 'numerical_value')
-    ds.add_columns('ValueTable', 'codeReference')
-    ds.add_component(
-        'LanguageTable',
-        dict(name='Countries', separator=';'),
-        {
-            'name': 'Family_ID',
-            'dc:description': 'Glottocode of the top-level genetic unit, the '
-            'languoid belongs to'},
-        {
-            'name': 'Language_ID',
-            'dc:description': 'Glottocode of the language-level languoid, the '
-            'languoid belongs to (in case of dialects)'},
-    )
-    ds.add_foreign_key('LanguageTable', 'Family_ID', 'LanguageTable', 'ID')
-    ds.add_foreign_key('LanguageTable', 'Language_ID', 'LanguageTable', 'ID')
-
-    ds['LanguageTable', 'Macroarea'].separator = ';'
-    ds['ValueTable', 'Value'].null = ['<NA>']
-
-    data = collections.defaultdict(list)
+def cldf(ds, data, api, log):
     data['ParameterTable'].extend([
         dict(ID='level', Name='Level', type='categorical'),
         dict(ID='category', Name='Category', type='categorical'),
@@ -179,6 +140,3 @@ def cldf(api, outdir, log):
                 Source=[med.id] if med else [],
                 Code_ID='med-{0}'.format(med.med_type.id) if med else None),
         ])
-
-    ds.write(outdir / 'cldf-metadata.json', **data)
-    ds.validate(log=log)

@@ -234,16 +234,16 @@ class Glottolog(API):
         return references.BibFiles.from_path(self.references_path(), api=self)
 
     def refs_by_languoid(self, nodes=None):
-        all = {}
+        all_ = {}
         languoids_by_code = self.languoids_by_code(
             nodes or {lang.id: lang for lang in self.languoids()})
         res = collections.defaultdict(list)
         for bib in tqdm(self.bibfiles):
             for entry in bib.iterentries():
-                all[entry.id] = entry
+                all_[entry.id] = entry
                 for lang in entry.languoids(languoids_by_code)[0]:
                     res[lang.id].append(entry)
-        return res, all
+        return res, all_
 
     @lazyproperty
     def hhtypes(self):

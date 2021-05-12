@@ -3,7 +3,7 @@ import json
 import pathlib
 import collections
 
-from csvw.dsv import reader
+from csvw.dsv import reader, Dialect
 import requests
 from clldutils.misc import nfilter
 
@@ -19,9 +19,13 @@ URL = 'http://chirila.yale.edu/languages'
 
 class AIATSIS(LinkProvider):
     def iterupdated(self, languoids):  # pragma: no cover
-        res = reader(io.StringIO(requests.get(MD_URL).content.decode('utf-8-sig')), dicts=True)
+        res = reader(
+            io.StringIO(requests.get(MD_URL).content.decode('utf-8-sig')),
+            dialect=Dialect(skipBlankRows=True, commentPrefix='<'),
+            dicts=True)
         md = {d['language_code']: d for d in res}
         lmap = collections.defaultdict(set)
+        return
         for line in requests.get(URL).text.splitlines():
             if line.startswith('var curItem'):
                 line = line.split('=', maxsplit=1)[1]

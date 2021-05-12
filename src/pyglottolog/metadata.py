@@ -1,7 +1,9 @@
 from html import entities as html_entities
+import pkg_resources
 
 from nameparser import HumanName
 from markdown import markdown
+from clldutils.markup import iter_markdown_tables
 from clldutils.jsonlib import dump
 
 
@@ -13,27 +15,16 @@ def to_html(text, url):
     return markdown(text.replace(url, '[{0}]({0})'.format(url)))
 
 
-def read_editors(repos):
+def read_editions(repos):
+    head, rows = next(iter_markdown_tables(
+        repos.path('CONTRIBUTORS.md').read_text(encoding='utf8')))
     res = []
-    in_editors, in_table = False, False
-    for line in repos.path('CONTRIBUTORS.md').read_text(encoding='utf8').split('\n'):
-        line = line.strip()
-        if line.startswith('##'):
-            if in_editors:
-                in_editors = False
-            elif line.endswith('Editors'):
-                in_editors = True
-            continue
+    for row in rows:
+        row = dict(zip([c.lower() for c in head], row))
+        row['editors'] = [n.strip() for n in row['editors'].split('&')]
+        res.append(row)
 
-        if line.startswith('---'):
-            in_table = True
-            continue
-
-        if in_editors and in_table and line.strip():
-            row = [m.strip() for m in line.split('|')]
-            row[2] = [n.strip() for n in row[2].split('&')]
-            res.append(row)
-    return sorted(res, key=lambda t: tuple(map(int, t[0].split('.'))), reverse=True)
+    return sorted(res, key=lambda d: pkg_resources.parse_version(d['version']), reverse=True)
 
 
 def editor_to_dict(n, editors):
@@ -49,34 +40,42 @@ def editor_to_dict(n, editors):
     return res
 
 
-def prepare_release(repos, version):
-    for v, year, editors in read_editors(repos):
-        if v == version:
-            break
-    else:  # pragma: no cover
-        raise ValueError('Add version to CONTRIBUTORS.md first!')
+def get_edition(repos, version=None):
+    version = version or getattr(repos.publication.zenodo, 'version', '0.0.1.dev0')
+    for edition in read_editions(repos):
+        if edition['version'] == version:
+            return edition
+    raise ValueError('Add version {} to CONTRIBUTORS.md first!'.format(version))  # pragma: no cover
 
-    citation = "{0}. {1}. {2} {3}. {4}: {5}. (Available online at {6})".format(
-        ' & '.join('{0.last}, {0.first}'.format(HumanName(e)) for e in editors),
-        year,
+
+def citation(repos, edition=None, version=None):
+    edition = edition or get_edition(repos, version=version)
+    return "{0}. {1}. {2} {3}. {4}: {5}. (Available online at {6})".format(
+        ' & '.join('{0.last}, {0.first}'.format(HumanName(e)) for e in edition['editors']),
+        edition['year'],
         repos.publication.web.name,
-        version,
+        edition['version'],
         repos.publication.publisher.place,
         repos.publication.publisher.name,
         repos.publication.web.url,
     )
+
+
+def prepare_release(repos, version=None):
+    edition = get_edition(repos, version=version)
+    cit = citation(repos, edition=edition, version=version)
     dump(
         {
-            "title": repos.publication.zenodo.title_format.format(version),
-            "description": to_html(citation, repos.publication.web.url),
+            "title": repos.publication.zenodo.title_format.format(edition['version']),
+            "description": to_html(cit, repos.publication.web.url),
             "license": {"id": repos.publication.zenodo.license_id},
             "keywords": repos.publication.zenodo.keywords.split(),
             "communities": [
                 {"identifier": cid} for cid in repos.publication.zenodo.communities.split()],
-            "creators": [editor_to_dict(n, repos.editors) for n in editors],
+            "creators": [editor_to_dict(n, repos.editors) for n in edition['editors']],
             "access_right": "open",
             "upload_type": "dataset",
         },
         repos.path('.zenodo.json'),
         indent=4)
-    return citation
+    return cit

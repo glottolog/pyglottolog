@@ -64,6 +64,7 @@ class LinkProvider(object):
             res = collections.defaultdict(list)
             for gc, langs in read_grouped_cldf_languages(self.__cldf_dataset_url__):
                 for lang in langs:
+                    lang = {k: v.strip() if isinstance(v, str) else v for k, v in lang.items()}
                     item = self.__url_template__.format(lang)
                     if self.__label_template__:
                         item = (item, self.__label_template__.format(lang))

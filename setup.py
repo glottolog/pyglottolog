@@ -26,6 +26,7 @@ setup(
         ],
     },
     install_requires=[
+        'gitpython',
         'pybtex>=0.22',
         'attrs>=19.2',
         'clldutils>=3.7',

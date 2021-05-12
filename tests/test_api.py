@@ -37,6 +37,12 @@ def test_cache_languoids(caching_api):
     assert 'abcd1234' in caching_api.cache
 
 
+def test_refs_by_languoid(api):
+    res = api.refs_by_languoid()
+    assert len(res[0]) == 2
+    assert len(res[1]) == 7
+
+
 def test_editors(api):
     eids = [
         e.id for e in sorted(api.editors.values(), key=lambda i: int(i.ord))

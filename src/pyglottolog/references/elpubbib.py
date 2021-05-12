@@ -16,7 +16,7 @@ LC_INDEX = 'http://www.elpublishing.org/language-contexts'
 
 
 def download(bibfile, log):  # pragma: no cover
-    fname = scrape(pathlib.Path(tempfile.gettempdir()) / 'elp.bib')
+    fname = scrape(pathlib.Path(tempfile.gettempdir()) / 'elpub.bib')
     bibfile.update(fname, log=log)
     bibfile.check(log)
     fname.unlink()

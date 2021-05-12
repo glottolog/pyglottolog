@@ -130,9 +130,3 @@ def test_iso2codes(_main, tmp_path):
     _main('iso2codes --output {0}'.format(tmp_path.as_posix()))
     assert tmp_path.joinpath('iso2glottocodes.csv').exists()
 
-
-def test_cldf(_main, tmp_path, caplog):
-    path = (tmp_path / 'cldf').as_posix()
-    _main('cldf {0}'.format(path), log=logging.getLogger())
-    assert len(caplog.records) == 16
-    _main('cldf {0}'.format(path))

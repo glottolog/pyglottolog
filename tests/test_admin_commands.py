@@ -19,9 +19,9 @@ def _main(api_copy, mocker):
 
 
 def test_release(_main):
-    with pytest.raises(ValueError):
-        _main('release x.y')
-    _main('release 2.7')
+    with pytest.raises(AssertionError):
+        _main('release --version 1.0.1.dev0')
+    _main('release --version 2.7')
 
 
 def test_update_links(_main, capsys, elcat):

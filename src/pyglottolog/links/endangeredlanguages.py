@@ -103,7 +103,12 @@ class ElCatLanguage(object):
 
     @property
     def names(self):
-        return [self.name] + [n for n in self.also_known_as if n != self.name]
+        res = [self.name]
+        for n in self.also_known_as:
+            for nn in split(n, sep=','):
+                if nn not in res:
+                    res.append(nn)
+        return res
 
     @property
     def url(self):
