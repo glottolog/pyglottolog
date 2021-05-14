@@ -116,6 +116,7 @@ class BibFile(object):
         converter=lambda s: None if s is None or s.lower() == 'none' else s)
     priority = attr.ib(default=0, converter=int)
     url = attr.ib(default=None)
+    curation = attr.ib(default=None)
     api = attr.ib(default=None)
 
     @property

@@ -1,9 +1,10 @@
 import os
+import pathlib
 import re
+import typing
 import datetime
 import functools
 import warnings
-from pathlib import Path
 
 from clldutils.inifile import INI
 from newick import Node
@@ -32,14 +33,43 @@ class Languoid(object):
     """
     Info on languoids is encoded in the ini files and in the directory hierarchy.
     This class provides access to all of it.
+
+    **Languoid formatting**:
+
+    :ivar _format_specs: A `dict` mapping custom format specifiers to conversion functions.
+
+    Usage:
+
+    .. code-block:: python
+
+        >>> l = Languoid.from_name_id_level(pathlib.Path('.'), 'N(a,m)e', 'abcd1234', 'language')
+        >>> '{0:newick_name}'.format(l)
+        'N{a/m}e'
+
+    .. seealso::
+
+        `<https://www.python.org/dev/peps/pep-3101/#format-specifiers>`_ and
+        `<https://www.python.org/dev/peps/pep-3101/#controlling-formatting-on-a-per-type-basis>`_
     """
     section_core = 'core'
 
-    def __init__(self, cfg, lineage=None, id_=None, directory=None, tree=None, _api=None):
+    def __init__(
+            self,
+            cfg: INI,
+            lineage: typing.Union[None, typing.List[typing.Tuple[str, str, str]]] = None,
+            id_: typing.Union[None, str] = None,
+            directory: typing.Union[None, pathlib.Path] = None,
+            tree: typing.Union[None, pathlib.Path] = None,
+            _api=None):
         """
+        Refer to the factory methods for typical use cases of instantiating a `Languoid`:
 
-        :param cfg:
-        :param lineage: list of ancestors, given as (id, name) pairs.
+        - :meth:`Languoid.from_dir`
+        - :meth:`Languoid.from_id_name_level`
+
+        :param cfg: `INI` instance storing the languoid's metadata.
+        :param lineage: list of ancestors (from root to this languoid).
+        :param id_: Glottocode for the languoid (or `None`, if `directory` is passed).
         :param _api: Some properties require access to config data which is accessed through a \
         `Glottolog` API instance.
         """
@@ -57,7 +87,13 @@ class Languoid(object):
         self._api = _api
 
     @classmethod
-    def from_dir(cls, directory, nodes=None, **kw):
+    def from_dir(cls, directory: pathlib.Path, nodes=None, **kw):
+        """
+        Create a `Languoid` from a directory, named with the Glottocode and containing `md.ini`.
+
+        This method is used by :class:`pyglottolog.Glottolog` to read `Languoid`s from the
+        repository's `languoids/tree` directory.
+        """
         if nodes is None:
             nodes = {}
         cfg = INI.from_file(directory.joinpath(INFO_FILENAME), interpolation=None)
@@ -81,6 +117,10 @@ class Languoid(object):
 
     @classmethod
     def from_name_id_level(cls, tree, name, id, level, **kw):
+        """
+        This method is used in `pyglottolog.lff` to instantiate `Languoid`s for new nodes
+        encountered in "lff"-format trees.
+        """
         cfg = INI(interpolation=None)
         cfg.read_dict(dict(core=dict(name=name)))
         res = cls(cfg, kw.pop('lineage', []), id_=Glottocode(id), tree=tree)
@@ -143,7 +183,14 @@ class Languoid(object):
             return type_(res)
         return res
 
-    def newick_node(self, nodes=None, template=None, maxlevel=None, level=0):
+    def newick_node(self, nodes=None, template=None, maxlevel=None, level=0) -> Node:
+        """
+        Return a `newick.Node` representing the subtree of the Glottolog classification starting
+        at the languoid.
+
+        :param template: Python format string accepting the `Languoid` instance as single \
+        variable named `l`, used to format node labels.
+        """
         template = template or self._newick_default_template
         n = Node(name=template.format(l=self), length='1')  # noqa: E741
 
@@ -157,10 +204,13 @@ class Languoid(object):
                 nn.newick_node(nodes=nodes, template=template, maxlevel=maxlevel, level=level + 1))
         return n
 
-    def write_info(self, outdir=None):
+    def write_info(self, outdir: typing.Union[None, pathlib.Path] = None):
+        """
+        Write `Languoid` metadata as INI file to `outdir/<INFO_FILENAME>`.
+        """
         outdir = outdir or self.dir
-        if not isinstance(outdir, Path):
-            outdir = Path(outdir)
+        if not isinstance(outdir, pathlib.Path):
+            outdir = pathlib.Path(outdir)
         if outdir.name != self.id:
             outdir = outdir.joinpath(self.id)
         if not outdir.exists():
