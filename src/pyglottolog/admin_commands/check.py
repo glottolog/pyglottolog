@@ -1,9 +1,11 @@
 """
 Check the glottolog data for consistency.
 """
+import pathlib
 import collections
 
 from clldutils.jsonlib import load
+import pyglottolog
 from pyglottolog.languoids import Reference
 from pyglottolog.util import message
 import pyglottolog.iso
@@ -56,8 +58,8 @@ def run(args):
     iso_in_gl, languoids, iso_splits, hid = {}, {}, [], {}
     names = collections.defaultdict(set)
 
-    for attr in args.repos.__config__:
-        for obj in getattr(args.repos, attr).values():
+    for p in pathlib.Path(pyglottolog.__file__).parent.joinpath('config').glob('*.ini'):
+        for obj in getattr(args.repos, p.stem).values():
             ref_id = getattr(obj, 'reference_id', None)
             if ref_id and ref_id not in refkeys:
                 error(obj, 'missing reference: {0}'.format(ref_id))

@@ -1,5 +1,6 @@
-from collections import OrderedDict, defaultdict
 import re
+import typing
+import collections
 
 import attr
 import markdown
@@ -11,6 +12,7 @@ import purl
 
 from ..util import message
 from ..config import AESSource, AES
+from ..references import Entry
 
 __all__ = [
     'Glottocode', 'Glottocodes',
@@ -26,8 +28,8 @@ __all__ = [
 
 @attr.s(hash=True)
 class Link(object):
-    url = attr.ib()
-    label = attr.ib(default=None)
+    url = attr.ib()  #:
+    label = attr.ib(default=None)  #:
 
     @property
     def domain(self):
@@ -88,7 +90,7 @@ class Glottocodes(object):
         if not dry_run:
             self._store[alpha] = num
             # Store the updated dictionary of glottocodes back.
-            ordered = OrderedDict()
+            ordered = collections.OrderedDict()
             for k in sorted(self._store.keys()):
                 ordered[k] = self._store[k]
             jsonlib.dump(ordered, self._fname, indent=4)
@@ -110,8 +112,11 @@ class Glottocode(str):
 
 @attr.s
 class Reference(object):
-    key = attr.ib()
-    pages = attr.ib(default=None)
+    """
+    A reference of a bibliographical record in Glottolog.
+    """
+    key = attr.ib()  #:
+    pages = attr.ib(default=None)  #:
     trigger = attr.ib(default=None)
     pattern = re.compile(
         r"\*\*(?P<key>[a-z0-9\-_]+:[a-zA-Z.?\-;*'/()\[\]!_:0-9\u2014]+?)\*\*"
@@ -127,7 +132,10 @@ class Reference(object):
             res += '<trigger "{0.trigger}">'.format(self)
         return res
 
-    def get_source(self, api):
+    def get_source(self, api) -> Entry:
+        """
+        Retrieve the referenced bibliographical record.
+        """
         return api.bibfiles[self.bibname][self.bibkey]
 
     @property
@@ -174,8 +182,8 @@ class Country(object):
 
     .. see also:: https://en.wikipedia.org/wiki/ISO_3166-1
     """
-    id = attr.ib()
-    name = attr.ib()
+    id = attr.ib()  #: ISO 3166 alpha 2 code
+    name = attr.ib()  #: name
 
     def __str__(self):
         return self._format()
@@ -207,14 +215,23 @@ class Country(object):
 
 @attr.s
 class ClassificationComment(object):
+    """
+    Commentary on the classification of the languoid
+    """
+    #: Commentary on the internal classification of the descendants of the languoid
     sub = attr.ib(default=None)
-    subrefs = attr.ib(default=attr.Factory(list), converter=Reference.from_list)
+    #: References for the internal classification
+    subrefs: typing.List[Reference] = attr.ib(
+        default=attr.Factory(list), converter=Reference.from_list)
+    #: Commentary on the classification of the languoid within its family
     family = attr.ib(default=None)
-    familyrefs = attr.ib(default=attr.Factory(list), converter=Reference.from_list)
+    #: References for the family classification
+    familyrefs: typing.List[Reference] = attr.ib(
+        default=attr.Factory(list), converter=Reference.from_list)
 
     def merged_refs(self, type):
         assert type in ['sub', 'family']
-        res = defaultdict(set)
+        res = collections.defaultdict(set)
         for m in Reference.pattern.finditer(getattr(self, type) or ''):
             res[m.group('key')].add(m.group('pages'))
         for ref in getattr(self, type + 'refs'):
@@ -244,15 +261,18 @@ class ClassificationComment(object):
 
 @attr.s
 class ISORetirement(object):
-
-    code = attr.ib(default=None)
-    name = attr.ib(default=None)
-    change_request = attr.ib(default=None)
-    effective = attr.ib(default=None)
-    reason = attr.ib(default=None)
-    change_to = attr.ib(default=attr.Factory(list))
-    remedy = attr.ib(default=None)
-    comment = attr.ib(converter=lambda s: s.replace('\n.', '\n') if s else s, default=None)
+    """
+    Information extracted from accepted ISO 639-3 change requests about retired ISO codes
+    associated with the languoid.
+    """
+    code = attr.ib(default=None)  #: Retired ISO 639-3 code
+    name = attr.ib(default=None)  #: Name of the retired ISO language
+    change_request = attr.ib(default=None)  #: Number of the ISO change request
+    effective = attr.ib(default=None)  #: Date of acceptance of the change request
+    reason = attr.ib(default=None)  #: Reason to retire the ISO code
+    change_to = attr.ib(default=attr.Factory(list))  #: List of ISO codes replacing the retired code
+    remedy = attr.ib(default=None)  #: What to do about the retired code
+    comment = attr.ib(converter=lambda s: s.replace('\n.', '\n') if s else s, default=None)  #:
 
     def asdict(self):
         return attr.asdict(self)
@@ -262,9 +282,13 @@ class ISORetirement(object):
 
 @attr.s
 class Endangerment(object):
-    status = attr.ib(validator=attr.validators.instance_of(AES))
-    source = attr.ib(validator=attr.validators.instance_of(AESSource))
-    comment = attr.ib()
+    """
+    Info about the endangerment status of the languoid
+    """
+    status: AES = attr.ib(validator=attr.validators.instance_of(AES))  #:
+    source: AESSource = attr.ib(validator=attr.validators.instance_of(AESSource))  #:
+    comment = attr.ib()  #:
+    #: Date when the endangerment status was assessed
     date = attr.ib(converter=parser.parse)
 
     def __json__(self):
@@ -291,28 +315,32 @@ def valid_comment(inst, attr, value):
 
 @attr.s
 class EthnologueComment(object):
+    """
+    Commentary about the classification of the languoid according to Ethnologue
+    """
     # There's the isohid field which says which iso/hid the comment concerns.
     isohid = attr.ib()
 
-    # There's the comment_type field which is either
-    # - "spurious" meaning the comment is to explain why the languoid in question is
-    #   spurious and in which Ethnologue (as below) that is/was
-    # - "missing" meaning the comment is to explain why the languoid in question is
-    #   missing (as a language entry) and in which Ethnologue (as below) that is/was
+    #: Either
+    #:
+    #: - "spurious" meaning the comment is to explain why the languoid in question is \
+    #:   spurious and in which Ethnologue (as below) that is/was
+    #: - "missing" meaning the comment is to explain why the languoid in question is \
+    #:   missing (as a language entry) and in which Ethnologue (as below) that is/was
     comment_type = attr.ib(validator=valid_comment_type, converter=lambda s: s.lower())
 
-    # There's the "ethnologue_versions" field which says which Ethnologue version(s)
-    # from E16-E19 the comment pertains to, joined by /:s. E.g. E16/E17. In the case of
-    # comment_type=spurious, E16/E17 in the version field means that the code was spurious
-    # in E16/E17 but no longer spurious in E18/E19. In the case of comment_type=missing,
-    # E16/E17 would mean that the code was missing from E16/E17, but present in E18/E19.
-    # If the comment concerns a language where versions would be the empty string,
-    # instead the string ISO 639-3 appears.
+    #: Which Ethnologue version(s)
+    #: from E16-E19 the comment pertains to, joined by /:s. E.g. E16/E17. In the case of
+    #: comment_type=spurious, E16/E17 in the version field means that the code was spurious
+    #: in E16/E17 but no longer spurious in E18/E19. In the case of comment_type=missing,
+    #: E16/E17 would mean that the code was missing from E16/E17, but present in E18/E19.
+    #: If the comment concerns a language where versions would be the empty string,
+    #: instead the string ISO 639-3 appears.
     ethnologue_versions = attr.ib(
         default='',
         validator=valid_ethnologue_versions,
         converter=lambda s: s.replace('693', '639').split('/'))
-    comment = attr.ib(default=None, validator=valid_comment)
+    comment = attr.ib(default=None, validator=valid_comment)  #:
 
     def __json__(self):
         return attr.asdict(self)

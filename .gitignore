@@ -10,6 +10,7 @@ __pycache__
 *.eggs
 dist
 /build
+_build/
 eggs
 parts
 bin

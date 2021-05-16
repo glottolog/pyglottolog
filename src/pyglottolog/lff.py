@@ -1,10 +1,11 @@
 import re
 import os
+import shutil
 import logging
 import operator
 import collections
 
-from clldutils.path import move, readlines
+from clldutils.path import readlines
 
 from .languoids import Languoid, Glottocode
 
@@ -172,7 +173,7 @@ def lff2tree(api, log=logging.getLogger(__name__)):
             if builddir.exists():  # pragma: no cover
                 raise ValueError('please remove %s before proceeding' % builddir)
         # move the old tree out of the way
-        move(out, builddir)
+        shutil.move(out, builddir)
     out.mkdir()
 
     new = {}

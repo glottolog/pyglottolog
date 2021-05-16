@@ -49,6 +49,7 @@ setup(
     extras_require={
         'dev': ['tox>=3.14', 'flake8', 'pep8-naming', 'wheel', 'twine'],
         'test': ['pytest>=5', 'pytest-mock', 'pytest-cov'],
+        'docs': ['sphinx', 'sphinx-autodoc-typehints', 'sphinx-rtd-theme'],
     },
     classifiers=[
         'Programming Language :: Python',

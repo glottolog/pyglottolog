@@ -1,12 +1,13 @@
 # bibfiles.py - ordered collection of bibfiles with load/save api
 
 import re
+import math
+import typing
+import pathlib
+import datetime
+import functools
 import collections
 import unicodedata
-import datetime
-import math
-import functools
-import pathlib
 
 import attr
 
@@ -19,6 +20,7 @@ from clldutils.attrlib import cmp_off
 
 from . import bibtex
 from . import util
+from ..config import MEDType
 from .bibfiles_db import Database
 
 __all__ = ['BibFiles', 'BibFile', 'Entry']
@@ -53,7 +55,7 @@ class BibFiles(list):
     """Ordered collection of `BibFile` objects accessible by filname or index."""
 
     @classmethod
-    def from_path(cls, path, api=None):
+    def from_path(cls, path: typing.Union[str, pathlib.Path], api=None) -> 'BibFiles':
         """BibTeX files from `<path>/bibtex/*.bib` if listed in `<path>/BIBFILES.ini`."""
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
@@ -73,7 +75,8 @@ class BibFiles(list):
         super().__init__(bibfiles)
         self._map = {b.fname.name: b for b in self}
 
-    def __getitem__(self, index_or_filename):
+    def __getitem__(self, index_or_filename: typing.Union[int, str])\
+            -> typing.Union['BibFile', 'Entry']:
         """Retrieve a bibfile by index or filename or an entry by qualified key.
 
         :param index_or_filename: Either an `int` index, or a bibfile name, or a \
@@ -84,6 +87,8 @@ class BibFiles(list):
             if ':' in index_or_filename:
                 stem, key = index_or_filename.split(':', maxsplit=1)
                 return self._map['{}.bib'.format(stem)][key]
+            if not index_or_filename.endswith('.bib'):
+                index_or_filename += '.bib'
             return self._map[index_or_filename]
         return super().__getitem__(index_or_filename)
 
@@ -103,11 +108,14 @@ def file_if_exists(i, a, value):
 
 @attr.s
 class BibFile(object):
-
-    fname = attr.ib(validator=file_if_exists)
-    name = attr.ib(default=None)
-    title = attr.ib(default=None)
-    description = attr.ib(default=None)
+    """
+    Represents a BibTeX file, storing a provider's bibliography, providing easy access to its
+    records.
+    """
+    fname: pathlib.Path = attr.ib(validator=file_if_exists)
+    name = attr.ib(default=None)  #: Short name of the bibliography
+    title = attr.ib(default=None)  #: Title of the bibliography
+    description = attr.ib(default=None)  #: The provenance of the bibliography
     abbr = attr.ib(default=None)
     encoding = attr.ib(default='utf-8')
     normalize = attr.ib(default='NFC')
@@ -115,15 +123,19 @@ class BibFile(object):
         default=None,
         converter=lambda s: None if s is None or s.lower() == 'none' else s)
     priority = attr.ib(default=0, converter=int)
-    url = attr.ib(default=None)
-    curation = attr.ib(default=None)
+    url = attr.ib(default=None)  #: URL pointing to the source of the bibliography
+    curation = attr.ib(default=None)  #: Curation policy for the bibliography at Glottolog
     api = attr.ib(default=None)
 
     @property
     def id(self):
         return self.fname.stem
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str) -> 'Entry':
+        """
+        :param item: BibTeX citation key of an entry
+        :raises KeyError: if no matching `Entry` is contained in the `BibFile`
+        """
         if item.startswith(self.id + ':'):
             item = item.split(':', 1)[1]
         text = None
@@ -227,9 +239,29 @@ class BibFile(object):
 @functools.total_ordering
 @attr.s(**cmp_off)
 class Entry(object):
-    key = attr.ib()
-    type = attr.ib()
-    fields = attr.ib()
+    """
+    Represents an entry in a `BibFile`, i.e. a bibliographical record.
+
+    .. note::
+
+        `Entry` instances are orderable. The ordering is the one used to compute MEDs, i.e.
+
+        - grammars are "better" than other document types,
+        - more pages is "better" than less,
+        - more recent is "better" than old.
+
+    .. code-block:: python
+
+        >>> g = pyglottolog.Glottolog()
+        >>> g.bibfiles['hh:g:MacDonell:Sanskrit'] > g.bibfiles['hh:hv:Weijnen:Nederlandse']
+        True
+        >>> refs = g.refs_by_languoid(gl.bibfiles['hh'])
+        >>> sorted(refs[0]['stan1295'])[-1].med_type.name
+        'long grammar'
+    """
+    key = attr.ib()  #:
+    type = attr.ib()  #: BibTeX entry type
+    fields: dict = attr.ib()  #: The metadata of the record
     bib = attr.ib()
     api = attr.ib(default=None)
 
@@ -277,7 +309,10 @@ class Entry(object):
         return -index, pages, self.year_int or 0, self.id
 
     @lazyproperty
-    def med_type(self):
+    def med_type(self) -> MEDType:
+        """
+        The entry's type on the MED scale.
+        """
         if self.api:
             doctypes = list(self._defined_doctypes.keys())
             index = -self.weight[0]
@@ -330,12 +365,15 @@ class Entry(object):
         res += '\n}\n' if self.fields else ',\n}\n'
         return res
 
-    def text(self):
+    def text(self) -> str:
         """Return the text linearization of the entry."""
         return Source(self.type, self.key, _check_id=False, **self.fields).text()
 
     @property
-    def id(self):
+    def id(self) -> str:
+        """
+        The qualified entry ID, including the provider prefix.
+        """
         return '{0}:{1}'.format(self.bib.id, self.key)
 
     @classmethod
@@ -358,7 +396,10 @@ class Entry(object):
             if match:
                 return match.group('trigger')
 
-    def languoids(self, langs_by_codes):
+    def languoids(self, langs_by_codes: dict) -> typing.Tuple[list, typing.Optional[str]]:
+        """
+        Expand the language codes mentioned in a reference's "lgcode" field to `Languoid` objects.
+        """
         res = []
         if 'lgcode' in self.fields:
             for code in self.lgcodes(self.fields['lgcode']):

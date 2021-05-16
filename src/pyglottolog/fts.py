@@ -1,3 +1,5 @@
+import shutil
+
 import attr
 from whoosh import index
 from whoosh.fields import Schema, TEXT, KEYWORD, ID, NUMERIC
@@ -6,7 +8,6 @@ from whoosh.qparser import QueryParser, GtLtPlugin
 from whoosh.highlight import Formatter, get_text
 from tqdm import tqdm
 
-from clldutils.path import rmtree
 from clldutils.misc import slug
 
 
@@ -35,7 +36,7 @@ class Document(object):
 def get_langs_index(api, recreate=False):
     index_dir = api.build_path('whoosh_langs')
     if index_dir.exists() and recreate:
-        rmtree(index_dir)  # pragma: no cover
+        shutil.rmtree(index_dir)  # pragma: no cover
     if not index_dir.exists():
         index_dir.mkdir()
         schema = Schema(
@@ -109,7 +110,7 @@ def get_index(api, recreate=False, must_exist=False):
     index_dir = api.ftsindex
     if index_dir.exists():
         if recreate:
-            rmtree(index_dir)  # pragma: no cover
+            shutil.rmtree(index_dir)  # pragma: no cover
     elif must_exist:
         raise ValueError('No whoosh index found at {0}.'.format(index_dir))
 

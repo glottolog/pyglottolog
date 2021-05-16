@@ -13,12 +13,13 @@ from clldutils.path import walk, git_describe
 from clldutils.misc import lazyproperty
 from clldutils.apilib import API
 from clldutils.jsonlib import load
+import clldutils.iso_639_3
 import pycountry
 from termcolor import colored
 from tqdm import tqdm
 
 from . import util
-from . import languoids
+from . import languoids as lls
 from . import references
 from . import config
 from .languoids import models
@@ -36,9 +37,9 @@ class Cache(dict):
     def __bool__(self):
         return True
 
-    def add(self, directory: pathlib.Path, api) -> languoids.Languoid:
+    def add(self, directory: pathlib.Path, api) -> lls.Languoid:
         if directory.name not in self:
-            lang = languoids.Languoid.from_dir(directory, nodes=self._lineage, _api=api)
+            lang = lls.Languoid.from_dir(directory, nodes=self._lineage, _api=api)
             self._lineage[lang.id] = (lang.name, lang.id, lang.level)
             self[lang.id] = lang
             if lang.iso:
@@ -49,45 +50,50 @@ class Cache(dict):
 
 
 class Glottolog(API):
-    """API to access Glottolog data"""
-    countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
-    __config__ = {
-        'aes_status': config.AES,
-        'aes_sources': config.AESSource,
-        'document_types': config.DocumentType,
-        'med_types': config.MEDType,
-        'macroareas': config.Macroarea,
-        'language_types': config.LanguageType,
-        'languoid_levels': config.LanguoidLevel,
-        'editors': config.Generic,
-        'publication': config.Generic,
-    }
+    """
+    API to access Glottolog data
 
-    def __init__(self, repos='.', *, cache=False):
+    This class provides (read and write) access to a local copy of the Glottolog data, which can
+    be obtained as explained in the `README <https://github.com/glottolog/pyglottolog#install>`_
+    """
+    countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
+
+    def __init__(self, repos='.', *, cache: bool = False):
         """
-        :param repos: Path to a clone or export of https://github.com/glottolog/glottolog
+        :param repos: Path to a copy of `<https://github.com/glottolog/glottolog>`_
         :param cache: Indicate whether to cache `Languoid` objects or not. If `True`, the API must \
         be used read-only.
         """
         API.__init__(self, repos=repos)
-        self.repos = self.repos.resolve()
-        self.tree = self.repos / 'languoids' / 'tree'
+        #: Absolute path to the copy of the data repository:
+        self.repos: pathlib.Path = pathlib.Path.cwd() / self.repos
+        #: Absolute path to the `tree` directory in the repos.
+        self.tree: pathlib.Path = self.repos / 'languoids' / 'tree'
         if not self.tree.exists():
             raise ValueError('repos dir %s missing tree dir: %s' % (self.repos, self.tree))
         if not self.repos.joinpath('references').exists():
             raise ValueError('repos dir %s missing references subdir' % (self.repos,))
-        for name, cls in self.__config__.items():
-            fname = self.repos / 'config' / (name + '.ini')
-            setattr(self, name, config.Config.from_ini(fname, object_class=cls))
         self.cache = Cache() if cache else None
 
     def __str__(self):
         return '<Glottolog repos {0} at {1}>'.format(git_describe(self.repos), self.repos)
 
-    def describe(self):
+    def describe(self) -> str:
         return git_describe(self.repos)
 
-    def build_path(self, *comps):
+    def references_path(self, *comps: str):
+        """
+        Path within the `references` directory of the repos.
+        """
+        return self.repos.joinpath('references', *comps)
+
+    def languoids_path(self, *comps):
+        """
+        Path within the `languoids` directory of the repos.
+        """
+        return self.repos.joinpath('languoids', *comps)
+
+    def build_path(self, *comps: str) -> pathlib.Path:
         build_dir = self.repos.joinpath('build')
         if not build_dir.exists():
             build_dir.mkdir()  # pragma: no cover
@@ -100,39 +106,110 @@ class Glottolog(API):
             d.mkdir()
         yield d
 
-    def references_path(self, *comps):
-        return self.repos.joinpath('references', *comps)
-
-    def languoids_path(self, *comps):
-        return self.repos.joinpath('languoids', *comps)
+    def _cfg(self, name, cls=None):
+        return config.Config.from_ini(
+            self.path('config', name + '.ini'), object_class=cls or config.Generic)
 
     @lazyproperty
-    def iso(self):
+    def aes_status(self) -> typing.Dict[str, config.AES]:
         """
-        :return: `clldutils.iso_639_3.ISO` instance, fed with the data of the latest
-        ISO code table zip found in the build directory.
+        :rtype: mapping with :class:`config.AES` values.
+        """
+        return self._cfg('aes_status', cls=config.AES)
+
+    @lazyproperty
+    def aes_sources(self) -> typing.Dict[str, config.AESSource]:
+        """
+        :rtype: mapping with :class:`config.AESSource` values
+        """
+        return self._cfg('aes_sources', cls=config.AESSource)
+
+    @lazyproperty
+    def document_types(self) -> typing.Dict[str, config.DocumentType]:
+        """
+        :rtype: mapping with :class:`config.DocumentType` values
+        """
+        return self._cfg('document_types', cls=config.DocumentType)
+
+    @lazyproperty
+    def med_types(self) -> typing.Dict[str, config.MEDType]:
+        """
+        :rtype: mapping with :class:`config.MEDType` values
+        """
+        return self._cfg('med_types', cls=config.MEDType)
+
+    @lazyproperty
+    def macroareas(self) -> typing.Dict[str, config.Macroarea]:
+        """
+        :rtype: mapping with :class:`config.Macroarea` values
+        """
+        return self._cfg('macroareas', cls=config.Macroarea)
+
+    @lazyproperty
+    def language_types(self) -> typing.Dict[str, config.LanguageType]:
+        """
+        :rtype: mapping with :class:`config.LanguageType` values
+        """
+        return self._cfg('language_types', cls=config.LanguageType)
+
+    @lazyproperty
+    def languoid_levels(self) -> typing.Dict[str, config.LanguoidLevel]:
+        """
+        :rtype: mapping with :class:`config.LanguoidLevel` values
+        """
+        return self._cfg('languoid_levels', cls=config.LanguoidLevel)
+
+    @lazyproperty
+    def editors(self) -> typing.Dict[str, config.Generic]:
+        """
+        Metadata about editors of Glottolog
+
+        :rtype: mapping with :class:`config.Generic` values
+        """
+        return self._cfg('editors')
+
+    @lazyproperty
+    def publication(self) -> typing.Dict[str, config.Generic]:
+        """
+        Metadata about the Glottolog publication
+
+        :rtype: mapping with :class:`config.Generic` values
+        """
+        return self._cfg('publication')
+
+    @lazyproperty
+    def iso(self) -> clldutils.iso_639_3.ISO:
+        """
+        :return: `clldutils.iso_639_3.ISO` instance, fed with the data of the latest \
+        ISO code table zip found in the `build` directory.
         """
         return util.get_iso(self.build_path())
 
     @property
-    def glottocodes(self):
-        return models.Glottocodes(self.languoids_path('glottocodes.json'))
-
-    @property
-    def ftsindex(self):
+    def ftsindex(self) -> pathlib.Path:
+        """
+        Directory within `build` where the FullTextSearch index is created.
+        """
         return self.build_path('whoosh')
 
     @lazyproperty
     def _tree_dirs(self):
         return list(walk(self.tree, mode='dirs'))
 
-    def languoid(self, id_) -> languoids.Languoid:
+    @property
+    def glottocodes(self) -> models.Glottocodes:
         """
-        Retrieve a languoid.
+        Registry of Glottocodes.
+        """
+        return models.Glottocodes(self.languoids_path('glottocodes.json'))
+
+    def languoid(self, id_: typing.Union[str, lls.Languoid]) -> lls.Languoid:
+        """
+        Retrieve a languoid specified by language code.
 
         :param id_: Glottocode or ISO code.
         """
-        if isinstance(id_, languoids.Languoid):
+        if isinstance(id_, lls.Languoid):
             return id_
 
         if self.cache and id_ in self.cache:
@@ -143,7 +220,7 @@ class Glottolog(API):
                 if self.cache:
                     l_ = self.cache.add(d, self)
                 else:
-                    l_ = languoids.Languoid.from_dir(d, _api=self)
+                    l_ = lls.Languoid.from_dir(d, _api=self)
                 if l_.iso_code == id_:
                     return l_
         else:
@@ -155,14 +232,22 @@ class Glottolog(API):
                 if d.name == id_:
                     if self.cache:
                         return l_
-                    return languoids.Languoid.from_dir(d, _api=self)
+                    return lls.Languoid.from_dir(d, _api=self)
 
-    def languoids(self, ids=None, maxlevel=None, exclude_pseudo_families=False) \
-            -> typing.Generator[languoids.Languoid, None, None]:
+    def languoids(
+            self,
+            ids: set = None,
+            maxlevel: typing.Union[int, config.LanguoidLevel, str] = None,
+            exclude_pseudo_families: bool = False
+    ) -> typing.Generator[lls.Languoid, None, None]:
         """
-        :param ids: `set` of Glottocodes to limit the result to.
+        Yields languoid objects.
+
+        :param ids: `set` of Glottocodes to limit the result to. This is useful to increase \
+        performance, since INI file reading can be skipped for languoids not listed.
         :param maxlevel: Numeric maximal nesting depth of languoids, or Languoid.level.
-        :return: Generator object, to iterate over languoids.
+        :param exclude_pseudo_families: Flag signaling whether to exclude pseud families, \
+        i.e. languoids from non-genealogical trees.
         """
         is_max_level_int = isinstance(maxlevel, int)
         # Non-numeric levels are interpreted as `Languoid.level` descriptors.
@@ -177,13 +262,13 @@ class Glottolog(API):
                 if self.cache:
                     lang = self.cache.add(d, self)
                 else:
-                    lang = languoids.Languoid.from_dir(d, nodes=nodes, _api=self)
+                    lang = lls.Languoid.from_dir(d, nodes=nodes, _api=self)
                 if (is_max_level_int and len(lang.lineage) <= maxlevel) \
                         or ((not is_max_level_int) and lang.level <= maxlevel):
                     if (not exclude_pseudo_families) or not lang.category.startswith('Pseudo'):
                         yield lang
 
-    def languoids_by_code(self, nodes=None) -> dict:
+    def languoids_by_code(self, nodes=None) -> typing.Dict[str, lls.Languoid]:
         """
         Returns a `dict` mapping the three major language code schemes
         (Glottocode, ISO code, and Harald's NOCODE_s) to Languoid objects.
@@ -197,7 +282,7 @@ class Glottolog(API):
                 res[lang.iso] = lang
         return res
 
-    def ascii_tree(self, start, maxlevel=None):
+    def ascii_tree(self, start: typing.Union[str, lls.Languoid], maxlevel=None):
         """
         Prints an ASCII representation of the languoid tree starting at `start` to `stdout`.
         """
@@ -209,8 +294,21 @@ class Glottolog(API):
             '',
             self.languoid_levels)
 
-    def newick_tree(self, start=None, template=None, nodes=None, maxlevel=None):
-        template = template or languoids.Languoid._newick_default_template
+    def newick_tree(
+            self,
+            start: typing.Union[None, str, lls.Languoid] = None,
+            template: str = None,
+            nodes=None,
+            maxlevel: typing.Union[int, config.LanguoidLevel] = None
+    ) -> str:
+        """
+        Returns the Newick representation of a (set of) Glottolog classification tree(s).
+
+        :param start: Root languoid of the tree (or `None` to return the complete classification).
+        :param template: Python format string accepting the `Languoid` instance as single \
+        variable named `l`, used to format node labels.
+        """
+        template = template or lls.Languoid._newick_default_template
         if start:
             return self.languoid(start).newick_node(
                 template=template, nodes=nodes, maxlevel=maxlevel, level=1).newick + ';'
@@ -223,22 +321,34 @@ class Glottolog(API):
                     nodes=nodes, template=template, maxlevel=maxlevel, level=1).newick
                 if lang.level == self.languoid_levels.language:
                     # An isolate: we wrap it in a pseudo-family with the same name and ID.
-                    fam = languoids.Languoid.from_name_id_level(
+                    fam = lls.Languoid.from_name_id_level(
                         lang.dir.parent, lang.name, lang.id, 'family', _api=self)
                     ns = '({0}){1}:1'.format(ns, template.format(l=fam))  # noqa: E741
                 trees.append('{0};'.format(ns))
         return '\n'.join(trees)
 
     @lazyproperty
-    def bibfiles(self):
+    def bibfiles(self) -> references.BibFiles:
+        """
+        Access reference data by BibFile.
+
+        :rtype: :class:`references.BibFiles`
+        """
         return references.BibFiles.from_path(self.references_path(), api=self)
 
-    def refs_by_languoid(self, nodes=None):
+    def refs_by_languoid(self, *bibfiles, **kw):
+        nodes = kw.get('nodes')
+        if bibfiles:
+            bibfiles = [
+                bib if isinstance(bib, references.BibFile) else self.bibfiles[bib]
+                for bib in bibfiles]
+        else:
+            bibfiles = self.bibfiles
         all_ = {}
         languoids_by_code = self.languoids_by_code(
             nodes or {lang.id: lang for lang in self.languoids()})
         res = collections.defaultdict(list)
-        for bib in tqdm(self.bibfiles):
+        for bib in tqdm(bibfiles):
             for entry in bib.iterentries():
                 all_[entry.id] = entry
                 for lang in entry.languoids(languoids_by_code)[0]:
@@ -247,6 +357,8 @@ class Glottolog(API):
 
     @lazyproperty
     def hhtypes(self):
+        # Note: The file `hhtype.ini` does not exist anymore. This is fixed in HHTypes, when
+        # calling `config.get_ini`. Only used when compiling monster.bib.
         return references.HHTypes(self.references_path('hhtype.ini'))
 
     @lazyproperty

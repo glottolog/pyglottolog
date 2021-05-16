@@ -26,7 +26,9 @@ def test_cache(caching_api, api):
     lang = caching_api.languoid('abcd1234')
     assert lang is caching_api.languoid('abcd1234')
     assert caching_api.languoid('aaa') is lang
-    assert caching_api.languoid('abc').id == 'abcd1235'
+    l2 = caching_api.languoid('abc')
+    assert l2.id == 'abcd1235'
+    assert l2.ancestors
 
 
 def test_cache_languoids(caching_api):
