@@ -4,6 +4,7 @@ Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 
 [![Build Status](https://github.com/glottolog/pyglottolog/workflows/tests/badge.svg)](https://github.com/glottolog/pyglottolog/actions?query=workflow%3Atests)
 [![codecov](https://codecov.io/gh/glottolog/pyglottolog/branch/master/graph/badge.svg)](https://codecov.io/gh/glottolog/pyglottolog)
+[![Documentation Status](https://readthedocs.org/projects/pyglottolog/badge/?version=latest)](https://pyglottolog.readthedocs.io/en/latest/?badge=latest)
 [![PyPI](https://img.shields.io/pypi/v/pyglottolog.svg)](https://pypi.org/project/pyglottolog)
 
 
@@ -41,84 +42,7 @@ All functionality is mediated through an instance of `pyglottolog.Glottolog`, e.
 <Glottolog repos v0.2-259-g27ac0ef at /.../glottolog>
 ```
 
-### Accessing languoid data
-
-The data in languoid info files in the `languoids/tree` subdirectory is mainly accessed through
-two methods:
-
-```python
->>> glottolog.languoid('stan1295')
-<Language stan1295>
->>> print(glottolog.languoid('stan1295'))
-German [stan1295]
-```
-
-### Accessing reference data
-```python
->>> print(api.bibfiles['hh:s:Karang:Tati-Harzani'])
-@book{s:Karang:Tati-Harzani,
-    author = {'Abd-al-'Ali Kārang},
-    title = {Tāti va Harzani},
-    publisher = {Tabriz: Tabriz University Press},
-    address = {Tabriz},
-    pages = {6+160},
-    year = {1334 [1953]},
-    glottolog_ref_id = {41999},
-    hhtype = {grammar_sketch},
-    inlg = {Farsi [pes]},
-    lgcode = {Harzani [hrz]},
-    macro_area = {Eurasia}
-}
-```
-
-### Performance considerations
-
-Reading the data for Glottolog's almost 25,000 languoids from the same number of files in individual
-directories isn't particularly quick. So on average computers running
-```python
->>> list(glottolog.languoids())
-```
-would take around 15 seconds.
-
-Due to this, care should be taken not to read languoid data from disk repeatedly. In particular
-"N+1"-type problems should be avoided, where one would read all languoid into memory and then look
-up attributes on each languoid, thereby triggering new reads from disk. This may easily happen,
-since attributes such as `Languoid.family` are implemented as
-[properties](https://docs.python.org/3/howto/descriptor.html#properties), which traverse the
-directory tree and read information from disk at **access** time.
-
-To make it possible to avoid such problems, many of these properties can be substituted with a call
-to a similar method of `Languoid`, which accepts a "node map" (i.e. a `dict` mapping `Languoid.id` 
-to `Languoid` objects) as parameter, e.g. `Languoid.ancestors_from_nodemap` or
-`Languoid.descendants_from_nodemap`. Typical usage would look as follows:
-```python
->>> languoids = {l.id: l for l in glottolog.languoids()}
->>> for l in languoids.values():
-...    if not l.ancestors_from_nodemap(languoids):
-...        print('top-level {0}: {1}'.format(l.level, l.name))
-```
-
-
-### Accessing configuration data
-
-The `config` subdirectory of Glottolog data contains machine readable metadata like the list
-of macroareas. This information can be accessed via an instance of `Glottolog`, too, using the
-stem of the filename as attribute name:
-```python
->>> for ma in glottolog.macroareas.values():
-...     print(ma.name)
-...     
-South America
-Eurasia
-Africa
-Papunesia
-North America
-Australia
-```
-
-Note that the data read from the INI files is stored as `dict`, with section names (or explicit
-`id` options) as keys and instances of the corresponding class in `pyglottolog.config` as
-values.
+For details, refer to the [API documentation at readthedocs](https://pyglottolog.readthedocs.io/en/latest/index.html).
 
 
 ## Command line interface
@@ -170,7 +94,8 @@ Glottolog data is often integrated with other data or incorporated as reference
 data in tools, e.g. as [LanguageTable](https://github.com/cldf/cldf/tree/master/components/languages)
 in a [CLDF](https://cldf.clld.org) dataset.
 
-To make this easier, `pyglottolog` provides the `languoids` subcommand, which
+To do this, the LanguageTable from [glottolog/glottolog-cldf](https://github.com/glottolog/glottolog-cldf)
+could be copied, or one may use `glottolog`'s `languoids` subcommand, which
 dumps basic languoid data into a CSVW file with accompanying metadata:
 
 ```shell script
@@ -195,10 +120,11 @@ so, run
 glottolog searchindex
 ```
 
-This will take a couple of minutes and build an indeces of about 750 MB size at `build/`.
+This will take a couple of minutes (~15 on a somewhat beefy laptop with SSD) and build an index of 
+about 800 MB size at `build/`.
 
 Now you can search the index, e.g. using alternative names as query:
-```shell script
+```shell
 $ glottolog langsearch "Abipónok"
 1 matches
 Abipon [abip1241] language
@@ -208,16 +134,18 @@ Abipónok [hu]
 1 matches
 ```
 
-But you can also exploit the schema defined in [pyglottolog.fts.get_langs_index](src/pyglottolog/fts.py):
-```shell script
-$ glottolog langsearch "country:Papua New Guinea"
+But you can also exploit the schema defined in 
+[pyglottolog.fts.get_langs_index](https://github.com/glottolog/pyglottolog/blob/c382b849b5245acba78d8022aadd4de83e73e909/src/pyglottolog/fts.py#L41-L52);
+i.e. use fields in [your query](https://whoosh.readthedocs.io/en/latest/querylang.html):
+```shell
+$ glottolog langsearch "country:PG"
 ...
 
 Alamblak [alam1246] language
 languoids/tree/sepi1257/sepi1258/east2496/alam1246/md.ini
 Papua New Guinea (PG)
 
-900 matches
+906 matches
 
 $ glottolog --repos=. langsearch "iso:mal"
 ...
@@ -236,8 +164,9 @@ The same can be done for reference data: To create a Whoosh index with all refer
 glottolog searchindex
 ```
 
-Now you can query the index:
-```shell script
+Now you can query the index (using the fields described in
+[the schema](https://github.com/glottolog/pyglottolog/blob/c382b849b5245acba78d8022aadd4de83e73e909/src/pyglottolog/fts.py#L118-L128)):
+```shell
 $ glottolog refsearch "author:Haspelmath AND title:Atlas"
 ...
 (13 matches)

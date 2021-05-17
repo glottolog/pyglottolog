@@ -3,8 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to pyglottolog's documentation!
-=======================================
+`pyglottolog` Python API
+========================
+
+Links
+~~~~~
+
+- `pyglottolog` on PyPI: `<https://pypi.org/project/pyglottolog>`_
+- `pyglottolog` on GitHub: `<https://github.com/glottolog/pyglottolog>`_
+- Issue tracker: `<https://github.com/glottolog/pyglottolog/issues>`_
 
 .. toctree::
    :maxdepth: 2

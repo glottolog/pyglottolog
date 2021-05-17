@@ -43,6 +43,8 @@ def test_refs_by_languoid(api):
     res = api.refs_by_languoid()
     assert len(res[0]) == 2
     assert len(res[1]) == 7
+    res = api.refs_by_languoid('a')
+    assert len(res[0]) == 1
 
 
 def test_editors(api):

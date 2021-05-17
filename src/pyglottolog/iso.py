@@ -120,7 +120,8 @@ class ChangeRequest(object):
                 i = 0
                 tables = list(_iter_tables(
                     read_url(path.format(year, page), cache_dir=cache_dir, log=log)))
-                if not tables:
+                if not tables:  # pragma: no cover
+                    # For one year, the table seems to have exactly 100 rows.
                     print('no crs for {}, page {}'.format(year, page))
                 else:
                     for i, cr in enumerate(tables[0]):

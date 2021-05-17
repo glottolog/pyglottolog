@@ -12,9 +12,17 @@ Releasing pyglottolog
   flake8 src
   ```
 
+- Make sure API docs can be built:
+  ```shell
+  cd docs
+  make clean html
+  cd ..
+  ```
+
 - Update the version number, by removing the trailing `.dev0` in:
   - `setup.py`
   - `src/pyglottolog/__init__.py`
+  - `docs.conf.py`
 
 - Create the release commit:
   ```shell
@@ -46,6 +54,7 @@ Releasing pyglottolog
 - Increment version number and append `.dev0` to the version number for the new development cycle:
   - `src/pyglottolog/__init__.py`
   - `setup.py`
+  - `docs/conf.py`
 
 - Commit/push the version change:
   ```shell
