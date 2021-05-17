@@ -4,4 +4,4 @@ from .api import Glottolog
 
 __all__ = ['Glottolog']
 
-__version__ = '3.5.1.dev0'
+__version__ = '3.6.0'
