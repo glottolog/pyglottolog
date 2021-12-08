@@ -6,7 +6,7 @@ __all__ = ['nullcontext',
            'removesuffix']
 
 
-if sys.version_info < (3, 7):
+if sys.version_info < (3, 7):  # pragma: no cover
     import contextlib
 
     @contextlib.contextmanager
@@ -24,12 +24,9 @@ if sys.version_info < (3, 9):
         >>> removesuffix('spam.bib', '.bib')
         'spam'
         """
-        if suffix and s.endswith(suffix):
-            return s[:-len(suffix)]
-        else:
-            return s
+        return s[:-len(suffix)] if suffix and s.endswith(suffix) else s
 
-else:
+else:  # pragma: no cover
     def removesuffix(s: str, suffix: str) -> str:
         """See https://www.python.org/dev/peps/pep-0616/
 

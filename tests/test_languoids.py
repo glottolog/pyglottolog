@@ -18,6 +18,7 @@ def test_Link():
     assert Link.from_(dict(url='xyz')).label is None
     assert Link.from_('[label](url)').url == 'url'
     assert 'url' in Link.from_('[label](url)').__json__()
+    assert Link.from_string('abc').to_string() == 'abc'
 
     with pytest.raises(TypeError):
         Link.from_(5)

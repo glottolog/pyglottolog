@@ -57,8 +57,7 @@ class BibFiles(list):
     @classmethod
     def from_path(cls, path: typing.Union[str, pathlib.Path], api=None) -> 'BibFiles':
         """BibTeX files from `<path>/bibtex/*.bib` if listed in `<path>/BIBFILES.ini`."""
-        if not isinstance(path, pathlib.Path):
-            path = pathlib.Path(path)
+        path = pathlib.Path(path)
         ini = INI.from_file(path / 'BIBFILES.ini', interpolation=None)
         return cls(cls._iterbibfiles(ini, path / 'bibtex', api=api))
 

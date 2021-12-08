@@ -34,7 +34,7 @@ SELECT ?item ?glottocode ?wikipedia WHERE {
 
 
 class Wikidata(LinkProvider):
-    def iterupdated(self, languoids):
+    def iterupdated(self, languoids):  # pragma: no cover
         res = requests.post(
             'https://query.wikidata.org/sparql',
             data=dict(query=SPARQL),
