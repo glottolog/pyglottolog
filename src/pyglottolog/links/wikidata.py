@@ -1,5 +1,20 @@
 """
 Query wikidata's SPARQL endpoint for info about Glottolog languoids identified by Glottocode.
+
+Run
+
+prefix schema: <http://schema.org/>
+SELECT ?item ?glottocode ?wikipedia WHERE {
+    ?item wdt:P1394 ?glottocode.
+    OPTIONAL {
+        ?wikipedia schema:about ?item .
+        ?wikipedia schema:inLanguage "en" .
+        FILTER (SUBSTR(str(?wikipedia), 1, 25) = "https://en.wikipedia.org/")
+    }
+}
+
+at https://query.wikidata.org/ and download the results to
+build/glottocode2wikidata.csv
 """
 from csvw.dsv import reader
 import requests
@@ -25,7 +40,11 @@ class Wikidata(LinkProvider):
             data=dict(query=SPARQL),
             headers=dict(Accept='text/csv')
         )
-        res = {d['glottocode']: d for d in reader(res.text.split('\n'), dicts=True)}
+        res = {}
+        if self.repos:
+            res = {d['glottocode']: d for d in reader(
+                self.repos.path('build', 'glottocode2wikidata.csv'), dicts=True)}
+        assert res
         for lang in languoids:
             urls = {
                 'www.wikidata.org': [

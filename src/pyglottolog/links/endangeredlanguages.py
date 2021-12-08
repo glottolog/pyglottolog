@@ -13,7 +13,7 @@ from .util import LinkProvider
 from ..languoids import Country
 
 
-BASE_URL = "http://endangeredlanguages.com"
+BASE_URL = "https://endangeredlanguages.com"
 DOMAIN = "endangeredlanguages.com"
 CFG_ID_NAME = "endangeredlanguages"
 LINK_TYPE = "elcat"
@@ -74,15 +74,33 @@ def split(s, sep=';'):
     return nfilter(ss.strip() for ss in s.split(sep))
 
 
+def lat(s):
+    if s.endswith('S'):
+        s = '-' + s[:-1]
+    return s
+
+
+def lon(s):
+    if s.endswith('W'):
+        s = '-' + s[:-1]
+    return s
+
+
 def parse_coords(s):
     cc = nfilter(ss.strip().replace(' ', '') for ss in re.split('[,;]', s))
-    return [Coordinate(cc[i], cc[i + 1]) for i in range(0, len(cc), 2)]
+    res = []
+    for i in range(0, len(cc), 2):
+        try:
+            res.append(Coordinate(cc[i], cc[i + 1]))
+        except ValueError:
+            continue
+    return res
 
 
 @attr.s
 class Coordinate(object):
-    latitude = attr.ib(converter=lambda s: float(s.strip()), validator=valid_range(-90, 90))
-    longitude = attr.ib(converter=lambda s: float(s.strip()), validator=valid_range(-180, 180))
+    latitude = attr.ib(converter=lambda s: float(lat(s.strip())), validator=valid_range(-90, 90))
+    longitude = attr.ib(converter=lambda s: float(lon(s.strip())), validator=valid_range(-180, 180))
 
 
 @attr.s

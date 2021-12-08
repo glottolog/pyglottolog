@@ -57,6 +57,9 @@ class LinkProvider(object):
     __url_template__ = None
     __label_template__ = None
 
+    def __init__(self, repos=None):
+        self.repos = repos
+
     def iterupdated(self, languoids):  # pragma: no cover
         if self.__domain__ and self.__cldf_dataset_url__ and self.__url_template__:
             # FIXME: Ideally, we'd want the CLDF data to specify full URLs for languages via a
@@ -79,7 +82,7 @@ class LinkProvider(object):
 class PHOIBLE(LinkProvider):  # pragma: no cover
     __domain__ = 'phoible.org'
 
-    def __init__(self):
+    def __init__(self, *args, **kw):
         r = requests.get('https://doi.org/10.5281/zenodo.2562766')
         record_id = r.url.split("/")[-1]
         r = requests.get('https://zenodo.org/api/records/%s' % record_id)
@@ -96,7 +99,7 @@ class PHOIBLE(LinkProvider):  # pragma: no cover
 
 class APICS(LinkProvider):  # pragma: no cover
     __domain__ = "apics-online.info"
-    __cldf_dataset_url__ = "https://cdstar.shh.mpg.de/bitstreams/" \
+    __cldf_dataset_url__ = "https://cdstar.eva.mpg.de/bitstreams/" \
                            "EAEA0-61A2-213C-A9D8-0/apics_dataset.cldf.zip"
     __url_template__ = 'https://' + __domain__ + \
                        '/contributions/{0[http://cldf.clld.org/v1.0/terms.rdf#id]}'
@@ -105,7 +108,7 @@ class APICS(LinkProvider):  # pragma: no cover
 
 class WALS(LinkProvider):  # pragma: no cover
     __domain__ = "wals.info"
-    __cldf_dataset_url__ = "https://cdstar.shh.mpg.de/bitstreams/" \
+    __cldf_dataset_url__ = "https://cdstar.eva.mpg.de/bitstreams/" \
                            "EAEA0-7269-77E5-3E10-0/wals_dataset.cldf.zip"
     __url_template__ = 'https://' + __domain__ + \
                        '/languoid/lect/wals_code_{0[http://cldf.clld.org/v1.0/terms.rdf#id]}'

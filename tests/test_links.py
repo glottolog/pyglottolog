@@ -1,3 +1,5 @@
+import pytest
+
 from pyglottolog.links import endangeredlanguages, wikidata
 
 
@@ -30,12 +32,6 @@ def test_el_altnames():
 
 
 def test_wikidata(mocker, api_copy):
-    class wd(object):
-        def post(self, *args, **kw):
-            return mocker.Mock(text='glottocode,item,wikipedia\nabcd1235,http://example.org,xyz')
-
     langs = {l.id: l for l in api_copy.languoids()}
-    mocker.patch('pyglottolog.links.wikidata.requests', wd())
-    assert list(wikidata.Wikidata().iterupdated(langs.values()))
-    assert 'https://example.org' in [l.url for l in langs['abcd1235'].links]
-    assert not list(wikidata.Wikidata().iterupdated(langs.values()))
+    with pytest.raises(AssertionError):
+        _ = list(wikidata.Wikidata().iterupdated(langs.values()))

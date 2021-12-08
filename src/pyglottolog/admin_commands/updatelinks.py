@@ -22,7 +22,7 @@ def run(args):
         if (not getattr(args, 'provider', None)) or (name in args.provider):
             args.log.info('updating {0} links ...'.format(name))
             i = 0
-            for i, l in enumerate(cls().iterupdated(langs), start=1):
+            for i, l in enumerate(cls(args.repos).iterupdated(langs), start=1):
                 l.write_info()
                 updated.add(l.id)
             args.log.info('... {0} done'.format(i))

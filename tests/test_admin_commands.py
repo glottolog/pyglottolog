@@ -1,9 +1,8 @@
 import shlex
+import shutil
 import logging
 
 import pytest
-
-from clldutils.path import copytree
 
 from pyglottolog.__main__ import admin_main
 
@@ -78,7 +77,7 @@ def test_check(capsys, _main, mocker, api_copy):
     assert any('missing reference' in m for m in msgs)
     assert len(msgs) == 27
 
-    copytree(
+    shutil.copytree(
         api_copy.tree / 'abcd1234' / 'abcd1235',
         api_copy.tree / 'abcd1235')
 
