@@ -311,6 +311,11 @@ class Languoid(object):
                 # we ignore leading non-languoid-dir path components.
                 break
 
+    def iter_descendants(self):
+        for child in self.children:
+            yield child
+            yield from child.iter_descendants()
+
     @property
     def ancestors(self) -> typing.List['Languoid']:
         """

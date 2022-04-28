@@ -275,3 +275,9 @@ def test_attrs(api):
         l.id = 'x'
     assert l.id == l.glottocode
     assert l.hid == 'NOCODE'
+
+
+def test_iter_descendants(api):
+    children = [l.id for l in api.languoid('abcd1234').iter_descendants()]
+    assert children == ['abcd1235', 'abcd1236']
+    
