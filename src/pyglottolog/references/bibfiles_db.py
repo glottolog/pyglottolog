@@ -90,7 +90,7 @@ class Connectable:
         """Connect to engine, execute ``statement``, return ``CursorResult``, close."""
         with self.connect() as conn:
             result = conn.execute(statement)
-            manager = contextlib.closing if closing else _compat.nullcontext
+            manager = contextlib.closing if closing else contextlib.nullcontext
             with manager(result) as result:
                 yield result
 

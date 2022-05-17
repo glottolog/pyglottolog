@@ -2,6 +2,8 @@
 
 # TODO: make check fail on non-whitespace between entries (bibtex 'comments')
 
+import typing
+import pathlib
 import functools
 import collections
 import unicodedata
@@ -25,30 +27,29 @@ def load(filename, preserve_order=False, encoding=None):
     return cls(iterentries(filename, encoding))
 
 
-def identity(x):
+def identity(x):  # pragma: no cover
     return x
 
 
 def iterentries_from_text(text, encoding='utf-8'):
-    py2_decode = identity
     if hasattr(text, 'read'):
         text = text.read(-1)
     if not isinstance(text, str):
         text = text.decode(encoding)
     for entrytype, (bibkey, fields) in LowLevelParser(text):
         fields = {
-            py2_decode(name).lower():
-                whitespace_re.sub(' ', py2_decode(''.join(values)).strip())
+            name.lower(): whitespace_re.sub(' ', ''.join(values)).strip()
             for name, values in fields}
-        yield py2_decode(bibkey), (py2_decode(entrytype), fields)
+        yield bibkey, (entrytype, fields)
 
 
-def iterentries(filename, encoding=None):
+def iterentries(filename: typing.Union[str, pathlib.Path], encoding=None)\
+        -> typing.Generator[typing.Tuple[str, typing.Tuple[str, dict]], None, None]:
     encoding = encoding or 'utf8'
     with memorymapped(str(filename)) as source:
         try:
-            for entrytype, (bibkey, fields) in iterentries_from_text(source, encoding):
-                yield entrytype, (bibkey, fields)
+            for bibkey, (entrytype, fields) in iterentries_from_text(source, encoding):
+                yield bibkey, (entrytype, fields)
         except PybtexSyntaxError as e:  # pragma: no cover
             debug_pybtex(source, e)
 

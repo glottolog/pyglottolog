@@ -2,19 +2,7 @@
 
 import sys
 
-__all__ = ['nullcontext',
-           'removesuffix']
-
-
-if sys.version_info < (3, 7):  # pragma: no cover
-    import contextlib
-
-    @contextlib.contextmanager
-    def nullcontext(enter_result=None):
-        yield enter_result
-
-else:
-    from contextlib import nullcontext
+__all__ = ['removesuffix']
 
 
 if sys.version_info < (3, 9):
