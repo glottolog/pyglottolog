@@ -1,5 +1,4 @@
 """
-
 """
 from clldutils.clilib import PathType
 
