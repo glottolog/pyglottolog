@@ -46,6 +46,7 @@ setup(
         'requests',
         'nameparser',
         'linglit>=0.3',
+        'cldfzenodo',
     ],
     extras_require={
         'dev': ['tox>=3.14', 'flake8', 'pep8-naming', 'wheel', 'twine'],
