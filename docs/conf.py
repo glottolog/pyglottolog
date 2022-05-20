@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'pyglottolog'
-copyright = '2021, Robert Forkel'
+copyright = '2022, Robert Forkel'
 author = 'Robert Forkel'
 
 # The full version, including alpha/beta/rc tags
-release = '3.7.1.dev0'
+release = '3.8.0'
 
 
 # -- General configuration ---------------------------------------------------
