@@ -22,12 +22,13 @@ def iter_id_iso():  # pragma: no cover
             yield (row[1].strip(), row[2].strip())
 
 
-class CRUBADAN(LinkProvider):
-    def iterupdated(self, languoids):  # pragma: no cover
-        lmap = collections.defaultdict(list)
-        for lid, iso in iter_id_iso():
-            lmap[iso].append(lid)
-        for lang in languoids:
-            links = ["http://crubadan.org/languages/" + c for c in lmap.get(lang.iso, [])]
-            if lang.update_links('crubadan.org', links):
-                yield lang
+# crubadan.org seems to no longer be operational
+#class CRUBADAN(LinkProvider):
+#    def iterupdated(self, languoids):  # pragma: no cover
+#        lmap = collections.defaultdict(list)
+#        for lid, iso in iter_id_iso():
+#            lmap[iso].append(lid)
+#        for lang in languoids:
+#            links = ["http://crubadan.org/languages/" + c for c in lmap.get(lang.iso, [])]
+#            if lang.update_links('crubadan.org', links):
+#                yield lang

@@ -19,13 +19,13 @@ URL = 'http://chirila.yale.edu/languages'
 
 class AIATSIS(LinkProvider):
     def iterupdated(self, languoids):  # pragma: no cover
+        return
         res = reader(
             io.StringIO(requests.get(MD_URL).content.decode('utf-8-sig')),
             dialect=Dialect(skipBlankRows=True, commentPrefix='<'),
             dicts=True)
-        md = {d['language_code']: d for d in res}
+        md = {d['language_code']: d for d in res if 'language_code' in d}
         lmap = collections.defaultdict(set)
-        return
         for line in requests.get(URL).text.splitlines():
             if line.startswith('var curItem'):
                 line = line.split('=', maxsplit=1)[1]
