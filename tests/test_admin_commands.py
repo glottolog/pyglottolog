@@ -75,7 +75,7 @@ def test_check(capsys, _main, mocker, api_copy):
     msgs = [a[0] for a, _ in log.error.call_args_list]
     assert any('unregistered glottocode' in m for m in msgs)
     assert any('missing reference' in m for m in msgs)
-    assert len(msgs) == 27
+    assert len(msgs) == 28
 
     shutil.copytree(
         api_copy.tree / 'abcd1234' / 'abcd1235',
@@ -85,9 +85,9 @@ def test_check(capsys, _main, mocker, api_copy):
     _main('check --tree-only', log=log)
     msgs = [a[0] for a, _ in log.error.call_args_list]
     assert any('duplicate glottocode' in m for m in msgs)
-    assert len(msgs) == 29
+    assert len(msgs) == 30
 
-    (api_copy.tree / 'abcd1235').rename(api_copy.tree / 'abcd1237')
+    (api_copy.tree / 'abcd1235').rename(api_copy.tree / 'abcd1238')
     log = mocker.Mock()
     _main('check --tree-only', log=log)
     msgs = [a[0] for a, _ in log.error.call_args_list]

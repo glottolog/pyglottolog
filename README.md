@@ -10,7 +10,7 @@ Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 
 ## Install
 
-To install `pyglottolog` you need a python installation on your system, running python >3.6. Run
+To install `pyglottolog` you need a python installation on your system, running python >3.7. Run
 ```shell script
 pip install pyglottolog
 ```

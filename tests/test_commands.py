@@ -102,7 +102,9 @@ def test_tree(capsys, _main):
     assert 'language' in capsys.readouterr()[0]
     _main('tree abcd1234 --newick --maxlevel language')
     out, _ = capsys.readouterr()
-    assert out.splitlines()[-1] == "('language [abcd1235][abc]-l-':1)'family [abcd1234][aaa]':1;"
+    assert out.splitlines()[-1] == \
+           "('language [abcd1235][abc]-l-':1," \
+           "'language2 [abcd1237]-l-':1)'family [abcd1234][aaa]':1;"
 
 
 def test_languoids(capsys, _main, tmp_path):

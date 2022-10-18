@@ -156,7 +156,7 @@ class Languoid(object):
         return object.__format__(self, format_spec)
 
     def __hash__(self):
-        return id(self)
+        return hash(self.id)
 
     def __eq__(self, other):
         return self.id == other.id
@@ -614,6 +614,22 @@ class Languoid(object):
     @iso_code.setter
     def iso_code(self, value):
         self._set('iso639-3', value)
+
+    def closest_iso(self, api=None) -> typing.Union[str, None]:
+        """
+        ISO 639-3 code assigned to the languoid or one of its ancestors in the classification
+        (in case of dialects) or `None`.
+
+        .. seealso:: https://github.com/glottolog/glottolog-cldf/issues/13
+        """
+        api = api or self._api
+        assert api
+        if self.iso:
+            return self.iso
+        for _, gc, _ in reversed(self.lineage):
+            lg = api.languoid(gc)
+            if lg.iso:
+                return lg.iso
 
     @property
     def iso_retirement(self):

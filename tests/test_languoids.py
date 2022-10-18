@@ -265,6 +265,11 @@ def test_isolate(api):
     assert l.family is None
 
 
+def test_closest_iso(api):
+    assert api.languoid('abcd1235').closest_iso() == 'abc'
+    assert api.languoid('abcd1236').closest_iso() == 'abc'
+
+
 def test_attrs(api):
     l = Languoid.from_name_id_level(api.tree, 'name', 'abcd1235', 'language', hid='NOCODE')
     l.name = 'other'
@@ -279,5 +284,5 @@ def test_attrs(api):
 
 def test_iter_descendants(api):
     children = [l.id for l in api.languoid('abcd1234').iter_descendants()]
-    assert children == ['abcd1235', 'abcd1236']
+    assert children == ['abcd1235', 'abcd1236', 'abcd1237']
     
