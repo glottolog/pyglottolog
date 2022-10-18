@@ -20,7 +20,7 @@ Releasing pyglottolog
   ```
 
 - Update the version number, by removing the trailing `.dev0` in:
-  - `setup.py`
+  - `setup.cfg`
   - `src/pyglottolog/__init__.py`
   - `docs.conf.py`
 
@@ -38,7 +38,7 @@ Releasing pyglottolog
   ```shell
   python setup.py clean --all
   rm dist/*
-  python setup.py sdist bdist_wheel
+  python -m build -n
   twine upload dist/*
   ```
 
@@ -50,7 +50,7 @@ Releasing pyglottolog
 
 - Increment version number and append `.dev0` to the version number for the new development cycle:
   - `src/pyglottolog/__init__.py`
-  - `setup.py`
+  - `setup.cfg`
   - `docs/conf.py`
 
 - Commit/push the version change:
