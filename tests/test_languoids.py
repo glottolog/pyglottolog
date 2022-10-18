@@ -284,5 +284,5 @@ def test_attrs(api):
 
 def test_iter_descendants(api):
     children = [l.id for l in api.languoid('abcd1234').iter_descendants()]
-    assert children == ['abcd1235', 'abcd1236', 'abcd1237']
+    assert set(children) == {'abcd1235', 'abcd1236', 'abcd1237'}
     
