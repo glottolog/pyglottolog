@@ -244,7 +244,7 @@ def test_factory(tmpdir, api_copy):
     assert len(l.countries) == 2
 
     assert l.parent == f
-    assert f.children[0] == l
+    assert l in f.children
     assert l.children[0].family == f
     l.write_info(str(tmpdir))
     assert (tmpdir / 'abcd1235').exists()
