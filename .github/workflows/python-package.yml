@@ -36,9 +36,3 @@ jobs:
           echo ::endgroup::
       - name: Run tests with pytest
         run: pytest
-      - name: Convert coverage
-        run: "python -m coverage xml"
-      - name: Upload coverage to Codecov
-        uses: "codecov/codecov-action@v1"
-        with:
-          fail_ci_if_error: true
