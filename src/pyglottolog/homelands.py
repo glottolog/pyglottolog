@@ -164,9 +164,7 @@ def recursive_centroids(langs: typing.List[Languoid])\
             else:
                 nps = [nearest_points(c, homeland)[0] for c in continents.values()]
                 nps = [(p, geodist(geod, (p.y, p.x), (homeland.y, homeland.x))) for p in nps]
-                hl = sorted(nps, key=lambda n: n[1])[0][0]
-                print('changing: {} -> {}'.format(homeland, hl))
-                homeland = hl
+                homeland = sorted(nps, key=lambda n: n[1])[0][0]
             homelands[gc] = (homeland.y, homeland.x)
             del subgroups[(tlgc, gc)]
     return homelands
