@@ -524,7 +524,10 @@ class Languoid(object):
     @links.setter
     def links(self, value):
         assert isinstance(value, list)
-        self._set('links', [v.to_string() for v in sorted(Link.from_(v) for v in value)])
+        self._set(
+            'links',
+            [v.to_string() for v in
+             sorted([Link.from_(v) for v in value], key=lambda l: (l.label or 'zzzz', l.domain))])
 
     def update_links(self, domain, urls):
         new = [li for li in self.links if li.domain != domain] + [Link.from_(u) for u in urls]
@@ -615,7 +618,7 @@ class Languoid(object):
     def iso_code(self, value):
         self._set('iso639-3', value)
 
-    def closest_iso(self, api=None) -> typing.Union[str, None]:
+    def closest_iso(self, api=None, nodes=None) -> typing.Union[str, None]:
         """
         ISO 639-3 code assigned to the languoid or one of its ancestors in the classification
         (in case of dialects) or `None`.
@@ -627,7 +630,7 @@ class Languoid(object):
         if self.iso:
             return self.iso
         for _, gc, _ in reversed(self.lineage):
-            lg = api.languoid(gc)
+            lg = nodes[gc] if nodes else api.languoid(gc)
             if lg.iso:
                 return lg.iso
 

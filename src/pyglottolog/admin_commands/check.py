@@ -173,6 +173,10 @@ def run(args):
                     error(lang, 'endangerment: invalid ref {0}'.format(ref))
         except (ValueError, KeyError) as e:  # pragma: no cover
             error(lang, 'endangerment: {0}: {1}'.format(e.__class__.__name__, str(e)))
+        timespan = lang.timespan
+        if timespan and not (
+                lang.endangerment and lang.endangerment.status == args.repos.aes_status.extinct):
+            error(lang, 'timespan specified for non-extinct languoid')  # pragma: no cover
 
     if iso:
         for level, obj, msg in pyglottolog.iso.check_coverage(iso, iso_in_gl, iso_splits):

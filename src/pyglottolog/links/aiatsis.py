@@ -1,4 +1,5 @@
 import io
+import re
 import json
 import pathlib
 import collections
@@ -19,7 +20,12 @@ URL = 'http://chirila.yale.edu/languages'
 
 class AIATSIS(LinkProvider):
     def iterupdated(self, languoids):  # pragma: no cover
-        return
+        def altname(s):
+            res = s.strip()
+            if res.endswith('^'):
+                res = res[:-1]
+            return res
+
         res = reader(
             io.StringIO(requests.get(MD_URL).content.decode('utf-8-sig')),
             dialect=Dialect(skipBlankRows=True, commentPrefix='<'),
@@ -48,10 +54,12 @@ class AIATSIS(LinkProvider):
         for lang in languoids:
             links, names = [], []
             for c in sorted(lmap.get(lang.id, [])):
-                links.append((md[c]['uri'], md[c]['language_name']))
-                if md[c]['language_name']:
-                    names.append(md[c]['language_name'])
-                names.extend(nfilter([n.strip() for n in md[c]['language_synonym'].split('|')]))
+                lname = altname(md[c]['language_name'])
+                links.append((md[c]['uri'], lname))
+                assert lname
+                names.append(lname)
+                names.extend(
+                    nfilter([altname(n) for n in re.split('[,;]', md[c]['language_synonym'])]))
             if any([
                 lang.update_links(DOMAIN, links),
                 lang.update_names(names, type_='aiatsis'),

@@ -152,7 +152,7 @@ def recursive_centroids(langs: typing.List[Languoid])\
             if any(isinstance(v, str) for v in coords):
                 # There are still unresolved homelands for the immediate children. Defer
                 # computation until all homelands of children are resolved.
-                continue
+                continue  # pragma: no cover
             # Compute the homeland from the homelands of the children.
             homeland = MultiPoint(
                 [(pos_lon(p[1], tlgc), p[0]) for p in coords]).convex_hull.centroid

@@ -46,6 +46,13 @@ class LinkProvider(object):
             raise NotImplementedError()
 
 
+class Crubadan(LinkProvider):  # pragma: no cover
+    def iterupdated(self, languoids):
+        for lang in languoids:
+            if lang.update_links('crubadan.org', []):
+                yield lang
+
+
 class PHOIBLE(LinkProvider):  # pragma: no cover
     __domain__ = 'phoible.org'
     __doi__ = '10.5281/zenodo.2562766'
