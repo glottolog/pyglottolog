@@ -5,14 +5,13 @@ import subprocess
 
 import requests
 from clldutils.source import Source
+from clldutils.oaipmh import iter_records
 try:
     from bs4 import BeautifulSoup as bs  # noqa: N813
 except ImportError:  # pragma: no cover
     bs = None
 
-LS_INDEX = 'http://www.elpublishing.org/language-snapshots'
-
-LC_INDEX = 'http://www.elpublishing.org/language-contexts'
+OAIPMH_URL = 'https://account.lddjournal.org/index.php/uv1-j-ldd/oai'
 
 
 def download(bibfile, log):  # pragma: no cover
@@ -22,99 +21,82 @@ def download(bibfile, log):  # pragma: no cover
     fname.unlink()
 
 
-def get(url):  # pragma: no cover
-    # Some user agents seem to be rejected
-    return requests.get(url, headers={'User-Agent': 'scrapy'})
-
-
-def get_html(url):  # pragma: no cover
-    return bs(get(url).text, 'html5lib')
-
-
-def get_language_name(title):  # pragma: no cover
-    if 'Contexts' in title and (':' in title):
-        return title.split(':', maxsplit=1)[-1].strip()
-    return title.split(')')[0] + ')'
-
-
-def language_code_from_pdf(url):  # pragma: no cover
+def iter_language_codes_from_pdf(url):  # pragma: no cover
     """
-    Parse the associated language code from the PDF.
+    Parse the associated language codes from the PDF.
     """
     iso = None
+    gcodes = False
+
+    url = bs(requests.get(url).text).find('a', class_='download')['href']
 
     with tempfile.TemporaryDirectory() as d:
-        pdf = pathlib.Path(d) / url.split('/')[-1]
+        pdf = pathlib.Path(d) / '{}.pdf'.format(url.split('/')[-1])
         txt = pathlib.Path(d) / url.split('/')[-1].replace('.pdf', '.txt')
         # Download the PDF
-        with pdf.open('wb') as f:
-            f.write(get(url).content)
+        pdf.write_bytes(requests.get(url).content)
         # Run pdftotext
-        subprocess.check_call(
-            ['pdftotext', str(pdf), str(txt)],
-            stderr=subprocess.DEVNULL,
-        )
-        # Identify the code - which is assumed to appear in a table,
+        subprocess.check_call(['pdftotext', str(pdf), str(txt)], stderr=subprocess.DEVNULL)
+        # Identify the codes - which are assumed to appear in a table,
         # which is extracted as "one cell per line" so can be identified
         # by regex applied to the complete line.
         for line in txt.read_text(encoding='utf8').split('\n'):
             line = line.strip()
             if re.match('[a-z]{4}[0-9]{4}$', line):
-                return line
+                gcodes = True
+                yield line
             m = re.match(r'Glottolog Code:\s*(?P<code>[a-z]{4}[0-9]{4})', line)
             if m:
-                return m.group('code')
+                gcodes = True
+                yield m.group('code')
             if re.match('([a-z]{3}|[A-Z]{3})$', line):
                 iso = line.lower()
             m = re.match(r'ISO 639-3 Code:\s*(?P<code>[a-z]{3}|[A-Z]{3})$', line)
             if m:
                 iso = m.group('code')
-    return iso
+    if iso and not gcodes:
+        yield iso
 
 
-def scrape_article(url, hhtype):  # pragma: no cover
-    html = get_html(url)
+def scrape_article(record, hhtype):  # pragma: no cover
+    doi = None
+    for id_ in record.oai_dc_metadata['identifier']:
+        if id_.startswith('10.2'):
+            doi = id_
+            break
+    else:
+        raise ValueError('no DOI found in dc:identifier')
+    pdf_url = record.oai_dc_metadata['relation'][0]
     md = {
-        'title': html.find('h3').text,
-        'author': [],
+        'title': record.oai_dc_metadata['title'][0].replace('&nbsp;', ''),
+        'author': ' and '.join(record.oai_dc_metadata['creator']),
         'hhtype': hhtype,
         'journal': 'Language Documentation and Description',
-        'url': url,
+        'url': 'https://doi.org/' + doi,
+        'abstract': record.oai_dc_metadata['description'][0],
+        'lgcode': '; '.join('[{}]'.format(code) for code in iter_language_codes_from_pdf(pdf_url)),
+        'subject': '; '.join(record.oai_dc_metadata.get('subject', [])),
     }
-    pdf_url = None
-    for div in html.find_all('div'):
-        if div.text.startswith('Link to item:'):
-            pdf_url = div.find('a')['href']
-            assert pdf_url.endswith('.pdf')
-            code = language_code_from_pdf(pdf_url)
-            if code:
-                md['lgcode'] = '{} [{}]'.format(get_language_name(md['title']), code)
-        if div.find('span') and div.find('span').text.startswith('Pages'):
-            md['pages'] = div.find('div').text
-        if div.text.startswith('Date: '):
-            md['year'] = div.text.split(':')[1].strip()
-    for td in html.find_all('td'):
-        link = td.find('a')
-        if link and link.attrs.get('href').startswith('/authorpage'):
-            md['author'].append(link.text)
-    assert pdf_url
-    match = re.search(r'/ldd(?P<volume>[0-9]+)_[0-9]+\.pdf', pdf_url)
-    md.update(match.groupdict())
-    md['author'] = ' and '.join(md['author'])
-    return Source('article', url.split('/')[-1], **md)
+    source_pattern = re.compile(
+        r'Language Documentation and Description; Vol. (?P<volume>[0-9]+) '
+        r'\((?P<year>[0-9]+)\); (?P<pages>[0-9\-]+)')
+    for source in record.oai_dc_metadata['source']:
+        m = source_pattern.match(source)
+        if m:
+            md.update(m.groupdict())
+            break
+    else:
+        raise ValueError('No matching dc:source found!')
+    return Source('article', doi.split('/')[-1], **md)
 
 
 def scrape(fname):  # pragma: no cover
     records = []
-    index = get_html(LS_INDEX)
-    for td in index.find_all('td'):
-        if 'title' in td.attrs.get('class', []):
-            link = td.find('a')
-            records.append(scrape_article(link['href'], 'overview'))
-    index = get_html(LC_INDEX)
-    for link in index.find_all('a'):
-        if '/itempage/' in link.attrs.get('href', ''):
-            records.append(scrape_article(link['href'], 'overview'))
+    for set_ in ['Snapshots', 'Contexts']:
+        for record in iter_records(OAIPMH_URL, set_='uv1-j-ldd:{}'.format(set_)):
+            if record.oai_dc_metadata:
+                records.append(scrape_article(record, 'overview'))
     fname.write_text(
-        '\n'.join([r.bibtex() for r in sorted(records, key=lambda r: int(r.id))]), encoding='utf8')
+        '\n'.join([r.bibtex() for r in sorted(
+            records, key=lambda r: int(r.id.replace('ldd', '')))]), encoding='utf8')
     return fname
