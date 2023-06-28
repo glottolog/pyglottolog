@@ -1,4 +1,5 @@
 import re
+import html
 import pathlib
 import tempfile
 import subprocess
@@ -28,7 +29,7 @@ def iter_language_codes_from_pdf(url):  # pragma: no cover
     iso = None
     gcodes = False
 
-    url = bs(requests.get(url).text).find('a', class_='download')['href']
+    url = bs(requests.get(url).text, features='lxml').find('a', class_='download')['href']
 
     with tempfile.TemporaryDirectory() as d:
         pdf = pathlib.Path(d) / '{}.pdf'.format(url.split('/')[-1])
@@ -68,26 +69,27 @@ def scrape_article(record, hhtype):  # pragma: no cover
         raise ValueError('no DOI found in dc:identifier')
     pdf_url = record.oai_dc_metadata['relation'][0]
     md = {
-        'title': record.oai_dc_metadata['title'][0].replace('&nbsp;', ''),
+        'title': html.unescape(record.oai_dc_metadata['title'][0]),
         'author': ' and '.join(record.oai_dc_metadata['creator']),
         'hhtype': hhtype,
         'journal': 'Language Documentation and Description',
         'url': 'https://doi.org/' + doi,
-        'abstract': record.oai_dc_metadata['description'][0],
+        'abstract': html.unescape(record.oai_dc_metadata['description'][0]),
         'lgcode': '; '.join('[{}]'.format(code) for code in iter_language_codes_from_pdf(pdf_url)),
         'subject': '; '.join(record.oai_dc_metadata.get('subject', [])),
     }
     source_pattern = re.compile(
         r'Language Documentation and Description; Vol. (?P<volume>[0-9]+) '
-        r'\((?P<year>[0-9]+)\); (?P<pages>[0-9\-]+)')
+        r'(No\. (?P<number>[0-9]+) )?\((?P<year>[0-9]+)\); (?P<pages>[0-9\-]+)')
     for source in record.oai_dc_metadata['source']:
         m = source_pattern.match(source)
         if m:
             md.update(m.groupdict())
             break
     else:
-        raise ValueError('No matching dc:source found!')
-    return Source('article', doi.split('/')[-1], **md)
+        if record.oai_dc_metadata['source']:
+            raise ValueError('No matching dc:source "{}" found!'.format(record.oai_dc_metadata['source']))
+    return Source('article', doi.split('/')[-1].replace('.', ''), **md)
 
 
 def scrape(fname):  # pragma: no cover
