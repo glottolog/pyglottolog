@@ -1,6 +1,6 @@
 from html import entities as html_entities
-import pkg_resources
 
+from packaging import version
 from nameparser import HumanName
 from markdown import markdown
 from clldutils.markup import iter_markdown_tables
@@ -24,7 +24,7 @@ def read_editions(repos):
         row['editors'] = [n.strip() for n in row['editors'].split('&')]
         res.append(row)
 
-    return sorted(res, key=lambda d: pkg_resources.parse_version(d['version']), reverse=True)
+    return sorted(res, key=lambda d: version.parse(d['version']), reverse=True)
 
 
 def editor_to_dict(n, editors):

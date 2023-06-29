@@ -2,7 +2,7 @@
 Write release info to .zenodo.json, CITATION.md and CONTRIBUTORS.md
 """
 import git.exc
-import pkg_resources
+import packaging.version
 
 from git import Repo
 
@@ -19,5 +19,5 @@ def run(args):
     except git.exc.InvalidGitRepositoryError:
         pass
     version = getattr(args.repos.publication.zenodo, 'version', args.version)
-    assert not pkg_resources.parse_version(version).is_prerelease, 'invalid release version number'
+    assert not packaging.version.parse(version).is_prerelease, 'invalid release version number'
     print(prepare_release(args.repos, version=version))

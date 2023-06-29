@@ -88,7 +88,8 @@ def scrape_article(record, hhtype):  # pragma: no cover
             break
     else:
         if record.oai_dc_metadata['source']:
-            raise ValueError('No matching dc:source "{}" found!'.format(record.oai_dc_metadata['source']))
+            raise ValueError(
+                'No matching dc:source "{}" found!'.format(record.oai_dc_metadata['source']))
     return Source('article', doi.split('/')[-1].replace('.', ''), **md)
 
 

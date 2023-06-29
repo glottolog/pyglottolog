@@ -25,8 +25,6 @@ from .bibfiles_db import Database
 
 __all__ = ['BibFiles', 'BibFile', 'Entry']
 
-ATTRS_VERSION = tuple(int(v) for v in getattr(attr, '__version__', '20.1').split('.'))
-
 BIBFILES = 'bibfiles.sqlite3'
 
 DOCTYPES = {k: k for k in ['grammar',
