@@ -94,7 +94,7 @@ def compile(api, log=None, rebuild=False):
         hhbib,
         api.hhtypes,
         api.build_path('monstermark-hht.txt'),
-        rank=lambda l: api.hhtypes[l])
+        rank=lambda l_: api.hhtypes[l_])
 
     # Annotate with lgcode
     log.info('%s annotate lgcode' % time.ctime())

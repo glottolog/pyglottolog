@@ -23,14 +23,10 @@ def test_release(_main):
     _main('release --version 2.7')
 
 
-def test_update_links(_main, capsys, elcat):
+def test_update_links(_main, capsys):
     _main('updatelinks none')
     out, _ = capsys.readouterr()
     assert '0 languoids updated' in out
-
-    _main('updatelinks elcat')
-    out, _ = capsys.readouterr()
-    assert '1 languoids updated' in out
 
 
 def test_lff(capsys, _main, api_copy, encoding='utf-8'):

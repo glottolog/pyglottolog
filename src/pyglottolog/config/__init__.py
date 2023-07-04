@@ -1,4 +1,5 @@
 import pathlib
+import functools
 import collections
 
 import attr
@@ -37,7 +38,8 @@ class Generic(ConfigObject):
             setattr(self, k, v)
 
 
-@attr.s
+@functools.total_ordering
+@attr.s(cmp=False)
 class AES(ConfigObject):
     """
     AES status values
@@ -61,6 +63,12 @@ class AES(ConfigObject):
     #: Glottolog reference ID linking to further information
     reference_id = attr.ib()
     icon = attr.ib(default=None)
+
+    def __lt__(self, other):
+        return self.ordinal < other.ordinal
+
+    def __eq__(self, other):
+        return self.ordinal == other.ordinal
 
 
 @attr.s

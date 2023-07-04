@@ -5,7 +5,7 @@ import sys
 __all__ = ['removesuffix']
 
 
-if sys.version_info < (3, 9):
+if sys.version_info < (3, 9):  # pragma: no cover
     def removesuffix(s: str, suffix: str) -> str:
         """See https://www.python.org/dev/peps/pep-0616/
 

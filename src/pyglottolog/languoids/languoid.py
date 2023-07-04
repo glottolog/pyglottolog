@@ -138,14 +138,14 @@ class Languoid(object):
     # trees in newick format.
     _format_specs = {
         'newick_name': (
-            lambda l: l.name.replace(
+            lambda l_: l_.name.replace(
                 ',', '/').replace('(', '{').replace(')', '}').replace("'", "''"),
             "Languoid name with special newick characters replaced"),
         'newick_level': (
-            lambda l: '-l-' if getattr(l.level, 'id', l.level) == 'language' else '',
+            lambda l_: '-l-' if getattr(l_.level, 'id', l_.level) == 'language' else '',
             "Languoid level in case of languages"),
         'newick_iso': (
-            lambda l: '[{0}]'.format(l.iso) if l.iso else '',
+            lambda l_: '[{0}]'.format(l_.iso) if l_.iso else '',
             "Bracketed ISO code or nothing"),
     }
     _newick_default_template = "'{l:newick_name} [{l.id}]{l:newick_iso}{l:newick_level}'"
@@ -527,7 +527,8 @@ class Languoid(object):
         self._set(
             'links',
             [v.to_string() for v in
-             sorted([Link.from_(v) for v in value], key=lambda l: (l.label or 'zzzz', l.domain))])
+             sorted(
+                 [Link.from_(v) for v in value], key=lambda l_: (l_.label or 'zzzz', l_.domain))])
 
     def update_links(self, domain, urls):
         new = [li for li in self.links if li.domain != domain] + [Link.from_(u) for u in urls]
