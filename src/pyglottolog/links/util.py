@@ -2,7 +2,6 @@ import itertools
 import collections
 
 from clldutils.path import TemporaryDirectory
-from pycldf.dataset import Dataset
 import cldfzenodo
 
 
