@@ -173,7 +173,7 @@ class BibFile(object):
         return ['{0}:{1}'.format(self.id, e.key) for e in self.iterentries()]
 
     @property
-    def glottolog_ref_id_map(self):
+    def glottolog_ref_id_map(self) -> typing.Dict[str, str]:
         return {
             e.key: e.fields['glottolog_ref_id'] for e in self.iterentries()
             if 'glottolog_ref_id' in e.fields}

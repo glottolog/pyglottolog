@@ -9,7 +9,7 @@ import cldfzenodo
 def read_grouped_cldf_languages(doi):  # pragma: no cover
     rec = cldfzenodo.Record.from_doi(doi)
     with TemporaryDirectory() as tmp:
-        ds = Dataset.from_metadata(rec.download_dataset(tmp))
+        ds = rec.download_dataset(tmp)
         langs = sorted(
             ds.iter_rows('LanguageTable', 'id', 'glottocode', 'name'),
             key=lambda r: r['glottocode'] or '')
