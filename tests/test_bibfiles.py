@@ -45,6 +45,9 @@ def test_BibFile(tmpdir, bibfiles):
     bf.update(bibfiles['b.bib'].fname)
     assert len(list(bf.iterentries())) == 1
 
+    bf.update(bibfiles['b.bib'].fname, keep_old=True)
+    assert len(list(bf.iterentries())) == 1
+
     def visitor(entry):
         entry.fields['new_field'] = 'a'
 

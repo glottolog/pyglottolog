@@ -11,7 +11,6 @@ import unicodedata
 
 import attr
 
-from clldutils.misc import lazyproperty
 from clldutils.path import memorymapped
 from clldutils.source import Source
 from clldutils.text import split_text
@@ -178,8 +177,11 @@ class BibFile(object):
             e.key: e.fields['glottolog_ref_id'] for e in self.iterentries()
             if 'glottolog_ref_id' in e.fields}
 
-    def update(self, fname, log=None):
+    def update(self, fname, log=None, keep_old=False):
         entries, new = collections.OrderedDict(), 0
+        if keep_old:
+            for k, (t, f) in bibtex.iterentries(filename=self.fname, encoding=self.encoding):
+                entries[k] = (t, f)
         ref_id_map = self.glottolog_ref_id_map
         for key, (type_, fields) in bibtex.iterentries(fname, self.encoding):
             if key in ref_id_map and 'glottolog_ref_id' not in fields:
@@ -283,7 +285,7 @@ class Entry(object):
         return collections.OrderedDict((hht.id, hht.id) for hht in self.api.hhtypes) \
             if self.api else DOCTYPES
 
-    @lazyproperty
+    @functools.cached_property
     def weight(self):
         doctypes = self._defined_doctypes
         index = len(doctypes)
@@ -305,7 +307,7 @@ class Entry(object):
 
         return -index, pages, self.year_int or 0, self.id
 
-    @lazyproperty
+    @functools.cached_property
     def med_type(self) -> MEDType:
         """
         The entry's type on the MED scale.
@@ -321,7 +323,7 @@ class Entry(object):
                 return self.api.med_types.phonology_or_text
             return self.api.med_types.wordlist_or_less
 
-    @lazyproperty
+    @functools.cached_property
     def year_int(self):
         if self.fields.get('year'):
             # prefer years in brackets over the first 4-digit number.
@@ -332,7 +334,7 @@ class Entry(object):
             if match:
                 return int(match.group('year'))
 
-    @lazyproperty
+    @functools.cached_property
     def pages_int(self):
         if self.fields.get('numberofpages'):
             try:
@@ -345,7 +347,7 @@ class Entry(object):
         if self.fields.get('pages'):
             return util.compute_pages(self.fields['pages'])[2]
 
-    @lazyproperty
+    @functools.cached_property
     def publisher_and_address(self):
         p = self.fields.get('publisher')
         if p and ':' in p:

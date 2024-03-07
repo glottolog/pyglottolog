@@ -1,8 +1,11 @@
 from subprocess import check_output
-from collections import Counter
+from collections import Counter, OrderedDict
 
 from clldutils.markup import Table
 
+from pyglottolog import latex
+
+latex.register()
 URL = 'https://github.com/lingpy/bibliography/raw/master/evobib-converted.bib'
 
 
@@ -43,8 +46,18 @@ def update(newbib, bibfile, log):  # pragma: no cover
         entry.type = type_map.get(type_, type_)
         stats.update([entry.type])
 
+    def unescape(s):
+        s = s.replace(r'\%', '||||')
+        s = s.encode('utf8').decode('latex+utf8')
+        return s.replace('||||', '%')
+
+    def unescape_latex(entry):
+        entry.fields = OrderedDict(
+            [(k, v if k in ['url'] else unescape(v)) for k, v in entry.fields.items()])
+
     bibfile.update(newbib, log=log)
     bibfile.visit(fix_entry_type)
+    bibfile.visit(unescape_latex)
     bibfile.check(log)
     res = Table('entry type', '#')
     res.extend(list(stats.most_common()))

@@ -90,6 +90,10 @@ def test_Reference():
     with pytest.raises(ValueError):
         Reference.from_list(['abc'])
 
+    match = Reference.pattern.match('**bib:k(e)y(**)')
+    assert match.group('key') == 'bib:k(e)y'
+    assert match.group('endtag') == '(**)'
+
 
 def test_ClassificationComment(mocker):
     cc = ClassificationComment(family='**bib:key**')

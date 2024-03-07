@@ -125,7 +125,9 @@ class ChangeRequest(object):
                     print('no crs for {}, page {}'.format(year, page))
                 else:
                     for i, cr in enumerate(tables[0]):
-                        yield cls(**{k.replace(' ', '_'): v for k, v in cr.items()})
+                        d = {k.replace(' ', '_'): v for k, v in cr.items()}
+                        if 'Effective_Date' in d:
+                            yield cls(**{k.replace(' ', '_'): v for k, v in cr.items()})
                 if i < 99:
                     break
                 page += 1  # pragma: no cover

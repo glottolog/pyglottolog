@@ -118,8 +118,9 @@ class Reference(object):
     key = attr.ib()  #:
     pages = attr.ib(default=None)  #:
     trigger = attr.ib(default=None)
+    endtag = attr.ib(default='**')
     pattern = re.compile(
-        r"\*\*(?P<key>[a-z0-9\-_]+:[a-zA-Z.?\-;*'/()\[\]!_:0-9\u2014]+?)\*\*"
+        r"\*\*(?P<key>[a-z0-9\-_]+:[a-zA-Z.?\-;*'/()\[\]!_:0-9\u2014]+?)(?P<endtag>\*\*|\(\*\*\))"
         r"(:(?P<pages>[0-9\-f]+))?"
         r'(<trigger "(?P<trigger>[^\"]+)">)?')
     old_pattern = re.compile(r'[^\[]+\[(?P<pages>[^\]]*)\]\s*\([0-9]+\s+(?P<key>[^\)]+)\)')

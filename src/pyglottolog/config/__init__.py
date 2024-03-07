@@ -5,6 +5,7 @@ import collections
 import attr
 from clldutils.misc import nfilter
 from clldutils.inifile import INI
+from clldutils.jsonlib import load
 
 __all__ = [
     'AES', 'AESSource', 'Macroarea', 'DocumentType', 'LanguageType', 'LanguoidLevel',
@@ -16,7 +17,7 @@ class ConfigObject(object):
     Factory to turn INI file sections into instances of `@attr.s` classes.
     """
     @classmethod
-    def from_section(cls, cfg, section):
+    def from_section(cls, cfg, section, fname):
         try:
             fields = set(f.name for f in attr.fields(cls))
         except attr.exceptions.NotAnAttrsClassError:
@@ -24,7 +25,9 @@ class ConfigObject(object):
 
         kw = {'name' if 'id' in cfg[section] else 'id': section}
         kw.update(cfg[section].items())
-        return cls(**{k: v for k, v in kw.items() if fields is None or k in fields})
+        res = cls(**{k: v for k, v in kw.items() if fields is None or k in fields})
+        res._fname = fname
+        return res
 
 
 class Generic(ConfigObject):
@@ -94,6 +97,12 @@ class Macroarea(ConfigObject):
     description = attr.ib()  #:
     #: Glottolog reference ID linking to further information
     reference_id = attr.ib()
+
+    @property
+    def geojson(self):
+        fname = self._fname.parent / 'macroareas' / 'voronoi' / '{}.geojson'.format(
+            self.name.lower().replace(' ', '_'))
+        return load(fname) if fname.exists() else None
 
 
 @attr.s
@@ -178,7 +187,7 @@ class Config(collections.OrderedDict):
         ini = get_ini(fname)
         d = collections.OrderedDict()
         for sec in ini.sections():
-            obj = object_class.from_section(ini, sec)
+            obj = object_class.from_section(ini, sec, fname)
             d[obj.id] = obj
         res = cls(**d)
         res.__defaults__ = ini['DEFAULT']

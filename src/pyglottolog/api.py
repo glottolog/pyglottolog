@@ -4,13 +4,13 @@ Programmatic access to Glottolog data.
 import re
 import typing
 import pathlib
+import functools
 import contextlib
 import collections
 
 import pycldf.util
 from csvw import TableGroup, Column
 from clldutils.path import walk, git_describe
-from clldutils.misc import lazyproperty
 from clldutils.apilib import API
 from clldutils.jsonlib import load
 import clldutils.iso_639_3
@@ -110,56 +110,56 @@ class Glottolog(API):
         return config.Config.from_ini(
             self.path('config', name + '.ini'), object_class=cls or config.Generic)
 
-    @lazyproperty
+    @functools.cached_property
     def aes_status(self) -> typing.Dict[str, config.AES]:
         """
         :rtype: mapping with :class:`config.AES` values.
         """
         return self._cfg('aes_status', cls=config.AES)
 
-    @lazyproperty
+    @functools.cached_property
     def aes_sources(self) -> typing.Dict[str, config.AESSource]:
         """
         :rtype: mapping with :class:`config.AESSource` values
         """
         return self._cfg('aes_sources', cls=config.AESSource)
 
-    @lazyproperty
+    @functools.cached_property
     def document_types(self) -> typing.Dict[str, config.DocumentType]:
         """
         :rtype: mapping with :class:`config.DocumentType` values
         """
         return self._cfg('document_types', cls=config.DocumentType)
 
-    @lazyproperty
+    @functools.cached_property
     def med_types(self) -> typing.Dict[str, config.MEDType]:
         """
         :rtype: mapping with :class:`config.MEDType` values
         """
         return self._cfg('med_types', cls=config.MEDType)
 
-    @lazyproperty
+    @functools.cached_property
     def macroareas(self) -> typing.Dict[str, config.Macroarea]:
         """
         :rtype: mapping with :class:`config.Macroarea` values
         """
         return self._cfg('macroareas', cls=config.Macroarea)
 
-    @lazyproperty
+    @functools.cached_property
     def language_types(self) -> typing.Dict[str, config.LanguageType]:
         """
         :rtype: mapping with :class:`config.LanguageType` values
         """
         return self._cfg('language_types', cls=config.LanguageType)
 
-    @lazyproperty
+    @functools.cached_property
     def languoid_levels(self) -> typing.Dict[str, config.LanguoidLevel]:
         """
         :rtype: mapping with :class:`config.LanguoidLevel` values
         """
         return self._cfg('languoid_levels', cls=config.LanguoidLevel)
 
-    @lazyproperty
+    @functools.cached_property
     def editors(self) -> typing.Dict[str, config.Generic]:
         """
         Metadata about editors of Glottolog
@@ -168,7 +168,7 @@ class Glottolog(API):
         """
         return self._cfg('editors')
 
-    @lazyproperty
+    @functools.cached_property
     def publication(self) -> typing.Dict[str, config.Generic]:
         """
         Metadata about the Glottolog publication
@@ -177,7 +177,7 @@ class Glottolog(API):
         """
         return self._cfg('publication')
 
-    @lazyproperty
+    @functools.cached_property
     def iso(self) -> clldutils.iso_639_3.ISO:
         """
         :return: `clldutils.iso_639_3.ISO` instance, fed with the data of the latest \
@@ -192,7 +192,7 @@ class Glottolog(API):
         """
         return self.build_path('whoosh')
 
-    @lazyproperty
+    @functools.cached_property
     def _tree_dirs(self):
         return list(walk(self.tree, mode='dirs'))
 
@@ -327,7 +327,7 @@ class Glottolog(API):
                 trees.append('{0};'.format(ns))
         return '\n'.join(trees)
 
-    @lazyproperty
+    @functools.cached_property
     def bibfiles(self) -> references.BibFiles:
         """
         Access reference data by BibFile.
@@ -355,13 +355,13 @@ class Glottolog(API):
                     res[lang.id].append(entry)
         return res, all_
 
-    @lazyproperty
+    @functools.cached_property
     def hhtypes(self):
         # Note: The file `hhtype.ini` does not exist anymore. This is fixed in HHTypes, when
         # calling `config.get_ini`. Only used when compiling monster.bib.
         return references.HHTypes(self.references_path('hhtype.ini'))
 
-    @lazyproperty
+    @functools.cached_property
     def triggers(self):
         res = {'inlg': [], 'lgcode': []}
         for lang in self.languoids():
@@ -372,7 +372,7 @@ class Glottolog(API):
                                        for text in lang.cfg.getlist('triggers', type_)])
         return res
 
-    @lazyproperty
+    @functools.cached_property
     def macroarea_map(self):
         res = {}
         for lang in self.languoids():

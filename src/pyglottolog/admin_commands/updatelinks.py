@@ -18,6 +18,8 @@ def run(args):
     langs = list(args.repos.languoids())
     updated = set()
     for cls in LinkProvider.__subclasses__():
+        if getattr(cls, '__inactive__', False):
+            continue
         name = cls.__name__.lower()
         if (not getattr(args, 'provider', None)) or (name in args.provider):
             args.log.info('updating {0} links ...'.format(name))

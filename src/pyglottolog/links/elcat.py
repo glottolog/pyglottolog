@@ -41,6 +41,7 @@ def format_date() -> str:
 
 
 class ElCat(LinkProvider):
+    __inactive__ = True
     status_map = {}
 
     def __init__(self, repos=None):

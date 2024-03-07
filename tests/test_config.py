@@ -10,6 +10,7 @@ def test_aes(api_copy):
 def test_macroarea(api_copy):
     ma = Config.from_ini(api_copy.repos / 'config' / 'macroareas.ini', Macroarea)
     assert ma.__defaults__['description']
+    assert ma.eurasia.geojson is None
 
 
 def test_doctype(api_copy):

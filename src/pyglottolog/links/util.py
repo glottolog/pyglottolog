@@ -6,7 +6,7 @@ import cldfzenodo
 
 
 def read_grouped_cldf_languages(doi):  # pragma: no cover
-    rec = cldfzenodo.Record.from_doi(doi)
+    rec = cldfzenodo.Record.from_concept_doi(doi)
     with TemporaryDirectory() as tmp:
         ds = rec.download_dataset(tmp)
         langs = sorted(
@@ -76,4 +76,18 @@ class WALS(LinkProvider):  # pragma: no cover
     __domain__ = "wals.info"
     __doi__ = '10.5281/zenodo.3606197'
     __url_template__ = 'https://' + __domain__ + '/languoid/lect/wals_code_{0[id]}'
+    __label_template__ = '{0[name]}'
+
+
+class Grambank(LinkProvider):  # pragma: no cover
+    __domain__ = "grambank.clld.org"
+    __doi__ = '10.5281/zenodo.7740139'
+    __url_template__ = 'https://' + __domain__ + '/languages/{0[id]}'
+    __label_template__ = '{0[name]}'
+
+
+class Lexibank(LinkProvider):  # pragma: no cover
+    __domain__ = "lexibank.clld.org"
+    __doi__ = '10.5281/zenodo.5227817'
+    __url_template__ = 'https://' + __domain__ + '/languages/{0[id]}'
     __label_template__ = '{0[name]}'
