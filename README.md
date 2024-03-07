@@ -6,10 +6,15 @@ Programmatic access to [Glottolog data](https://github.com/glottolog/glottolog).
 [![Documentation Status](https://readthedocs.org/projects/pyglottolog/badge/?version=latest)](https://pyglottolog.readthedocs.io/en/latest/?badge=latest)
 [![PyPI](https://img.shields.io/pypi/v/pyglottolog.svg)](https://pypi.org/project/pyglottolog)
 
+> [!NOTE]  
+> Accessing Glottolog data programmatically has become a lot easier with the
+> [Glottolog CLDF dataset](https://github.com/glottolog/glottolog-cldf). Thus, `pyglottolog` now
+> mostly serves as internal data curation tool.
+
 
 ## Install
 
-To install `pyglottolog` you need a python installation on your system, running python >3.7. Run
+To install `pyglottolog` you need a python installation on your system, running python >3.8. Run
 ```shell script
 pip install pyglottolog
 ```
@@ -67,7 +72,6 @@ available commands:
   Run "COMAMND -h" to get help for a specific command.
 
   COMMAND
-    cldf                Dump Glottolog data as CLDF dataset
     create              Create a new languoid directory for a languoid
                         specified by name and level.
     edit                Open a languoid's INI file in a text editor.

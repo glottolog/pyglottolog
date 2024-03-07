@@ -1,10 +1,10 @@
 """
 Write release info to .zenodo.json, CITATION.md and CONTRIBUTORS.md
 """
-import git.exc
-import packaging.version
+import shlex
+import subprocess
 
-from git import Repo
+import packaging.version
 
 from pyglottolog.metadata import prepare_release
 
@@ -15,8 +15,13 @@ def register(parser):
 
 def run(args):
     try:
-        assert Repo(str(args.repos.repos)).active_branch.name.startswith('release')
-    except git.exc.InvalidGitRepositoryError:
+        branch = ''
+        out = subprocess.check_output(shlex.split("git -C {} branch".format(args.repos.repos)))
+        for line in out.decode('utf8').split('\n'):
+            if line.startswith('*'):
+                branch = line[1:].strip()
+        assert branch.startswith('release')
+    except subprocess.CalledProcessError:
         pass
     version = getattr(args.repos.publication.zenodo, 'version', args.version)
     assert not packaging.version.parse(version).is_prerelease, 'invalid release version number'

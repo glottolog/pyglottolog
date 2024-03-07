@@ -1,6 +1,7 @@
 import re
 import typing
 import collections
+import urllib.parse
 
 import attr
 import markdown
@@ -8,7 +9,6 @@ import pycountry
 from clldutils.misc import slug, nfilter
 from clldutils import jsonlib
 from dateutil import parser
-import purl
 
 from ..util import message
 from ..config import AESSource, AES
@@ -33,7 +33,7 @@ class Link(object):
 
     @property
     def domain(self):
-        return purl.URL(self.url).domain()
+        return urllib.parse.urlparse(self.url).netloc
 
     @classmethod
     def from_string(cls, s):
