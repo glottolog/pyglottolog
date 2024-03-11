@@ -36,7 +36,7 @@ class LinkProvider(object):
                     lang = {k: v.strip() if isinstance(v, str) else v for k, v in lang.items()}
                     item = self.__url_template__.format(lang)
                     if self.__label_template__:
-                        item = (item, self.__label_template__.format(lang))
+                        item = (item, self.__label_template__.format(lang).split('[')[0].strip())
                     res[gc].append(item)
             for lang in languoids:
                 if lang.update_links(self.__domain__, res.get(lang.id, [])):
