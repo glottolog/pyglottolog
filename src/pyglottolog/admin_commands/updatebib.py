@@ -10,7 +10,7 @@ from linglit.bibtex import merge
 def register(parser):
     parser.add_argument(
         'bibkey',
-        choices=['benjamins', 'glossa', 'langsci', 'dplace', 'ldh', 'jocp'],
+        choices=['cldf', 'benjamins', 'glossa', 'langsci', 'dplace', 'ldh', 'jocp'],
     )
     parser.add_argument(
         'bib',

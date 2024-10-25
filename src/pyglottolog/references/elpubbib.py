@@ -10,8 +10,8 @@ from pycldf.sources import Source
 
 INDEX_URL = "https://www.lddjournal.org/articles/"
 URLS = {
-    'contexts': '{}?section__pk=55&order_by=-date_published&paginate_by=100'.format(INDEX_URL),
-    'snapshots': '{}?section__pk=54&order_by=-date_published&paginate_by=100'.format(INDEX_URL),
+    'contexts': '{}?date_published__date__gte=&date_published__date__lte=&section__pk=55'.format(INDEX_URL),
+    'snapshots': '{}?date_published__date__gte=&date_published__date__lte=&section__pk=54'.format(INDEX_URL),
 }
 
 
@@ -31,7 +31,7 @@ def get(url, cache, series=None):  # pragma: no cover
             else:
                 raise ValueError(url)
     p = cache / fname
-    if not p.exists():
+    if fname.startswith('index') or not p.exists():
         p.write_text(requests.get(url).text, encoding='utf8')
     if p.suffix == '.html':
         return fromstring(p.read_text(encoding='utf8'), parser=HTMLParser())
@@ -67,14 +67,15 @@ def download(bibfile, log, repos):  # pragma: no cover
         if item.id not in old:
             new.append(item)
 
-    fname = pathlib.Path(tempfile.gettempdir()) / 'elpub.bib'
-    fname.write_text(
-        '\n'.join([r.bibtex() for r in sorted(
-            new, key=lambda r: int(r.id.replace('ldd', '')))]), encoding='utf8')
+    if new:
+        fname = pathlib.Path(tempfile.gettempdir()) / 'elpub.bib'
+        fname.write_text(
+            '\n'.join([r.bibtex() for r in sorted(
+                new, key=lambda r: int(r.id.replace('ldd', '')))]), encoding='utf8')
 
-    bibfile.update(fname, log=log, keep_old=True)
-    bibfile.check(log)
-    fname.unlink()
+        bibfile.update(fname, log=log, keep_old=True)
+        bibfile.check(log)
+        fname.unlink()
 
 
 def scrape_article(series, metas, xml):  # pragma: no cover
@@ -88,7 +89,7 @@ def scrape_article(series, metas, xml):  # pragma: no cover
         'citation_issue': ('number', False, None),
         'citation_doi': ('doi', False, None),
     }
-    md = None, {'hhtype': 'overview'}
+    md = {'hhtype': 'overview'}
     for name, content in metas:
         if name in meta2bibtex:
             bname, mult, conv = meta2bibtex[name]
@@ -102,7 +103,7 @@ def scrape_article(series, metas, xml):  # pragma: no cover
                     md[bname] = [content]
     md['author'] = ' and '.join(md['author'])
     md['url'] = 'https://doi.org/{}'.format(md['doi'])
-    if xml:
+    if xml is not None:
         md.update(parse_xml(xml))
     return Source('article', md['doi'].split('/')[-1].replace('.', ''), **md)
 

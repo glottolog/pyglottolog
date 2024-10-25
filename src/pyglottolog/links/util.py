@@ -66,6 +66,7 @@ class PHOIBLE(LinkProvider):  # pragma: no cover
 
 
 class APICS(LinkProvider):  # pragma: no cover
+    __inactive__ = True
     __domain__ = "apics-online.info"
     __doi__ = '10.5281/zenodo.3823887'
     __url_template__ = 'https://' + __domain__ + '/contributions/{0[id]}'
@@ -80,6 +81,7 @@ class WALS(LinkProvider):  # pragma: no cover
 
 
 class Grambank(LinkProvider):  # pragma: no cover
+    __inactive__ = True
     __domain__ = "grambank.clld.org"
     __doi__ = '10.5281/zenodo.7740139'
     __url_template__ = 'https://' + __domain__ + '/languages/{0[id]}'
@@ -87,6 +89,7 @@ class Grambank(LinkProvider):  # pragma: no cover
 
 
 class Lexibank(LinkProvider):  # pragma: no cover
+    __inactive__ = True
     __domain__ = "lexibank.clld.org"
     __doi__ = '10.5281/zenodo.5227817'
     __url_template__ = 'https://' + __domain__ + '/languages/{0[id]}'
