@@ -294,7 +294,7 @@ class Exportable:
                                  'hash',
                                  Entry.id))
 
-        with self.execute(select_rows) as result,\
+        with self.execute(select_rows) as result, \
              dsv.UnicodeWriter(filename, encoding=encoding, dialect=dialect) as writer:
             header = list(result.keys())
             writer.writerow(header)

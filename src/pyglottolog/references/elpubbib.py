@@ -10,8 +10,10 @@ from pycldf.sources import Source
 
 INDEX_URL = "https://www.lddjournal.org/articles/"
 URLS = {
-    'contexts': '{}?date_published__date__gte=&date_published__date__lte=&section__pk=55'.format(INDEX_URL),
-    'snapshots': '{}?date_published__date__gte=&date_published__date__lte=&section__pk=54'.format(INDEX_URL),
+    'contexts':
+        '{}?date_published__date__gte=&date_published__date__lte=&section__pk=55'.format(INDEX_URL),
+    'snapshots':
+        '{}?date_published__date__gte=&date_published__date__lte=&section__pk=54'.format(INDEX_URL),
 }
 
 
