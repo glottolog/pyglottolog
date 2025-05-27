@@ -23,7 +23,7 @@ def get(url, cache, series=None):  # pragma: no cover
         assert series
         fname = 'index_{}.html'.format(series)
     else:
-        m = re.fullmatch(r'/article/id/(?P<aid>[0-9]+)/', parsed.path)
+        m = re.fullmatch(r'/article/(pub)?id/(?P<aid>[0-9]+)/', parsed.path)
         if m:
             fname = '{}.html'.format(m.group('aid'))
         else:
@@ -111,16 +111,21 @@ def scrape_article(series, metas, xml):  # pragma: no cover
 
 
 def parse_xml(article):  # pragma: no cover
+    from lxml.etree import tostring
     inlg = pycountry.languages.get(
         alpha_2=article.attrib['{http://www.w3.org/XML/1998/namespace}lang'])
     abstract = article.xpath('.//{}abstract'.format('trans-' if inlg.alpha_2 != 'en' else ''))[0]
     if '{http://www.w3.org/XML/1998/namespace}lang' in abstract.attrib:
         assert abstract.attrib['{http://www.w3.org/XML/1998/namespace}lang'] == 'en'
-    res = {
+    try:
+        res = {
         'inlg': '{} [{}]'.format(inlg.name, inlg.alpha_3),
         'abstract': '\n'.join(re.sub(r'\s+', ' ', p.text) for p in abstract.xpath('p') if p.text),
-        'subject': '; '.join(kw.text for kw in article.xpath('.//kwd-group/kwd')),
-    }
+        'subject': '; '.join(kw.text for kw in article.xpath('.//kwd-group/kwd') if kw.text),
+        }
+    except:
+        print(tostring(article).decode('utf8'))
+        raise
     props = []
     for e in article.xpath('body/*'):
         if e.tag == 'sec':

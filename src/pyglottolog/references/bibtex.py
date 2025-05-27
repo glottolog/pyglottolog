@@ -57,7 +57,7 @@ def iterentries(filename: typing.Union[str, pathlib.Path], encoding=None)\
 def debug_pybtex(source, e):  # pragma: no cover
     start, line, pos = e.error_context_info
     print('BIBTEX ERROR on line %d, last parsed lines:' % line)
-    print(source[start:start + 500] + '...')
+    print(source[start:start + 500].decode('utf8') + '...')
     raise e
 
 

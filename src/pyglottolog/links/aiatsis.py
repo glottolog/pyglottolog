@@ -19,6 +19,8 @@ URL = 'http://chirila.yale.edu/languages'
 
 
 class AIATSIS(LinkProvider):
+    __inactive__ = True
+
     def iterupdated(self, languoids):  # pragma: no cover
         def altname(s):
             res = s.strip()
