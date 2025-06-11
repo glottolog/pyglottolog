@@ -8,12 +8,12 @@ import functools
 import collections
 import unicodedata
 
-from pybtex.database.input.bibtex import LowLevelParser, Parser, UndefinedMacro
-from pybtex.scanner import PybtexSyntaxError
-from pybtex.exceptions import PybtexError
-from pybtex.textutils import whitespace_re
-from pybtex.bibtex.utils import split_name_list
-from pybtex.database import Person
+from simplepybtex.database.input.bibtex import LowLevelParser, Parser, UndefinedMacro
+from simplepybtex.scanner import PybtexSyntaxError
+from simplepybtex.exceptions import PybtexError
+from simplepybtex.textutils import whitespace_re
+from simplepybtex.bibtex.utils import split_name_list
+from simplepybtex.database import Person
 
 from clldutils.path import memorymapped
 

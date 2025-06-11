@@ -8,6 +8,7 @@ import markdown
 import pycountry
 from clldutils.misc import slug, nfilter
 from clldutils import jsonlib
+from clldutils.markup import MarkdownLink
 from dateutil import parser
 
 from ..util import message
@@ -296,6 +297,20 @@ class Endangerment(object):
         res = attr.asdict(self, recurse=True)
         res['date'] = res['date'].isoformat().split('T')[0]
         return res
+
+    def check(self, lang, keys, log):
+        def repl(ml):
+            if ml.url not in keys:
+                log.error(message(
+                    lang,
+                    'endangerment comment: invalid bibkey: {}'.format(ml.url)))
+
+        if self.source and self.source.reference_id:
+            ref = self.source.reference_id
+            if ref not in keys:  # pragma: no cover
+                log.error(message(lang, 'endangerment: invalid bibkey {0}'.format(ref)))
+        if self.comment:
+            MarkdownLink.replace(self.comment, repl)
 
 
 def valid_ethnologue_versions(inst, attr, value):

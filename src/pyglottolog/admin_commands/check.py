@@ -165,14 +165,9 @@ def run(args):
             else:
                 error(lang, 'family without children')  # pragma: no cover
 
-        try:
-            endangerment = lang.endangerment
-            if endangerment and endangerment.source and endangerment.source.reference_id:
-                ref = endangerment.source.reference_id
-                if ref not in refkeys:  # pragma: no cover
-                    error(lang, 'endangerment: invalid ref {0}'.format(ref))
-        except (ValueError, KeyError) as e:  # pragma: no cover
-            error(lang, 'endangerment: {0}: {1}'.format(e.__class__.__name__, str(e)))
+        if lang.endangerment:
+            lang.endangerment.check(lang, refkeys, args.log)
+
         timespan = lang.timespan
         if timespan and not (
                 lang.endangerment and lang.endangerment.status == args.repos.aes_status.extinct):
