@@ -3,9 +3,9 @@ import hashlib
 import pathlib
 import datetime
 import itertools
+import dataclasses
 from xml.etree import ElementTree
 
-import attr
 from clldutils import iso_639_3
 from csvw import dsv
 
@@ -36,16 +36,16 @@ def read_url(path, cache_dir=None, log=None):
         return fp.read().decode('utf8')
 
 
-def valid_iso_code(instance, attr, value):
+def valid_iso_code(attr, value):
     if not ISO_CODE_PATTERN.match(value):
-        raise ValueError('invalid ISO code in {0}: {1}'.format(attr.name, value))
+        raise ValueError('invalid ISO code in {0}: {1}'.format(attr, value))
 
 
 def normalize_whitespace(s):
     return re.sub(r'\s+', ' ', s).strip()
 
 
-@attr.s
+@dataclasses.dataclass
 class Retirement(object):
     RET_REASON = {  # http://www-01.sil.org/iso639-3/download.asp#retiredDownloads
         'C': 'change',
@@ -54,16 +54,25 @@ class Retirement(object):
         'S': 'split',
         'M': 'merge',
     }
-    Id = attr.ib(validator=valid_iso_code)
-    Ref_Name = attr.ib()
-    Ret_Reason = attr.ib(converter=lambda v: Retirement.RET_REASON.get(v))
-    Change_To = attr.ib(
-        converter=lambda v: v or None,
-        validator=attr.validators.optional(valid_iso_code))
-    Ret_Remedy = attr.ib(converter=normalize_whitespace)
-    Effective = attr.ib(
-        converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
-    cr = attr.ib(default=None)
+    Id: str # = attr.ib(validator=valid_iso_code)
+    Ref_Name: str # = attr.ib()
+    Ret_Reason: str #= attr.ib(converter=lambda v: Retirement.RET_REASON.get(v))
+    Change_To: str #= attr.ib(
+        #converter=lambda v: v or None,
+        #validator=attr.validators.optional(valid_iso_code))
+    Ret_Remedy: str #= attr.ib(converter=normalize_whitespace)
+    Effective: datetime.date #= attr.ib(
+        #converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
+    cr: str = None #attr.ib(default=None)
+
+    def __post_init__(self):
+        valid_iso_code('Id', self.Id)
+        self.Ret_Reason = Retirement.RET_REASON.get(self.Ret_Reason)
+        self.Change_To = self.Change_To or None
+        if self.Change_To:
+            valid_iso_code('Change_To', self.Change_To)
+        self.Ret_Remedy = normalize_whitespace(self.Ret_Remedy)
+        self.Effective = datetime.date(*[int(p) for p in self.Effective.split('-')]) if self.Effective else None
 
     @classmethod
     def iter(cls, table=None, cache_dir=None, log=None):
@@ -75,8 +84,8 @@ class Retirement(object):
             yield cls(**d)
 
 
-@attr.s
-class ChangeRequest(object):
+@dataclasses.dataclass
+class ChangeRequest:
     CHANGE_TYPES = {  # map change types to a sort key
         'Create': 'z',
         'Merge': 'c',
@@ -84,16 +93,22 @@ class ChangeRequest(object):
         'Split': 'b',
         'Update': 'y'
     }
-    Status = attr.ib(
-        validator=attr.validators.in_(['Rejected', 'Adopted', 'Pending', 'Partially Adopted']))
-    Reference_Name = attr.ib()
-    Effective_Date = attr.ib(
-        converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
-    Change_Type = attr.ib(validator=attr.validators.in_(list(CHANGE_TYPES.keys())))
-    Change_Request_Number = attr.ib(converter=lambda v: str(v) if v else None)
-    Region_Group = attr.ib()
-    Affected_Identifier = attr.ib()
-    Language_Family_Group = attr.ib()
+    Status: str #= attr.ib(
+        #validator=attr.validators.in_(['Rejected', 'Adopted', 'Pending', 'Partially Adopted']))
+    Reference_Name: str #= attr.ib()
+    Effective_Date: datetime.date #= attr.ib(
+        #converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
+    Change_Type: str #= attr.ib(validator=attr.validators.in_(list(CHANGE_TYPES.keys())))
+    Change_Request_Number: str #= attr.ib(converter=lambda v: str(v) if v else None)
+    Region_Group: str #= attr.ib()
+    Affected_Identifier: str #= attr.ib()
+    Language_Family_Group: str #= attr.ib()
+
+    def __post_init__(self):
+        assert self.Status in ['Rejected', 'Adopted', 'Pending', 'Partially Adopted']
+        self.Effective_Date = datetime.date(*[int(p) for p in self.Effective_Date.split('-')]) if self.Effective_Date else None
+        assert self.Change_Type in self.CHANGE_TYPES
+        self.Change_Request_Number = str(self.Change_Request_Number) if self.Change_Request_Number else None
 
     @property
     def url(self):

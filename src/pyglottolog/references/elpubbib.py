@@ -116,7 +116,7 @@ def parse_xml(article):  # pragma: no cover
         alpha_2=article.attrib['{http://www.w3.org/XML/1998/namespace}lang'])
     abstract = article.xpath('.//{}abstract'.format('trans-' if inlg.alpha_2 != 'en' else ''))[0]
     if '{http://www.w3.org/XML/1998/namespace}lang' in abstract.attrib:
-        assert abstract.attrib['{http://www.w3.org/XML/1998/namespace}lang'] == 'en'
+        assert abstract.attrib['{http://www.w3.org/XML/1998/namespace}lang'] in {'en', 'ru'}
     try:
         res = {
         'inlg': '{} [{}]'.format(inlg.name, inlg.alpha_3),

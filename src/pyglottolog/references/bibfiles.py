@@ -7,15 +7,13 @@ import pathlib
 import datetime
 import functools
 import collections
+import dataclasses
 import unicodedata
-
-import attr
 
 from clldutils.path import memorymapped
 from clldutils.source import Source
 from clldutils.text import split_text
 from clldutils.inifile import INI
-from clldutils.attrlib import cmp_off
 
 from . import bibtex
 from . import util
@@ -102,26 +100,30 @@ def file_if_exists(i, a, value):
         raise ValueError('invalid path')  # pragma: no cover
 
 
-@attr.s
-class BibFile(object):
+@dataclasses.dataclass
+class BibFile:
     """
     Represents a BibTeX file, storing a provider's bibliography, providing easy access to its
     records.
     """
-    fname: pathlib.Path = attr.ib(validator=file_if_exists)
-    name = attr.ib(default=None)  #: Short name of the bibliography
-    title = attr.ib(default=None)  #: Title of the bibliography
-    description = attr.ib(default=None)  #: The provenance of the bibliography
-    abbr = attr.ib(default=None)
-    encoding = attr.ib(default='utf-8')
-    normalize = attr.ib(default='NFC')
-    sortkey = attr.ib(
-        default=None,
-        converter=lambda s: None if s is None or s.lower() == 'none' else s)
-    priority = attr.ib(default=0, converter=int)
-    url = attr.ib(default=None)  #: URL pointing to the source of the bibliography
-    curation = attr.ib(default=None)  #: Curation policy for the bibliography at Glottolog
-    api = attr.ib(default=None)
+    fname: pathlib.Path  # = attr.ib(validator=file_if_exists)
+    name: str = None  #attr.ib(default=None)  #: Short name of the bibliography
+    title: str = None  #attr.ib(default=None)  #: Title of the bibliography
+    description: str = None  #attr.ib(default=None)  #: The provenance of the bibliography
+    abbr: str = None  #attr.ib(default=None)
+    encoding: str = 'utf-8'  #attr.ib(default='utf-8')
+    normalize: str = 'NFC'  #attr.ib(default='NFC')
+    sortkey: str = None  #attr.ib(
+        #default=None,
+        #converter=lambda s: None if s is None or s.lower() == 'none' else s)
+    priority: int = 0  #attr.ib(default=0, converter=int)
+    url: str = None  #attr.ib(default=None)  #: URL pointing to the source of the bibliography
+    curation: str = None  #attr.ib(default=None)  #: Curation policy for the bibliography at Glottolog
+    api: typing.Any = None  #attr.ib(default=None)
+
+    def __post_init__(self):
+        self.priority = int(self.priority)
+        self.sortkey = None if self.sortkey is None or self.sortkey.lower() == 'none' else self.sortkey
 
     @property
     def id(self):
@@ -236,8 +238,8 @@ class BibFile(object):
 
 
 @functools.total_ordering
-@attr.s(**cmp_off)
-class Entry(object):
+@dataclasses.dataclass
+class Entry:
     """
     Represents an entry in a `BibFile`, i.e. a bibliographical record.
 
@@ -258,11 +260,11 @@ class Entry(object):
         >>> sorted(refs[0]['stan1295'])[-1].med_type.name
         'long grammar'
     """
-    key = attr.ib()  #:
-    type = attr.ib()  #: BibTeX entry type
-    fields: dict = attr.ib()  #: The metadata of the record
-    bib = attr.ib()
-    api = attr.ib(default=None)
+    key: str #= attr.ib()  #:
+    type: str #= attr.ib()  #: BibTeX entry type
+    fields: dict #= attr.ib()  #: The metadata of the record
+    bib: str #= attr.ib()
+    api: typing.Any = None  #attr.ib(default=None)
 
     # FIXME: add method to apply triggers!
 

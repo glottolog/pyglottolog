@@ -1,27 +1,26 @@
+import types
 import pathlib
 import functools
 import collections
+import dataclasses
 
-import attr
 from clldutils.misc import nfilter
 from clldutils.inifile import INI
 from clldutils.jsonlib import load
 
 __all__ = [
     'AES', 'AESSource', 'Macroarea', 'DocumentType', 'LanguageType', 'LanguoidLevel',
-    'Generic', 'Config']
+    'Config']
 
 
-class ConfigObject(object):
+@dataclasses.dataclass
+class ConfigObject:
     """
-    Factory to turn INI file sections into instances of `@attr.s` classes.
+    Factory to turn INI file sections into instances of dataclasses.
     """
     @classmethod
     def from_section(cls, cfg, section, fname):
-        try:
-            fields = set(f.name for f in attr.fields(cls))
-        except attr.exceptions.NotAnAttrsClassError:
-            fields = None
+        fields = set(f.name for f in dataclasses.fields(cls))
 
         kw = {'name' if 'id' in cfg[section] else 'id': section}
         kw.update(cfg[section].items())
@@ -30,19 +29,22 @@ class ConfigObject(object):
         return res
 
 
-class Generic(ConfigObject):
-    """
-    Make config options available as attributes.
-    """
-    def __init__(self, **kw):
-        for k, v in kw.items():
-            if v in ['True', 'False']:
-                v = eval(v)
-            setattr(self, k, v)
+@dataclasses.dataclass
+class Editors(ConfigObject):
+    id: str
+    current: bool = True
+    affiliation: str = ''
+    orcid: str = ''
+    name: str = ''
+    ord: int = 9
+    github: str = None
+
+    def __post_init__(self):
+        self.current = eval(self.current)
 
 
 @functools.total_ordering
-@attr.s(cmp=False)
+@dataclasses.dataclass
 class AES(ConfigObject):
     """
     AES status values
@@ -51,21 +53,24 @@ class AES(ConfigObject):
     """
     # The attribute which is used for ordering objects of this type must come first:
     #: Sequential numeric value
-    ordinal = attr.ib(converter=int)
+    ordinal: int #= attr.ib(converter=int)
     #: unique identifier (suitable as Python name, \
     #: see `<https://docs.python.org/3/reference/lexical_analysis.html#identifiers>`_)
-    id = attr.ib()
+    id: str #= attr.ib()
     #: unique human-readable name
-    name = attr.ib()
+    name: str #= attr.ib()
     #: corresponding status in the EGIDS scala
-    egids = attr.ib()
+    egids: str #= attr.ib()
     #: corresponding status in the UNESCO scala
-    unesco = attr.ib()
+    unesco: str #= attr.ib()
     #: corresponding status in ElCat
-    elcat = attr.ib()
+    elcat: str #= attr.ib()
     #: Glottolog reference ID linking to further information
-    reference_id = attr.ib()
-    icon = attr.ib(default=None)
+    reference_id: str #= attr.ib()
+    icon: str = None  #attr.ib(default=None)
+
+    def __post_init__(self):
+        self.ordinal = int(self.ordinal)
 
     def __lt__(self, other):
         return self.ordinal < other.ordinal
@@ -74,29 +79,29 @@ class AES(ConfigObject):
         return self.ordinal == other.ordinal
 
 
-@attr.s
+@dataclasses.dataclass
 class AESSource(ConfigObject):
     """
     Reference information for AES sources
     """
-    id = attr.ib()  #:
-    name = attr.ib()  #:
-    url = attr.ib()  #:
+    id: str #= attr.ib()  #:
+    name: str #= attr.ib()  #:
+    url: str #= attr.ib()  #:
     #: Glottolog reference ID linking to further information
-    reference_id = attr.ib()
-    pages = attr.ib(default=None)  #:
+    reference_id: str #= attr.ib()
+    pages: str = None #attr.ib(default=None)  #:
 
 
-@attr.s
+@dataclasses.dataclass
 class Macroarea(ConfigObject):
     """
     Glottolog macroareas (see `<https://glottolog.org/meta/glossary#macroarea>`_)
     """
-    id = attr.ib()  #:
-    name = attr.ib()  #:
-    description = attr.ib()  #:
+    id: str #= attr.ib()  #:
+    name: str #= attr.ib()  #:
+    description: str #= attr.ib()  #:
     #: Glottolog reference ID linking to further information
-    reference_id = attr.ib()
+    reference_id: str #= attr.ib()
 
     @property
     def geojson(self):
@@ -105,57 +110,84 @@ class Macroarea(ConfigObject):
         return load(fname) if fname.exists() else None
 
 
-@attr.s
+@functools.total_ordering
+@dataclasses.dataclass
 class DocumentType(ConfigObject):
     """
     Document types categorize Glottolog references
     """
-    rank = attr.ib(converter=int)  #:
-    id = attr.ib()  #:
-    name = attr.ib()  #:
-    description = attr.ib()  #:
-    abbv = attr.ib()
-    bibabbv = attr.ib()
-    webabbr = attr.ib()
-    triggers = attr.ib(converter=lambda s: nfilter(s.split('\n')))
+    rank: int #= attr.ib(converter=int)  #:
+    id: str #= attr.ib()  #:
+    name: str #= attr.ib()  #:
+    description: str #= attr.ib()  #:
+    abbv: str #= attr.ib()
+    bibabbv: str #= attr.ib()
+    webabbr: str #= attr.ib()
+    triggers: list[str] #= attr.ib(converter=lambda s: nfilter(s.split('\n')))
+
+    def __post_init__(self):
+        self.rank = int(self.rank)
+        self.triggers = nfilter(self.triggers.split('\n'))
+
+    def __lt__(self, other):
+        return self.rank < other.rank
+
+    def __eq__(self, other):
+        return self.rank == other.rank
 
 
-@attr.s
+@dataclasses.dataclass
 class MEDType(ConfigObject):
     """
     MED (aka Descriptive Status) types (more coarse-grained document types)
 
     .. seealso:: `<https://glottolog.org/langdoc/status>`_
     """
-    rank = attr.ib(converter=int)  #:
-    id = attr.ib()  #:
-    name = attr.ib()  #:
-    description = attr.ib()  #:
-    icon = attr.ib(default=None)
+    rank: str #= attr.ib(converter=int)  #:
+    id: str #= attr.ib()  #:
+    name: str #= attr.ib()  #:
+    description: str #= attr.ib()  #:
+    icon: str = None #attr.ib(default=None)
+
+    def __post_init__(self):
+        self.rank = int(self.rank)
 
 
-@attr.s
+@dataclasses.dataclass
 class LanguageType(ConfigObject):
     """
     Language types categorize languages.
     """
-    id = attr.ib()  #:
+    id: str #= attr.ib()  #:
     #: Glottocode of the pseudo-family that languages of this type are grouped in.
-    pseudo_family_id = attr.ib()
-    category = attr.ib()  #: category name for languages of this type
-    description = attr.ib()  #:
+    pseudo_family_id: str #= attr.ib()
+    category: str #= attr.ib()  #: category name for languages of this type
+    description: str #= attr.ib()  #:
 
 
-@attr.s(hash=True)
+@functools.total_ordering
+@dataclasses.dataclass
 class LanguoidLevel(ConfigObject):
     """
     Languoid levels describe the position of languoid nodes in the classification.
 
     :ivar name: alias for `id`
     """
-    ordinal = attr.ib(converter=int)  #:
-    id = attr.ib()  #:
-    description = attr.ib()  #:
+    ordinal: int #= attr.ib(converter=int)  #:
+    id: str #= attr.ib()  #:
+    description: str #= attr.ib()  #:
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __post_init__(self):
+        self.ordinal = int(self.ordinal)
+
+    def __lt__(self, other):
+        return self.ordinal < other.ordinal
+
+    def __eq__(self, other):
+        return self.ordinal == other.ordinal
 
     @property
     def name(self):
@@ -187,7 +219,13 @@ class Config(collections.OrderedDict):
         ini = get_ini(fname)
         d = collections.OrderedDict()
         for sec in ini.sections():
-            obj = object_class.from_section(ini, sec, fname)
+            if object_class is types.SimpleNamespace:
+                kw = {'name' if 'id' in ini[sec] else 'id': sec, '_fname': fname}
+                kw.update({
+                    k: eval(v) if v in ('True', 'False') else v for k, v in ini[sec].items()})
+                obj = cls(**kw)
+            else:
+                obj = object_class.from_section(ini, sec, fname)
             d[obj.id] = obj
         res = cls(**d)
         res.__defaults__ = ini['DEFAULT']

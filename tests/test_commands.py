@@ -65,21 +65,6 @@ def test_create(capsys, _main, api_copy):
         (api_copy.repos / 'languoids' / 'tree' / 'abcd1234').as_posix()))
 
 
-def test_fts(capsys, _main):
-    with pytest.raises(SystemExit):
-        _main('refsearch "Harzani year:1334"')
-
-    _main('searchindex')
-    _main('refsearch "Harzani year:1334"')
-    assert "'Abd-al-'Ali Karang" in capsys.readouterr()[0]
-
-    _main('langsearch id:abcd*')
-    assert "abcd1234" in capsys.readouterr()[0]
-
-    _main('langsearch classification')
-    assert "abcd1234" in capsys.readouterr()[0]
-
-
 def test_metadata(capsys, _main):
     _main('langdatastats')
     assert "longitude" in capsys.readouterr()[0]

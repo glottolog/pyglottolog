@@ -2,6 +2,7 @@
 Programmatic access to Glottolog data.
 """
 import re
+import types
 import typing
 import pathlib
 import functools
@@ -108,7 +109,7 @@ class Glottolog(API):
 
     def _cfg(self, name, cls=None):
         return config.Config.from_ini(
-            self.path('config', name + '.ini'), object_class=cls or config.Generic)
+            self.path('config', name + '.ini'), object_class=cls or types.SimpleNamespace)
 
     @functools.cached_property
     def aes_status(self) -> typing.Dict[str, config.AES]:
@@ -160,16 +161,16 @@ class Glottolog(API):
         return self._cfg('languoid_levels', cls=config.LanguoidLevel)
 
     @functools.cached_property
-    def editors(self) -> typing.Dict[str, config.Generic]:
+    def editors(self) -> typing.Dict[str, config.Editors]:
         """
         Metadata about editors of Glottolog
 
         :rtype: mapping with :class:`config.Generic` values
         """
-        return self._cfg('editors')
+        return self._cfg('editors', cls=config.Editors)
 
     @functools.cached_property
-    def publication(self) -> typing.Dict[str, config.Generic]:
+    def publication(self) -> typing.Dict[str, str]:
         """
         Metadata about the Glottolog publication
 
