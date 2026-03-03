@@ -36,17 +36,15 @@ SELECT ?item ?glottocode ?wikipedia WHERE {
 
 def query(p):
         res = requests.post(
-            'https://query.wikidata.org/sparql',
+            'https://query.wikidata.org/bigdata/namespace/wdq/sparql',
             data=dict(query=SPARQL),
-            headers=dict(Accept='text/csv')
+            headers={'Accept': 'text/csv', 'User-Agent': 'pyglottolog'}
         )
         p.write_text(res.text)
 
 
 class Wikidata(LinkProvider):
     def iterupdated(self, languoids):  # pragma: no cover
-        if confirm('Query Wikidata?'):
-            query(self.repos.path('build', 'glottocode2wikidata.csv'))
         res = {}
         if self.repos:
             res = {d['glottocode']: d for d in reader(

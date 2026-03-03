@@ -127,7 +127,10 @@ class ChangeRequest(object):
                     for i, cr in enumerate(tables[0]):
                         d = {k.replace(' ', '_'): v for k, v in cr.items()}
                         if 'Effective_Date' in d:
-                            yield cls(**{k.replace(' ', '_'): v for k, v in cr.items()})
+                            try:
+                                yield cls(**{k.replace(' ', '_'): v for k, v in cr.items()})
+                            except (KeyError, ValueError):
+                                pass
                 if i < 99:
                     break
                 page += 1  # pragma: no cover
@@ -137,11 +140,14 @@ class ChangeRequest(object):
 
 def change_request_as_source(id_, rows, ref_ids):
     title = "Change Request Number {0}: ".format(id_)
-    title += ", ".join(
-        "{0} {1} [{2}]".format(r.Status.lower(), r.Change_Type.lower(), r.Affected_Identifier)
-        for r in sorted(
-            rows,
-            key=lambda cr: (ChangeRequest.CHANGE_TYPES[cr.Change_Type], cr.Affected_Identifier)))
+    title_parts = []
+    for r in sorted(
+        rows, key=lambda cr: (ChangeRequest.CHANGE_TYPES[cr.Change_Type], cr.Affected_Identifier)
+    ):
+        part = f"{r.Status.lower()} {r.Change_Type.lower()} [{r.Affected_Identifier}]"
+        if part not in title_parts:
+            title_parts.append(part)
+    title += ", ".join(title_parts)
     date = None
     for row in rows:
         if row.Effective_Date:
@@ -162,7 +168,7 @@ def change_request_as_source(id_, rows, ref_ids):
         'year': rows[0].year,
         'hhtype': "overview",
         'lgcode': ', '.join(
-            "{0} [{1}]".format(r.Reference_Name, r.Affected_Identifier) for r in rows),
+            sorted({f"{r.Reference_Name} [{r.Affected_Identifier}]" for r in rows})),
         'src': "iso6393",
     }
     if id_ in ref_ids and ref_ids[id_]:
