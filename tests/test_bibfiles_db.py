@@ -12,16 +12,13 @@ def test_Database(capsys, tmpdir, bibfiles_copy):
     fpath = str(tmpdir / 'test.sqlite3')
     bibfiles_copy.to_sqlite(fpath)
     assert 'ENTRYTYPE' in capsys.readouterr()[0]
-    bibfiles_copy.to_sqlite(fpath, verbose=True, rebuild=True)
+    bibfiles_copy.to_sqlite(fpath, verbose=True)
     assert 'ENTRYTYPE' in capsys.readouterr()[0]
 
     bibfiles_copy.to_sqlite(fpath)
-    bibfiles_copy.to_sqlite(fpath, rebuild=True)
     capsys.readouterr()
 
     db = Database(fpath)
-    db.is_uptodate(bibfiles_copy[1:], verbose=True)
-    assert len(capsys.readouterr()[0].splitlines()) == 3
 
     db.to_bibfile(str(tmpdir / 'out.bib'))
     db.to_csvfile(str(tmpdir / 'out.csv'))

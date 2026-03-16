@@ -81,10 +81,7 @@ available commands:
                         and dialects subsumed "under" it.
     langdatastats       List all metadata fields used in languoid INI files
                         and their frequency.
-    langsearch          Search Glottolog languoids.
     languoids           Write languoids data to csv files
-    refsearch           Search Glottolog references
-    searchindex         Index
     show                Display details of a Glottolog object.
     tree                Print the classification tree starting at a specific
                         languoid.
@@ -112,65 +109,3 @@ This will create a CSVW package, i.e.
 where `VERSION` is the result of running `git describe` on the data repository,
 or the version string passed as`--version=VERSION` in case you are running the command
 on an export of the repository or a download from ZENODO.
-
-
-### Languoid search
-
-To allow convenient search across all languoid info files, `pyglottolog` comes with functionality
-to create and search a [Whoosh](https://whoosh.readthedocs.io/en/latest/intro.html) index. To do
-so, run
-```shell script
-glottolog searchindex
-```
-
-This will take a couple of minutes (~15 on a somewhat beefy laptop with SSD) and build an index of 
-about 800 MB size at `build/`.
-
-Now you can search the index, e.g. using alternative names as query:
-```shell
-$ glottolog langsearch "Abipónok"
-1 matches
-Abipon [abip1241] language
-languoids/tree/guai1249/guai1250/abip1241/md.ini
-Abipónok [hu]
-
-1 matches
-```
-
-But you can also exploit the schema defined in 
-[pyglottolog.fts.get_langs_index](https://github.com/glottolog/pyglottolog/blob/c382b849b5245acba78d8022aadd4de83e73e909/src/pyglottolog/fts.py#L41-L52);
-i.e. use fields in [your query](https://whoosh.readthedocs.io/en/latest/querylang.html):
-```shell
-$ glottolog langsearch "country:PG"
-...
-
-Alamblak [alam1246] language
-languoids/tree/sepi1257/sepi1258/east2496/alam1246/md.ini
-Papua New Guinea (PG)
-
-906 matches
-
-$ glottolog --repos=. langsearch "iso:mal"
-...
-
-Malayalam [mala1464] language
-languoids/tree/drav1251/sout3133/sout3138/tami1291/tami1292/tami1293/tami1294/tami1297/tami1298/mala1541/mala1464/md.ini
-
-1 matches
-```
-
-
-### Reference search
-
-The same can be done for reference data: To create a Whoosh index with all reference data, run
-```shell script
-glottolog searchindex
-```
-
-Now you can query the index (using the fields described in
-[the schema](https://github.com/glottolog/pyglottolog/blob/c382b849b5245acba78d8022aadd4de83e73e909/src/pyglottolog/fts.py#L118-L128)):
-```shell
-$ glottolog refsearch "author:Haspelmath AND title:Atlas"
-...
-(13 matches)
-```

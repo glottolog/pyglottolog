@@ -99,14 +99,12 @@ class BaseDatabase(Connectable):
     """Collection of parsed .bib files loaded into a SQLite database."""
 
     @classmethod
-    def from_bibfiles(cls, bibfiles, filepath, *, rebuild: bool = False,
+    def from_bibfiles(cls, bibfiles, filepath, *,
                       page_size: typing.Optional[int] = PAGE_SIZE,
                       verbose: bool = False):
         """Load ``bibfiles`` if needed, hash, split/merge, return the database."""
         self = cls(filepath)
         if self.filepath.exists():
-            if not rebuild and self.is_uptodate(bibfiles):
-                return self
             self.filepath.unlink()
 
         with self.connect(page_size=page_size) as conn:
@@ -130,11 +128,6 @@ class BaseDatabase(Connectable):
             conn.commit()
 
         return self
-
-    def is_uptodate(self, bibfiles, *, verbose: bool = False):
-        """Does the db have the same filenames, sizes, and mtimes as ``bibfiles``?"""
-        with self.connect() as conn:
-            return File.same_as(conn, bibfiles, verbose=verbose)
 
     def __iter__(self, *, chunksize: int = 100):
         """Yield pairs of ``(Entry.id, Entry.hash)`` and unmerged field values."""
@@ -320,9 +313,6 @@ class Exportable:
         with self.connect() as conn:
             assert Entry.allid(conn=conn)
 
-        if not self.is_uptodate(bibfiles, verbose=True):
-            raise RuntimeError('trickle with an outdated db')  # pragma: no cover
-
         changed = (Entry.id != sa.func.coalesce(Entry.refid, -1))
 
         select_files = (sa.select(File.pk,
@@ -501,31 +491,8 @@ class File:
                      unique=True)
 
     size = sa.Column(sa.Integer, sa.CheckConstraint('size > 0'), nullable=False)
-    mtime = sa.Column(sa.DateTime, nullable=False)
 
     priority = sa.Column(sa.Integer, nullable=False)
-
-    @classmethod
-    def same_as(cls, conn, bibfiles, *, verbose: bool = False):
-        """Return whether all sizes and mtimes are the same as in ``bibfiles``."""
-        ondisk = {b.fname.name: (b.size, b.mtime) for b in bibfiles}
-
-        select_files = (sa.select(cls.name, cls.size, cls.mtime)
-                        .order_by('name'))
-        result = conn.execute(select_files)
-        indb = {name: (size, mtime) for name, size, mtime in result}
-
-        if ondisk == indb:
-            return True
-
-        if verbose:
-            ondisk_names, indb_names = (d.keys() for d in (ondisk, indb))
-            print(f'missing in db: {list(ondisk_names - indb_names)}')
-            print(f'missing on disk: {list(indb_names - ondisk_names)}')
-            common = ondisk_names & indb_names
-            differing = [c for c in common if ondisk[c] != indb[c]]
-            print(f'differing in size/mtime: {differing}')
-        return False
 
 
 @registry.mapped
@@ -760,7 +727,7 @@ def import_bibfiles(conn, bibfiles, *, ref_id_field=REF_ID_FIELD):
     log.info('importing bibfiles into a new db')
 
     insert_file = dbapi_insert(conn, File,
-                               column_keys=['name', 'size', 'mtime', 'priority'])
+                               column_keys=['name', 'size', 'priority'])
     insert_entry = dbapi_insert(conn, Entry,
                                 column_keys=['file_pk', 'bibkey', 'refid'])
     insert_values = dbapi_insert(conn, Value,
@@ -768,7 +735,7 @@ def import_bibfiles(conn, bibfiles, *, ref_id_field=REF_ID_FIELD):
                                  executemany=True)
 
     for b in bibfiles:
-        file = (b.fname.name, b.size, b.mtime, b.priority)
+        file = (b.fname.name, b.size, b.priority)
         file_pk = insert_file(file).lastrowid
         for e in b.iterentries():
             entry = (file_pk, e.key, e.fields.get(ref_id_field))

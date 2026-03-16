@@ -54,10 +54,6 @@ def test_editors(api):
     assert eids[0] == 'hammarstroem'
 
 
-def test_paths(api):
-    assert api.ftsindex
-
-
 def test_languoid(api):
     assert api.languoid('abc').name == 'language'
 

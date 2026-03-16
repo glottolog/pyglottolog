@@ -186,13 +186,6 @@ class Glottolog(API):
         """
         return util.get_iso(self.build_path())
 
-    @property
-    def ftsindex(self) -> pathlib.Path:
-        """
-        Directory within `build` where the FullTextSearch index is created.
-        """
-        return self.build_path('whoosh')
-
     @functools.cached_property
     def _tree_dirs(self):
         return list(walk(self.tree, mode='dirs'))

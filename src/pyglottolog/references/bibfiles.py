@@ -86,9 +86,9 @@ class BibFiles(list):
             return self._map[index_or_filename]
         return super().__getitem__(index_or_filename)
 
-    def to_sqlite(self, filepath=BIBFILES, rebuild=False, verbose=False):
+    def to_sqlite(self, filepath=BIBFILES, verbose=False):
         """Return a database with the bibfiles loaded."""
-        return Database.from_bibfiles(self, filepath, rebuild=rebuild, verbose=verbose)
+        return Database.from_bibfiles(self, filepath, verbose=verbose)
 
     def roundtrip_all(self):
         """Load and save all bibfiles with the current settings."""
