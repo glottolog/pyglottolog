@@ -35,12 +35,12 @@ SELECT ?item ?glottocode ?wikipedia WHERE {
 
 
 def query(p):
-        res = requests.post(
-            'https://query.wikidata.org/sparql',
-            data=dict(query=SPARQL),
-            headers=dict(Accept='text/csv')
-        )
-        p.write_text(res.text)
+    res = requests.post(
+        'https://query.wikidata.org/sparql',
+        data=dict(query=SPARQL),
+        headers=dict(Accept='text/csv')
+    )
+    p.write_text(res.text)
 
 
 class Wikidata(LinkProvider):

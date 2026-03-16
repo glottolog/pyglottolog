@@ -1,3 +1,7 @@
+"""
+Functionality to integrate ISO 639-3 data.
+"""
+import logging
 import re
 import hashlib
 import pathlib
@@ -5,17 +9,24 @@ import datetime
 import itertools
 import dataclasses
 from xml.etree import ElementTree
+from typing import Optional
+from collections.abc import Generator, Iterator
 
 from clldutils import iso_639_3
 from csvw import dsv
 
-from .references.bibtex import save
+from .references.bibtex import save, EntryType
+from .util import PathType
 
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 CACHE_DIR = 'iso_639_3_cache'
 
 
-def read_url(path, cache_dir=None, log=None):
+def read_url(
+        path: str,
+        cache_dir: Optional[PathType] = None,
+        log: Optional[logging.Logger] = None,
+) -> str:
     """
     Delegate scraping to clldutils, since nowadays this requires tweaking the user agent as well.
     """
@@ -36,17 +47,14 @@ def read_url(path, cache_dir=None, log=None):
         return fp.read().decode('utf8')
 
 
-def valid_iso_code(attr, value):
-    if not ISO_CODE_PATTERN.match(value):
-        raise ValueError('invalid ISO code in {0}: {1}'.format(attr, value))
-
-
-def normalize_whitespace(s):
+def normalize_whitespace(s: str) -> str:
+    """Turn cluster of whitespace into single space."""
     return re.sub(r'\s+', ' ', s).strip()
 
 
 @dataclasses.dataclass
-class Retirement(object):
+class Retirement:
+    """A row in the retirements table."""
     RET_REASON = {  # http://www-01.sil.org/iso639-3/download.asp#retiredDownloads
         'C': 'change',
         'D': 'duplicate',
@@ -54,28 +62,36 @@ class Retirement(object):
         'S': 'split',
         'M': 'merge',
     }
-    Id: str # = attr.ib(validator=valid_iso_code)
-    Ref_Name: str # = attr.ib()
-    Ret_Reason: str #= attr.ib(converter=lambda v: Retirement.RET_REASON.get(v))
-    Change_To: str #= attr.ib(
-        #converter=lambda v: v or None,
-        #validator=attr.validators.optional(valid_iso_code))
-    Ret_Remedy: str #= attr.ib(converter=normalize_whitespace)
-    Effective: datetime.date #= attr.ib(
-        #converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
-    cr: str = None #attr.ib(default=None)
+    Id: str
+    Ref_Name: str
+    Ret_Reason: str
+    Change_To: str
+    Ret_Remedy: str
+    Effective: datetime.date
+    cr: str = None
 
     def __post_init__(self):
-        valid_iso_code('Id', self.Id)
+        def _validate_iso_code(attr, value):
+            if not ISO_CODE_PATTERN.match(value):
+                raise ValueError(f'invalid ISO code in {attr}: {value}')
+
+        _validate_iso_code('Id', self.Id)
         self.Ret_Reason = Retirement.RET_REASON.get(self.Ret_Reason)
         self.Change_To = self.Change_To or None
         if self.Change_To:
-            valid_iso_code('Change_To', self.Change_To)
+            _validate_iso_code('Change_To', self.Change_To)
         self.Ret_Remedy = normalize_whitespace(self.Ret_Remedy)
-        self.Effective = datetime.date(*[int(p) for p in self.Effective.split('-')]) if self.Effective else None
+        self.Effective = datetime.date(
+            *[int(p) for p in self.Effective.split('-')]) if self.Effective else None
 
     @classmethod
-    def iter(cls, table=None, cache_dir=None, log=None):
+    def iter(
+            cls,
+            table: Optional[Iterator[dict[str, str]]] = None,
+            cache_dir: Optional[PathType] = None,
+            log: Optional[logging.Logger] = None,
+    ) -> Generator['Retirement', None, None]:
+        """Read retirements from a table."""
         content = read_url(
             'sites/iso639-3/files/downloads/iso-639-3_Retirements.tab',
             cache_dir=cache_dir,
@@ -86,6 +102,7 @@ class Retirement(object):
 
 @dataclasses.dataclass
 class ChangeRequest:
+    """A Change request."""
     CHANGE_TYPES = {  # map change types to a sort key
         'Create': 'z',
         'Merge': 'c',
@@ -93,38 +110,47 @@ class ChangeRequest:
         'Split': 'b',
         'Update': 'y'
     }
-    Status: str #= attr.ib(
-        #validator=attr.validators.in_(['Rejected', 'Adopted', 'Pending', 'Partially Adopted']))
-    Reference_Name: str #= attr.ib()
-    Effective_Date: datetime.date #= attr.ib(
-        #converter=lambda v: datetime.date(*[int(p) for p in v.split('-')]) if v else None)
-    Change_Type: str #= attr.ib(validator=attr.validators.in_(list(CHANGE_TYPES.keys())))
-    Change_Request_Number: str #= attr.ib(converter=lambda v: str(v) if v else None)
-    Region_Group: str #= attr.ib()
-    Affected_Identifier: str #= attr.ib()
-    Language_Family_Group: str #= attr.ib()
+    Status: str
+    Reference_Name: str
+    Effective_Date: datetime.date
+    Change_Type: str
+    Change_Request_Number: str
+    Region_Group: str
+    Affected_Identifier: str
+    Language_Family_Group: str
 
     def __post_init__(self):
         assert self.Status in ['Rejected', 'Adopted', 'Pending', 'Partially Adopted']
-        self.Effective_Date = datetime.date(*[int(p) for p in self.Effective_Date.split('-')]) if self.Effective_Date else None
+        self.Effective_Date = datetime.date(
+            *[int(p) for p in self.Effective_Date.split('-')]) if self.Effective_Date else None
         assert self.Change_Type in self.CHANGE_TYPES
-        self.Change_Request_Number = str(self.Change_Request_Number) if self.Change_Request_Number else None
+        self.Change_Request_Number = str(self.Change_Request_Number) \
+            if self.Change_Request_Number else None
 
     @property
-    def url(self):
+    def url(self) -> str:
+        """URL for the change request on the ISO-639 website."""
         return iso_639_3.BASE_URL + 'request/' + self.Change_Request_Number
 
     @property
-    def year(self):
+    def year(self) -> str:
+        """Year the change request was created."""
         return self.Change_Request_Number.split('-')[0]
 
     @property
-    def pdf(self):
-        return '{0}sites/iso639-3/files/change_requests/{1}/{2}.pdf'.format(
-            iso_639_3.BASE_URL, self.year, self.Change_Request_Number)
+    def pdf(self) -> str:
+        """URL of the PDF with the cr details on the ISO-639 website."""
+        return (f'{iso_639_3.BASE_URL}sites/iso639-3/files/change_requests/'
+                f'{self.year}/{self.Change_Request_Number}.pdf')
 
     @classmethod
-    def iter(cls, max_year=None, cache_dir=None, log=None):
+    def iter(
+            cls,
+            max_year: Optional[int] = None,
+            cache_dir: Optional[PathType] = None,
+            log: Optional[logging.Logger] = None,
+    ) -> Generator['ChangeRequest', None, None]:
+        """Read change requests from the website (or possibly from cached copies)."""
         path = "code_changes/change_request_index/data/{0}?" \
                "field_change_request_region_grp_tid=All&field_change_request_lf_group_tid=All&" \
                "field_change_instance_chnge_type_tid=All&field_change_request_act_status_tid=All&" \
@@ -150,7 +176,7 @@ class ChangeRequest:
             page = 0
 
 
-def change_request_as_source(id_, rows, ref_ids):
+def change_request_as_source(id_, rows, ref_ids) -> EntryType:
     title = "Change Request Number {0}: ".format(id_)
     title += ", ".join(
         "{0} {1} [{2}]".format(r.Status.lower(), r.Change_Type.lower(), r.Affected_Identifier)
@@ -193,7 +219,7 @@ def bibtex(api, log, max_year=None):
     bib = api.bibfiles['iso6393.bib']
     glottolog_ref_ids = bib.glottolog_ref_id_map
 
-    entries = []
+    entries: list[EntryType] = []
 
     with api.cache_dir(CACHE_DIR) as cache_dir:
         grouped = itertools.groupby(

@@ -1,13 +1,16 @@
+"""
+Handling roman numbers.
+"""
 import re
 
 __all__ = ['introman', 'romanint']
 
 ROMAN_MAP = {'m': 1_000, 'd': 500, 'c': 100, 'l': 50, 'x': 10, 'v': 5, 'i': 1}
-
 REROM = re.compile(r'(\d+)')
 
 
-def introman(i):
+def introman(i: int) -> str:
+    """Convert a number to a roman numeral."""
     iz = {v: k for k, v in ROMAN_MAP.items()}
     x = ""
     for v, c in sorted(iz.items(), reverse=True):
@@ -20,7 +23,8 @@ def introman(i):
     return x
 
 
-def romanint(r):
+def romanint(r: str) -> int:
+    """Convert a roman numeral to a number"""
     i = 0
     prev = 10_000
     for c in r:
@@ -33,5 +37,6 @@ def romanint(r):
     return i
 
 
-def roman(x):
+def roman(x: str) -> str:
+    """Convert the string representation of a number to a roman numeral."""
     return REROM.sub(lambda o: introman(int(o.group(1))), x).upper()

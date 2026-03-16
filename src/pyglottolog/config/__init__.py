@@ -53,21 +53,21 @@ class AES(ConfigObject):
     """
     # The attribute which is used for ordering objects of this type must come first:
     #: Sequential numeric value
-    ordinal: int #= attr.ib(converter=int)
+    ordinal: int
     #: unique identifier (suitable as Python name, \
     #: see `<https://docs.python.org/3/reference/lexical_analysis.html#identifiers>`_)
-    id: str #= attr.ib()
+    id: str
     #: unique human-readable name
-    name: str #= attr.ib()
+    name: str
     #: corresponding status in the EGIDS scala
-    egids: str #= attr.ib()
+    egids: str
     #: corresponding status in the UNESCO scala
-    unesco: str #= attr.ib()
+    unesco: str
     #: corresponding status in ElCat
-    elcat: str #= attr.ib()
+    elcat: str
     #: Glottolog reference ID linking to further information
-    reference_id: str #= attr.ib()
-    icon: str = None  #attr.ib(default=None)
+    reference_id: str
+    icon: str = None
 
     def __post_init__(self):
         self.ordinal = int(self.ordinal)
@@ -84,12 +84,12 @@ class AESSource(ConfigObject):
     """
     Reference information for AES sources
     """
-    id: str #= attr.ib()  #:
-    name: str #= attr.ib()  #:
-    url: str #= attr.ib()  #:
+    id: str
+    name: str
+    url: str
     #: Glottolog reference ID linking to further information
-    reference_id: str #= attr.ib()
-    pages: str = None #attr.ib(default=None)  #:
+    reference_id: str
+    pages: str = None
 
 
 @dataclasses.dataclass
@@ -97,11 +97,11 @@ class Macroarea(ConfigObject):
     """
     Glottolog macroareas (see `<https://glottolog.org/meta/glossary#macroarea>`_)
     """
-    id: str #= attr.ib()  #:
-    name: str #= attr.ib()  #:
-    description: str #= attr.ib()  #:
+    id: str
+    name: str
+    description: str
     #: Glottolog reference ID linking to further information
-    reference_id: str #= attr.ib()
+    reference_id: str
 
     @property
     def geojson(self):
@@ -116,14 +116,14 @@ class DocumentType(ConfigObject):
     """
     Document types categorize Glottolog references
     """
-    rank: int #= attr.ib(converter=int)  #:
-    id: str #= attr.ib()  #:
-    name: str #= attr.ib()  #:
-    description: str #= attr.ib()  #:
-    abbv: str #= attr.ib()
-    bibabbv: str #= attr.ib()
-    webabbr: str #= attr.ib()
-    triggers: list[str] #= attr.ib(converter=lambda s: nfilter(s.split('\n')))
+    rank: int
+    id: str
+    name: str
+    description: str
+    abbv: str
+    bibabbv: str
+    webabbr: str
+    triggers: list[str]
 
     def __post_init__(self):
         self.rank = int(self.rank)
@@ -143,11 +143,11 @@ class MEDType(ConfigObject):
 
     .. seealso:: `<https://glottolog.org/langdoc/status>`_
     """
-    rank: str #= attr.ib(converter=int)  #:
-    id: str #= attr.ib()  #:
-    name: str #= attr.ib()  #:
-    description: str #= attr.ib()  #:
-    icon: str = None #attr.ib(default=None)
+    rank: str
+    id: str
+    name: str
+    description: str
+    icon: str = None
 
     def __post_init__(self):
         self.rank = int(self.rank)
@@ -158,11 +158,11 @@ class LanguageType(ConfigObject):
     """
     Language types categorize languages.
     """
-    id: str #= attr.ib()  #:
+    id: str
     #: Glottocode of the pseudo-family that languages of this type are grouped in.
-    pseudo_family_id: str #= attr.ib()
-    category: str #= attr.ib()  #: category name for languages of this type
-    description: str #= attr.ib()  #:
+    pseudo_family_id: str
+    category: str  #: category name for languages of this type
+    description: str
 
 
 @functools.total_ordering
@@ -173,9 +173,9 @@ class LanguoidLevel(ConfigObject):
 
     :ivar name: alias for `id`
     """
-    ordinal: int #= attr.ib(converter=int)  #:
-    id: str #= attr.ib()  #:
-    description: str #= attr.ib()  #:
+    ordinal: int
+    id: str
+    description: str
 
     def __hash__(self):
         return hash(self.id)

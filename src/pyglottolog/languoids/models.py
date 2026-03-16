@@ -278,7 +278,8 @@ class ISORetirement:
     change_request: Optional[str] = None  #: Number of the ISO change request
     effective: Optional[str] = None  #: Date of acceptance of the change request
     reason: Optional[str] = None  #: Reason to retire the ISO code
-    change_to: list[str] = dataclasses.field(default_factory=list)  #: List of ISO codes replacing the retired code
+    #: List of ISO codes replacing the retired code
+    change_to: list[str] = dataclasses.field(default_factory=list)
     remedy: Optional[str] = None  #: What to do about the retired code
     comment: Optional[str] = None
 

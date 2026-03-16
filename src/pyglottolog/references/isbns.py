@@ -1,21 +1,23 @@
 # isbns.py
-
+"""
+https://en.wikipedia.org/wiki/International_Standard_Book_Number
+"""
 import re
 
 __all__ = ['Isbns', 'Isbn']
 
 
 class Isbns(list):
-
-    class Parser(object):
+    """ISBN numbers"""
+    class Parser:  # pylint: disable=C0115,R0903
         @staticmethod
-        def parse(ma):
+        def parse(ma):  # pylint: disable=C0116
             return ''.join(g for g in ma.groups() if g is not None)
 
-    class Numeric(Parser):
+    class Numeric(Parser):  # pylint: disable=C0115,R0903
         pattern = re.compile(r'(97[89])?(\d{9})([\dXx])(?![\dXx])')
 
-    class Hyphened(Parser):
+    class Hyphened(Parser):  # pylint: disable=C0115,R0903
         pattern = re.compile(r'''
             (?:
               (?:ISBN[- ])? (97[89])-
@@ -24,7 +26,7 @@ class Isbns(list):
             )?
             (\d{1,5})- (\d+)- (\d+)- ([\dXx])(?![\dXx])''', flags=re.VERBOSE)
 
-    class Ten99(Parser):
+    class Ten99(Parser):  # pylint: disable=C0115,R0903
         pattern = re.compile(r'(99)-(\d{7})-([\dXx])(?![\dXx])')
 
     @classmethod
@@ -37,7 +39,7 @@ class Isbns(list):
                     pos += len(ma.group())
                     break
             else:
-                raise ValueError('no matching ISBN pattern at index %s: %r' % (pos, s))
+                raise ValueError('no matching ISBN pattern at index {pos}: {s!r}')
             if pos == len(s):
                 return
             for delim in delimiters:
@@ -45,19 +47,19 @@ class Isbns(list):
                     pos += len(delim)
                     break
             else:
-                raise ValueError('no matching delimiter at index %s: %r' % (pos, s))
+                raise ValueError(f'no matching delimiter at index {pos}: {s!r}')
 
     @classmethod
-    def from_field(cls, field):
+    def from_field(cls, field):  # pylint: disable=C0116
         isbns = map(Isbn, cls._iterparse(field))
         seen = set()
         return cls(i for i in isbns if i not in seen and not seen.add(i))
 
-    def to_string(self):
+    def to_string(self):  # pylint: disable=C0116
         return ', '.join(i.digits for i in self)
 
 
-class Isbn(object):
+class Isbn:
     """A 13 digit ISBN from a string of 13 or 10 digits.
 
     see also https://en.wikipedia.org/wiki/International_Standard_Book_Number
@@ -85,11 +87,11 @@ class Isbn(object):
             digits = digits.upper()
             check = self._isbn10_check_digit(digits)
         else:
-            raise ValueError('invalid ISBN digits length (%s): %r' % (len(digits), digits))
+            raise ValueError(f'invalid ISBN digits length ({len(digits)}): {digits!r}')
 
         if digits[-1] != check:
-            raise ValueError('invalid ISBN check digit (%s instead of %s): %r'
-                             % (digits[-1], check, digits))
+            raise ValueError(
+                f'invalid ISBN check digit ({digits[-1]} instead of {check}): {digits!r}')
 
         if len(digits) == 10:  # convert
             digits = self._isbn10_prefix + digits[:9]
@@ -110,4 +112,4 @@ class Isbn(object):
         return NotImplemented  # pragma: no cover
 
     def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, self.digits)
+        return f'{self.__class__.__name__}({self.digits!r})'

@@ -16,6 +16,7 @@ from csvw.dsv import UnicodeWriter
 
 from ..util import unique, Trigger
 from .bibfiles import Entry
+from .bibtex import EntryType
 from .bibtex_undiacritic import undiacritic
 from .roman import roman, romanint
 
@@ -24,7 +25,7 @@ INF = float('inf')
 log = logging.getLogger('pyglottolog')
 
 # {<bibkey>: (<type>, <fields-dict>)}
-EntryDbType = dict[str, tuple[str, dict[str, str]]]
+EntryDbType = dict[str, EntryType]
 
 lgcodestr = Entry.lgcodes
 

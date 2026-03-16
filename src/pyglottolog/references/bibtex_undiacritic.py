@@ -1,19 +1,22 @@
 # bibtex_undiacritic.py - remove latex/unicode diacritics for string comparison
-
+"""
+Yet another way to deal with LaTeX coding in BibTeX.
+"""
 import re
 
 from unidecode import unidecode
 
-COMMAND1 = re.compile(r'\\[a-z]+\{([^}]*)\}')
+COMMAND1 = re.compile(r'\\[a-z]+\{([^}]*)}')
 
 COMMAND2 = re.compile(r'\\text[a-z]+')
 
-ACCENT = re.compile(r'''\\[`'^"H~ckl=b.druvt](\{[a-zA-Z]\}|[a-zA-Z])''')
+ACCENT = re.compile(r'''\\[`'^"H~ckl=b.druvt](\{[a-zA-Z]}|[a-zA-Z])''')
 
 DROP = re.compile(r'\\[^\s{}]+\{|\\.|[{}]')
 
 
-def undiacritic(txt):
+def undiacritic(txt: str) -> str:
+    """Remove diacritics."""
     assert isinstance(txt, str)
 
     txt = unidecode(txt)

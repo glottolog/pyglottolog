@@ -106,24 +106,23 @@ class BibFile:
     Represents a BibTeX file, storing a provider's bibliography, providing easy access to its
     records.
     """
-    fname: pathlib.Path  # = attr.ib(validator=file_if_exists)
-    name: str = None  #attr.ib(default=None)  #: Short name of the bibliography
-    title: str = None  #attr.ib(default=None)  #: Title of the bibliography
-    description: str = None  #attr.ib(default=None)  #: The provenance of the bibliography
-    abbr: str = None  #attr.ib(default=None)
-    encoding: str = 'utf-8'  #attr.ib(default='utf-8')
-    normalize: str = 'NFC'  #attr.ib(default='NFC')
-    sortkey: str = None  #attr.ib(
-        #default=None,
-        #converter=lambda s: None if s is None or s.lower() == 'none' else s)
-    priority: int = 0  #attr.ib(default=0, converter=int)
-    url: str = None  #attr.ib(default=None)  #: URL pointing to the source of the bibliography
-    curation: str = None  #attr.ib(default=None)  #: Curation policy for the bibliography at Glottolog
-    api: typing.Any = None  #attr.ib(default=None)
+    fname: pathlib.Path
+    name: str = None  #: Short name of the bibliography
+    title: str = None  #: Title of the bibliography
+    description: str = None  #: The provenance of the bibliography
+    abbr: str = None
+    encoding: str = 'utf-8'
+    normalize: str = 'NFC'
+    sortkey: str = None
+    priority: int = 0
+    url: str = None  #: URL pointing to the source of the bibliography
+    curation: str = None  #: Curation policy for the bibliography at Glottolog
+    api: typing.Any = None
 
     def __post_init__(self):
         self.priority = int(self.priority)
-        self.sortkey = None if self.sortkey is None or self.sortkey.lower() == 'none' else self.sortkey
+        self.sortkey = None if self.sortkey is None or self.sortkey.lower() == 'none' \
+            else self.sortkey
 
     @property
     def id(self):
@@ -260,11 +259,11 @@ class Entry:
         >>> sorted(refs[0]['stan1295'])[-1].med_type.name
         'long grammar'
     """
-    key: str #= attr.ib()  #:
-    type: str #= attr.ib()  #: BibTeX entry type
-    fields: dict #= attr.ib()  #: The metadata of the record
-    bib: str #= attr.ib()
-    api: typing.Any = None  #attr.ib(default=None)
+    key: str
+    type: str  #: BibTeX entry type
+    fields: dict  #: The metadata of the record
+    bib: str
+    api: typing.Any = None
 
     # FIXME: add method to apply triggers!
 
