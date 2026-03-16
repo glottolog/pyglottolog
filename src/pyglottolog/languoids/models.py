@@ -30,6 +30,7 @@ __all__ = [
 
 @dataclasses.dataclass(eq=True, frozen=True)
 class Link:
+    """Links appear in multiple places in languoid ini files."""
     url: str
     label: str = None
 
@@ -82,9 +83,10 @@ class Glottocodes:
     def __iter__(self):
         for alpha, num in self._store.items():
             for n in range(1234, num + 1):
-                yield '{0}{1}'.format(alpha, n)
+                yield f'{alpha}{n}'
 
-    def new(self, name, dry_run=False):
+    def new(self, name, dry_run=False) -> 'Glottocode':
+        """Mint a new Glottocode"""
         alpha = slug(str(name))[:4]
         assert alpha
         while len(alpha) < 4:
