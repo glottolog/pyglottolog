@@ -367,7 +367,7 @@ class Glottolog(API):
         return res
 
     @functools.cached_property
-    def macroarea_map(self):
+    def macroarea_map(self) -> dict[str, str]:
         res = {}
         for lang in self.languoids():
             ma = lang.macroareas[0].name if lang.macroareas else ''

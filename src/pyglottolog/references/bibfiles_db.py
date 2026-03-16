@@ -1,6 +1,7 @@
 """Load references from .bib files into sqlite3, hash, assign ids (split/merge)."""
 
 import collections
+from collections.abc import Generator
 import contextlib
 import difflib
 import functools
@@ -95,6 +96,10 @@ class Connectable:
                 yield result
 
 
+# A BibTeX entry, (key, (type, fields))
+EntryType = tuple[str, tuple[str, dict[str, str]]]
+
+
 class BaseDatabase(Connectable):
     """Collection of parsed .bib files loaded into a SQLite database."""
 
@@ -162,7 +167,7 @@ class BaseDatabase(Connectable):
                               for field, g in groupby_field(grp)]
                     yield id_hash, fields
 
-    def merged(self, *, ref_id_field: str = REF_ID_FIELD):
+    def merged(self, *, ref_id_field: str = REF_ID_FIELD) -> Generator[EntryType, None, None]:
         """Yield ``(bibkey, (entrytype, fields))`` entries merged by ``Entry.id``."""
         for (id_, hash_), grp in self:
             entrytype, fields = self._merged_entry(grp)

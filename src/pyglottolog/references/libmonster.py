@@ -3,12 +3,14 @@ r"""libmonster.py - mixed support library
 # TODO: consider replacing pauthor in keyid with _bibtex.names
 # TODO: enusure \emph is dropped from titles in keyid calculation
 """
-
 import re
+import logging
 from heapq import nsmallest
 from collections import defaultdict
+from collections.abc import Sequence
 from itertools import groupby
 from operator import itemgetter
+from typing import TypeVar, Callable, Any, Literal, Optional
 
 from csvw.dsv import UnicodeWriter
 
@@ -17,13 +19,17 @@ from .bibfiles import Entry
 from .bibtex_undiacritic import undiacritic
 from .roman import roman, romanint
 
+T = TypeVar('T')
 INF = float('inf')
+log = logging.getLogger('pyglottolog')
 
+# {<bibkey>: (<type>, <fields-dict>)}
+EntryDbType = dict[str, tuple[str, dict[str, str]]]
 
 lgcodestr = Entry.lgcodes
 
 
-def opv(d, func, *args):
+def map_values(d: dict[str, T], func: Callable[[T, ...], T], *args):
     """
     Apply func to all values of a dictionary.
 
@@ -31,31 +37,31 @@ def opv(d, func, *args):
     :param func: Callable accepting a value of `d` as first parameter.
     :param args: Additional positional arguments to be passed to `func`.
     :return: `dict` mapping the keys of `d` to the return value of the function call.
+
+    >>> map_values({'a': 1}, lambda x, y: x + y, 3)
+    {'a': 4}
     """
     return {i: func(v, *args) for i, v in d.items()}
 
 
-def grp2(list_):
+def group_pairs(seq: Sequence[Sequence[Any]]) -> dict[Any, list[Any]]:
     """
     Turn a list of pairs into a dictionary, mapping first elements to lists of
     co-occurring second elements in pairs.
 
-    :param l:
-    :return:
+    >>> group_pairs(['ab', 'ac', 'de', 'ax'])
+    {'a': ['b', 'c', 'x'], 'd': ['e']}
     """
     return {a: [pair[1] for pair in pairs] for a, pairs in
-            groupby(sorted(list_, key=itemgetter(0)), itemgetter(0))}
+            groupby(sorted(seq, key=itemgetter(0)), itemgetter(0))}
 
 
-def grp2fd(list_):
+def grp2fd(seq: Sequence[Sequence[Any]]) -> dict[Any, dict[Any, Literal[1]]]:
     """
-    Turn a list of pairs into a nested dictionary, thus grouping by the first element in
-    the pair.
-
-    :param l:
-    :return:
+    Turn a list of pairs into a nested dictionary, thus grouping by the first (and then by the
+    second) element in the pair.
     """
-    return {k: {vv: 1 for vv in v} for k, v in grp2(list_).items()}
+    return {k: {vv: 1 for vv in v} for k, v in group_pairs(seq).items()}
 
 
 reauthor = [re.compile(pattern) for pattern in [
@@ -74,7 +80,7 @@ reauthor = [re.compile(pattern) for pattern in [
 ]]
 
 
-def psingleauthor(n):
+def psingleauthor(n: str) -> Optional[dict[str, str]]:
     if not n:
         return
 
@@ -82,24 +88,23 @@ def psingleauthor(n):
         o = pattern.match(n)
         if o:
             return o.groupdict()
-    print("Couldn't parse name:", n)  # pragma: no cover
+    log.warning("Couldn't parse name: %s", n)  # pragma: no cover
+    return None  # pragma: no cover
 
 
 def pauthor(s):
     pas = [psingleauthor(a) for a in s.split(' and ')]
     if [a for a in pas if not a]:
         if s:
-            print(s)
+            log.warning("Couldn't parse name: %s", s)
     return [a for a in pas if a]
 
 
 relu = re.compile(r"\s+|(d\')(?=[A-Z])")
-
-
 recapstart = re.compile(r"\[?[A-Z]")
 
 
-def lowerupper(s):
+def lowerupper(s: str) -> tuple[list[str], list[str]]:
     parts, lower, upper = [x for x in relu.split(s) if x], [], []
     for i, x in enumerate(parts):
         if not recapstart.match(undiacritic(x)):
@@ -110,7 +115,11 @@ def lowerupper(s):
     return lower, upper
 
 
-def lastnamekey(s):
+def lastnamekey(s: str) -> str:
+    """
+    >>> lastnamekey('von der Meier')
+    'Meier'
+    """
     _, upper = lowerupper(s)
     return max(upper) if upper else ''
 
@@ -121,7 +130,7 @@ def rangecomplete(incomplete, complete):
     '12'
     """
     if len(complete) > len(incomplete):
-        # if the second number in a range of pages has less digits than the the first,
+        # if the second number in a range of pages has less digits than the first,
         # we assume it's meant as only the last digits of the bigger number,
         # i.e. 10-2 is interpreted as 10-12.
         return complete[:len(complete) - len(incomplete)] + incomplete
@@ -129,7 +138,6 @@ def rangecomplete(incomplete, complete):
 
 
 rebracketyear = re.compile(r"\[([\d,\-/]+)]")
-
 
 reyl = re.compile(r"[,\-/\s\[\]]+")
 
@@ -187,7 +195,7 @@ def renfn(e, ups):
 INLG = 'inlg'
 
 
-def add_inlg_e(e, trigs, verbose=True, return_newtrain=False):
+def add_inlg_e(e: EntryDbType, trigs, verbose=True) -> EntryDbType:
     # FIXME: does not honor 'NOT' for now, only maps words to iso codes.
     dh = {word: t.type for t in trigs for _, word in t.clauses}
 
@@ -207,22 +215,7 @@ def add_inlg_e(e, trigs, verbose=True, return_newtrain=False):
     if verbose:
         print(len(unique_), "cases of unique hits")
 
-    t2 = renfn(e, [(k, INLG, v) for (k, v) in unique_])
-
-    if return_newtrain:  # pragma: no cover
-        newtrain = grp2fd([
-            (lgcodestr(fields[INLG])[0], w) for (k, (typ, fields)) in t2.items()
-            if 'title' in fields and INLG in fields
-            if len(lgcodestr(fields[INLG])) == 1 for w in wrds(fields['title'])])
-        for (lg, wf) in sorted(newtrain.items(), key=lambda x: len(x[1])):
-            cm = [(1 + f,
-                   float(1 - f + sum(owf.get(w, 0) for owf in newtrain.values())),
-                   w) for (w, f) in wf.items() if f > 9]
-            cms = [(f / fn, f, fn, w) for (f, fn, w) in cm]
-            cms.sort(reverse=True)
-        return t2, newtrain, cms
-
-    return t2
+    return renfn(e, [(k, INLG, v) for (k, v) in unique_])
 
 
 rerpgs = re.compile(r"([xivmcl]+)-?([xivmcl]*)")
@@ -321,31 +314,39 @@ def accd(mi):
 
 
 def byid(es):
-    return grp2([(cfn, k) for (k, tf) in es.items() for cfn in lgcode(tf)])
+    return group_pairs([(cfn, k) for (k, tf) in es.items() for cfn in lgcode(tf)])
 
 
 def sdlgs(e, hht):
     eindex = byid(e)
-    fes = opv(eindex, lambda ks: {k: e[k] for k in ks})
-    fsd = opv(fes, sd, hht)
+    fes = map_values(eindex, lambda ks: {k: e[k] for k in ks})
+    fsd = map_values(fes, sd, hht)
     return fsd, fes
 
 
 def lstat(e, hht):
     (lsd, lse) = sdlgs(e, hht)
-    return opv(lsd, lambda xs: (xs + [[[None]]])[0][0][-1])
+    return map_values(lsd, lambda xs: (xs + [[[None]]])[0][0][-1])
 
 
 def lstat_witness(e, hht):
     def statwit(xs):
         assert xs
-        [(typ, ks)] = grp2([(t, k) for [p, y, k, t] in xs[0]]).items()
+        [(typ, ks)] = group_pairs([(t, k) for [p, y, k, t] in xs[0]]).items()
         return typ, ks
     (lsd, lse) = sdlgs(e, hht)
-    return opv(lsd, statwit)
+    return map_values(lsd, statwit)
 
 
-def markconservative(m, trigs, ref, hht, outfn, verbose=True, rank=None):
+def markconservative(
+        m: EntryDbType,
+        trigs,
+        ref,
+        hht,
+        outfn,
+        verbose=True,
+        rank=None,
+) -> EntryDbType:
     blamefield = "hhtype"
     mafter = markall(m, trigs, verbose=verbose, rank=rank)
     ls = lstat(ref, hht)
@@ -371,36 +372,42 @@ def markconservative(m, trigs, ref, hht, outfn, verbose=True, rank=None):
                     del f[blamefield]
                 mafter[k] = (t, f)
     for lg in no_status:
-        print('{0} lacks status'.format(lg))
+        print(f'{lg} lacks status')
     with UnicodeWriter(outfn, dialect='excel-tab') as writer:
         writer.writerows(((lg, was) + mis for (lg, miss, was) in log for mis in miss))
     return mafter
 
 
-def markall(e, trigs, verbose=True, rank=None):
+def markall(e: EntryDbType, trigs: list[Trigger], verbose=True, rank=None) -> EntryDbType:
+    """
+    Apply triggers.
+    """
     # the set of fields triggers relate to:
-    clss = set(t.field for t in trigs)
+    trigger_fields = set(t.field for t in trigs)
 
+    # Construct the first argument to Trigger.__call__
     # all bibitems lacking any of the potential triggered fields:
-    ei = {k: (typ, fields) for k, (typ, fields) in e.items()
-          if any(c not in fields for c in clss)}
+    ei: EntryDbType = {
+        k: (typ, fields) for k, (typ, fields) in e.items()
+        if any(c not in fields for c in trigger_fields)}
     eikeys = set(list(ei.keys()))
 
-    # map words in titles to lists of bibitem keys having the word in the title:
+    # Construct the second argument to Trigger.__call__.
+    # Map words in titles to lists of bibitem keys having the word in the title.
     wk = defaultdict(set)
     for k, (typ, fields) in ei.items():
         for w in wrds(fields.get('title', '')):
             wk[w].add(k)
 
-    u = defaultdict(lambda: defaultdict(list))
+    triggered: dict[str, dict[tuple[str, str], Trigger]] = defaultdict(lambda: defaultdict(list))
     for clauses, triggers in Trigger.group(trigs):
         for k in triggers[0](eikeys, wk):
             for t in triggers:
-                u[k][t.cls].append(t)
+                triggered[k][t.cls].append(t)
 
-    for k, t_by_c in sorted(u.items(), key=lambda i: i[0]):
+    for k, t_by_c in sorted(triggered.items(), key=lambda i: i[0]):
         t, f = e[k]
-        f2 = {a: b for a, b in f.items()}
+        f2 = {a: b for a, b in f.items()}  # A copy of the fields.
         for (field, type_), triggers in sorted(t_by_c.items(), key=lambda i: len(i[1])):
             # Make sure we handle the trigger class with the biggest number of matching
             # triggers last.
@@ -413,7 +420,7 @@ def markall(e, trigs, verbose=True, rank=None):
 
     if verbose:
         print("trigs", len(trigs))
-        print("label classes", len(clss))
+        print("label classes", len(trigger_fields))
         print("unlabeled refs", len(ei))
-        print("updates", len(u))
+        print("updates", len(triggered))
     return e
