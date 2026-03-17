@@ -3,6 +3,7 @@ import pathlib
 import functools
 import collections
 import dataclasses
+from typing import Optional
 
 from clldutils.misc import nfilter
 from clldutils.inifile import INI
@@ -85,8 +86,8 @@ class AESSource(ConfigObject):
     Reference information for AES sources
     """
     id: str
-    name: str
-    url: str
+    name: Optional[str]
+    url: Optional[str]
     #: Glottolog reference ID linking to further information
     reference_id: str
     pages: str = None

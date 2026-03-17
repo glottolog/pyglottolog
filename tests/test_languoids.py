@@ -142,6 +142,7 @@ def test_endangerment(api):
     lang = api.languoid('abcd1235')
     assert lang.endangerment.status == api.aes_status.sleeping
     assert 'source' in lang.endangerment.__json__()
+    assert isinstance(lang.endangerment.__json__()['source'], dict)
 
 
 def test_timespan(api, tmpdir, recwarn):

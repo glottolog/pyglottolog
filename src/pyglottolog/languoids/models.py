@@ -1,7 +1,12 @@
+"""
+OO wrappers for various Glottolog data objects.
+"""
 import datetime
+import logging
 import re
-from typing import Optional, Literal, get_args
+from typing import Optional, Literal, get_args, TYPE_CHECKING, Union
 import collections
+from collections.abc import Iterable
 import dataclasses
 import urllib.parse
 
@@ -15,6 +20,9 @@ from dateutil import parser
 from ..util import message
 from ..config import AESSource, AES
 from ..references import Entry
+
+if TYPE_CHECKING:
+    from . import Languoid
 
 __all__ = [
     'Glottocode', 'Glottocodes',
@@ -35,7 +43,8 @@ class Link:
     label: str = None
 
     @property
-    def domain(self):
+    def domain(self) -> str:
+        """The domain part of the URL, aka netloc."""
         return urllib.parse.urlparse(self.url).netloc
 
     @classmethod
@@ -48,7 +57,8 @@ class Link:
         return cls(s)
 
     @classmethod
-    def from_(cls, obj):
+    def from_(cls, obj: Union['Link', str, list, tuple, dict]) -> 'Link':
+        """Instantiate link from various input types."""
         if isinstance(obj, cls):
             return obj
         if isinstance(obj, str):
@@ -59,7 +69,8 @@ class Link:
             return cls(**obj)
         raise TypeError()
 
-    def to_string(self):
+    def to_string(self) -> str:
+        """Link formatted as markdown."""
         if self.label:
             return f'[{self.label}]({self.url})'
         return self.url
@@ -99,10 +110,11 @@ class Glottocodes:
             for k in sorted(self._store.keys()):
                 ordered[k] = self._store[k]
             jsonlib.dump(ordered, self._fname, indent=4)
-        return Glottocode('%s%s' % (alpha, num))
+        return Glottocode(f'{alpha}{num}')
 
 
 class Glottocode(str):
+    """Glottocodes are special string."""
     regex = r'[a-z0-9]{4}[0-9]{4}'
     pattern = re.compile(regex + r'$')
 
@@ -111,7 +123,8 @@ class Glottocode(str):
             raise ValueError(content)
         return str.__new__(cls, content)
 
-    def split(self):
+    def split(self) -> tuple[str, int]:
+        """Split the Glottocode into alpha-numeric and numeric part."""
         return self[:4], int(self[4:])
 
 
@@ -145,31 +158,41 @@ class Reference:
         return api.bibfiles[self.bibname][self.bibkey]
 
     @property
-    def provider(self):
+    def provider(self) -> str:
+        """The provider id."""
         return self.key.split(':')[0]
 
     @property
-    def bibname(self):
-        return '{0}.bib'.format(self.provider)
+    def bibname(self) -> str:
+        """The name of the bibtex file."""
+        return f'{self.provider}.bib'
 
     @property
-    def bibkey(self):
+    def bibkey(self) -> str:
+        """The local bibtex key in the bib."""
         return self.key.split(':', 1)[1]
 
     @classmethod
-    def from_match(cls, match):
+    def from_match(cls, match: re.Match) -> 'Reference':
+        """Instantiate a reference from a regex match."""
         assert match
         return cls(**match.groupdict())
 
     @classmethod
-    def from_string(cls, string, pattern=None):
+    def from_string(cls, string: str, pattern: Optional[re.Pattern] = None) -> 'Reference':
+        """Parse a reference from a string."""
         try:
             return cls.from_match((pattern or cls.pattern).match(string.strip()))
-        except AssertionError:
-            raise ValueError('Invalid reference: {0}'.format(string))
+        except AssertionError as e:
+            raise ValueError(f'Invalid reference: {string}') from e
 
     @classmethod
-    def from_list(cls, list_, pattern=None):
+    def from_list(
+            cls,
+            list_: Iterable[Union['Reference', str]],
+            pattern: Optional[re.Pattern] = None,
+    ) -> list['Reference']:
+        """Turn list of strings into list of Reference instances."""
         res = []
         for s in list_:
             if isinstance(s, cls):
@@ -178,8 +201,8 @@ class Reference:
             if s.strip():
                 try:
                     res.append(cls.from_string(s, pattern=pattern))
-                except AssertionError:  # pragma: no cover
-                    raise ValueError('invalid ref: {0}'.format(s))
+                except AssertionError as e:  # pragma: no cover
+                    raise ValueError(f'invalid ref: {s}') from e
         return res
 
 
@@ -201,19 +224,22 @@ class Country:
         return f'{self.name} ({self.id})' if not minimal else f'{self.id}'
 
     @classmethod
-    def from_name(cls, name):
+    def from_name(cls, name) -> Optional['Country']:  # pylint: disable=C0116
         res = pycountry.countries.get(name=name)
         if res:
             return cls(id=res.alpha_2, name=res.name)
+        return None  # pragma: no cover
 
     @classmethod
-    def from_id(cls, id_):
+    def from_id(cls, id_) -> Optional['Country']:  # pylint: disable=C0116
         res = pycountry.countries.get(alpha_2=id_)
         if res:
             return cls(id=res.alpha_2, name=res.name)
+        return None  # pragma: no cover
 
     @classmethod
-    def from_text(cls, text):
+    def from_text(cls, text: str) -> Optional['Country']:
+        """Instantiate country based on alpha_2 code or name."""
         match = re.search(r'(?P<code_only>^[A-Z]{2}$)|\(?(?P<code>[A-Z]{2})\)?', text)
         if match:
             code = match.group('code_only') or match.group('code')
@@ -239,23 +265,27 @@ class ClassificationComment:
         for att in ('subrefs', 'familyrefs'):
             setattr(self, att, Reference.from_list(getattr(self, att)))
 
-    def merged_refs(self, type):
-        assert type in ['sub', 'family']
+    def merged_refs(self, type_: Literal['sub', 'family']) -> list[Reference]:
+        """
+        Get unique sources referenced for the classification type, with accumulated page ranges.
+        """
+        assert type_ in ['sub', 'family']
         res = collections.defaultdict(set)
-        for m in Reference.pattern.finditer(getattr(self, type) or ''):
+        for m in Reference.pattern.finditer(getattr(self, type_) or ''):
             res[m.group('key')].add(m.group('pages'))
-        for ref in getattr(self, type + 'refs'):
+        for ref in getattr(self, type_ + 'refs'):
             res[ref.key].add(ref.pages)
         return [
             Reference(key=key, pages=';'.join(sorted(nfilter(pages))) or None)
             for key, pages in res.items()]
 
-    def check(self, lang, keys, log):
+    def check(self, lang: 'Languoid', keys: list[str], log: logging.Logger):
+        """Check formatting and content."""
         for attrib in ['subrefs', 'familyrefs']:
             for ref in getattr(self, attrib):
                 if ref.key not in keys:
                     log.error(message(
-                        lang, 'classification {0}: invalid bibkey: {1}'.format(attrib, ref.key)))
+                        lang, f'classification {attrib}: invalid bibkey: {ref.key}'))
 
         for attrib in ['sub', 'family']:
             comment = getattr(self, attrib)
@@ -263,14 +293,11 @@ class ClassificationComment:
                 for m in Reference.pattern.finditer(comment):
                     if m.group('key') not in keys:
                         log.error(message(
-                            lang,
-                            'classification {0}: invalid bibkey: {1}'.format(
-                                attrib, m.group('key'))))
-        return False
+                            lang, f"classification {attrib}: invalid bibkey: {m.group('key')}"))
 
 
 @dataclasses.dataclass
-class ISORetirement:
+class ISORetirement:  # pylint: disable=R0902
     """
     Information extracted from accepted ISO 639-3 change requests about retired ISO codes
     associated with the languoid.
@@ -288,7 +315,7 @@ class ISORetirement:
     def __post_init__(self):
         self.comment = self.comment.replace('\n.', '\n') if self.comment else None
 
-    def asdict(self):
+    def asdict(self):  # pylint: disable=C0116
         return dataclasses.asdict(self)
 
     __json__ = asdict
@@ -312,21 +339,20 @@ class Endangerment:
             self.date = parser.parse(self.date)
 
     def __json__(self):
-        res = dataclasses.asdict(self)  # FIXME: recurse!
+        res = dataclasses.asdict(self)
         res['date'] = res['date'].isoformat().split('T')[0]
         return res
 
-    def check(self, lang, keys, log):
+    def check(self, lang: 'Languoid', keys: list[str], log: logging.Logger):
+        """Check formatting of endangerment info."""
         def repl(ml):
             if ml.url not in keys:
-                log.error(message(
-                    lang,
-                    'endangerment comment: invalid bibkey: {}'.format(ml.url)))
+                log.error(message(lang, f'endangerment comment: invalid bibkey: {ml.url}'))
 
         if self.source and self.source.reference_id:
             ref = self.source.reference_id
             if ref not in keys:  # pragma: no cover
-                log.error(message(lang, 'endangerment: invalid bibkey {0}'.format(ref)))
+                log.error(message(lang, f'endangerment: invalid bibkey {ref}'))
         if self.comment:
             MarkdownLink.replace(self.comment, repl)
 
@@ -366,7 +392,8 @@ class EthnologueComment:
             raise ValueError(self.comment_type)
 
         if self.ethnologue_versions and isinstance(self.ethnologue_versions, str):
-            self.ethnologue_versions = self.ethnologue_versions.replace('693', '639').split('/')
+            self.ethnologue_versions = self.ethnologue_versions.replace(  # pylint: disable=E1101
+                '693', '639').split('/')
         pattern = re.compile(r'(E[1-9][0-9]|ISO 639-3)$')
         if not all(bool(pattern.match(x)) for x in self.ethnologue_versions):  # pragma: no cover
             raise ValueError(f'invalid ethnologue_versions: {"/".join(self.ethnologue_versions)}')
@@ -377,13 +404,12 @@ class EthnologueComment:
     def __json__(self):
         return dataclasses.asdict(self)
 
-    def check(self, lang, keys, log):
+    def check(self, lang: 'Languoid', keys: list[str], log: logging.Logger):
+        """Check formatting of the comment"""
         try:
             markdown.markdown(self.comment)
-        except Exception as e:  # pragma: no cover
-            log.error(message(lang, 'ethnologue comment: invalid markup: {0}'.format(e)))
+        except Exception as e:  # pragma: no cover  # pylint: disable=W0718
+            log.error(message(lang, f'ethnologue comment: invalid markup: {e}'))
         for m in Reference.pattern.finditer(self.comment):
             if m.group('key') not in keys:
-                log.error(message(lang, 'ethnologue comment: invalid bibkey: {0}'.format(
-                    m.group('key'))))
-        return False
+                log.error(message(lang, f"ethnologue comment: invalid bibkey: {m.group('key')}"))

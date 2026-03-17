@@ -1,5 +1,7 @@
 # languoids
-
+"""
+Languoids are one of the core objects in Glottolog.
+"""
 from .languoid import Languoid
 from .models import (
     Glottocode, Glottocodes,
