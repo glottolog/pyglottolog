@@ -8,12 +8,6 @@ from pyglottolog.languoids import (Languoid,
     ClassificationComment, EthnologueComment, Link)
 
 
-def test_legacy_imports():
-    from pyglottolog import objects
-    assert objects.Glottocode is Glottocode
-    assert objects.Reference is Reference
-
-
 def test_Link():
     assert Link.from_(dict(url='xyz')).label is None
     assert Link.from_('[label](url)').url == 'url'

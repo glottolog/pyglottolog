@@ -92,13 +92,6 @@ def test_tree(capsys, _main):
            "'language2 [abcd1237]-l-':1)'family [abcd1234][aaa]':1;"
 
 
-def test_languoids(capsys, _main, tmp_path):
-    _main('languoids --output={0}'.format(tmp_path.as_posix()))
-    out, _ = capsys.readouterr()
-    assert '-metadata.json' in out
-    assert tmp_path.glob('*.csv')
-
-
 def test_htmlmap(_main, tmp_path):
     _main('htmlmap --output {0} --min-langs-for-legend 1'.format(tmp_path.as_posix()))
     assert tmp_path.joinpath('glottolog_map.html').exists()

@@ -3,17 +3,15 @@ Programmatic access to Glottolog data.
 """
 import re
 import types
-import typing
+from typing import Union, Optional, TypedDict
 import pathlib
 import functools
 import contextlib
 import collections
+from collections.abc import Generator
 
-import pycldf.util
-from csvw import TableGroup, Column
 from clldutils.path import walk, git_describe
 from clldutils.apilib import API
-from clldutils.jsonlib import load
 import clldutils.iso_639_3
 import pycountry
 from termcolor import colored
@@ -27,10 +25,20 @@ from .languoids import models
 
 __all__ = ['Glottolog']
 
+LanguoidOrCode = Union[str, lls.Languoid]
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 
 
+class TriggerDict(TypedDict):
+    """Triggers by bibfile field name."""
+    inlg: list[util.Trigger]
+    lgcode: list[util.Trigger]
+
+
 class Cache(dict):
+    """
+    Since reading languoid metadata from disk is expensive, we provide a mechanism to cache them.
+    """
     def __init__(self):
         super().__init__()
         self._lineage = {}
@@ -38,7 +46,8 @@ class Cache(dict):
     def __bool__(self):
         return True
 
-    def add(self, directory: pathlib.Path, api) -> lls.Languoid:
+    def add(self, directory: pathlib.Path, api: 'Glottolog') -> lls.Languoid:
+        """Add a languoid specified by directory in the Glottolog tree to the cache."""
         if directory.name not in self:
             lang = lls.Languoid.from_dir(directory, nodes=self._lineage, _api=api)
             self._lineage[lang.id] = (lang.name, lang.id, lang.level)
@@ -50,7 +59,7 @@ class Cache(dict):
         return lang
 
 
-class Glottolog(API):
+class Glottolog(API):  # pylint: disable=too-many-public-methods
     """
     API to access Glottolog data
 
@@ -71,37 +80,37 @@ class Glottolog(API):
         #: Absolute path to the `tree` directory in the repos.
         self.tree: pathlib.Path = self.repos / 'languoids' / 'tree'
         if not self.tree.exists():
-            raise ValueError('repos dir %s missing tree dir: %s' % (self.repos, self.tree))
+            raise ValueError(f'repos dir {self.repos} missing tree dir: {self.tree}')
         if not self.repos.joinpath('references').exists():
-            raise ValueError('repos dir %s missing references subdir' % (self.repos,))
-        self.cache = Cache() if cache else None
+            raise ValueError(f'repos dir {self.repos} missing references subdir')
+        self.cache: lls.LanguoidMapType = Cache() if cache else None
 
     def __str__(self):
-        return '<Glottolog repos {0} at {1}>'.format(git_describe(self.repos), self.repos)
+        return f'<Glottolog repos {git_describe(self.repos)} at {self.repos}>'
 
-    def describe(self) -> str:
+    def describe(self) -> str:  # pylint: disable=C0116
         return git_describe(self.repos)
 
-    def references_path(self, *comps: str):
+    def references_path(self, *comps: str) -> pathlib.Path:
         """
         Path within the `references` directory of the repos.
         """
         return self.repos.joinpath('references', *comps)
 
-    def languoids_path(self, *comps):
+    def languoids_path(self, *comps) -> pathlib.Path:
         """
         Path within the `languoids` directory of the repos.
         """
         return self.repos.joinpath('languoids', *comps)
 
-    def build_path(self, *comps: str) -> pathlib.Path:
+    def build_path(self, *comps: str) -> pathlib.Path:  # pylint: disable=C0116
         build_dir = self.repos.joinpath('build')
         if not build_dir.exists():
             build_dir.mkdir()  # pragma: no cover
         return build_dir.joinpath(*comps)
 
     @contextlib.contextmanager
-    def cache_dir(self, name):
+    def cache_dir(self, name: str):  # pylint: disable=C0116
         d = self.build_path(name)
         if not d.exists():
             d.mkdir()
@@ -112,56 +121,56 @@ class Glottolog(API):
             self.path('config', name + '.ini'), object_class=cls or types.SimpleNamespace)
 
     @functools.cached_property
-    def aes_status(self) -> typing.Dict[str, config.AES]:
+    def aes_status(self) -> dict[str, config.AES]:
         """
         :rtype: mapping with :class:`config.AES` values.
         """
         return self._cfg('aes_status', cls=config.AES)
 
     @functools.cached_property
-    def aes_sources(self) -> typing.Dict[str, config.AESSource]:
+    def aes_sources(self) -> dict[str, config.AESSource]:
         """
         :rtype: mapping with :class:`config.AESSource` values
         """
         return self._cfg('aes_sources', cls=config.AESSource)
 
     @functools.cached_property
-    def document_types(self) -> typing.Dict[str, config.DocumentType]:
+    def document_types(self) -> dict[str, config.DocumentType]:
         """
         :rtype: mapping with :class:`config.DocumentType` values
         """
         return self._cfg('document_types', cls=config.DocumentType)
 
     @functools.cached_property
-    def med_types(self) -> typing.Dict[str, config.MEDType]:
+    def med_types(self) -> dict[str, config.MEDType]:
         """
         :rtype: mapping with :class:`config.MEDType` values
         """
         return self._cfg('med_types', cls=config.MEDType)
 
     @functools.cached_property
-    def macroareas(self) -> typing.Dict[str, config.Macroarea]:
+    def macroareas(self) -> dict[str, config.Macroarea]:
         """
         :rtype: mapping with :class:`config.Macroarea` values
         """
         return self._cfg('macroareas', cls=config.Macroarea)
 
     @functools.cached_property
-    def language_types(self) -> typing.Dict[str, config.LanguageType]:
+    def language_types(self) -> dict[str, config.LanguageType]:
         """
         :rtype: mapping with :class:`config.LanguageType` values
         """
         return self._cfg('language_types', cls=config.LanguageType)
 
     @functools.cached_property
-    def languoid_levels(self) -> typing.Dict[str, config.LanguoidLevel]:
+    def languoid_levels(self) -> dict[str, config.LanguoidLevel]:
         """
         :rtype: mapping with :class:`config.LanguoidLevel` values
         """
         return self._cfg('languoid_levels', cls=config.LanguoidLevel)
 
     @functools.cached_property
-    def editors(self) -> typing.Dict[str, config.Editors]:
+    def editors(self) -> dict[str, config.Editors]:
         """
         Metadata about editors of Glottolog
 
@@ -170,7 +179,7 @@ class Glottolog(API):
         return self._cfg('editors', cls=config.Editors)
 
     @functools.cached_property
-    def publication(self) -> typing.Dict[str, str]:
+    def publication(self) -> dict[str, str]:
         """
         Metadata about the Glottolog publication
 
@@ -197,7 +206,7 @@ class Glottolog(API):
         """
         return models.Glottocodes(self.languoids_path('glottocodes.json'))
 
-    def languoid(self, id_: typing.Union[str, lls.Languoid]) -> lls.Languoid:
+    def languoid(self, id_: LanguoidOrCode) -> Optional[lls.Languoid]:
         """
         Retrieve a languoid specified by language code.
 
@@ -227,13 +236,14 @@ class Glottolog(API):
                     if self.cache:
                         return l_
                     return lls.Languoid.from_dir(d, _api=self)
+        return None
 
     def languoids(
             self,
             ids: set = None,
-            maxlevel: typing.Union[int, config.LanguoidLevel, str] = None,
+            maxlevel: Union[int, config.LanguoidLevel, str] = None,
             exclude_pseudo_families: bool = False
-    ) -> typing.Generator[lls.Languoid, None, None]:
+    ) -> Generator[lls.Languoid, None, None]:
         """
         Yields languoid objects.
 
@@ -262,7 +272,7 @@ class Glottolog(API):
                     if (not exclude_pseudo_families) or not lang.category.startswith('Pseudo'):
                         yield lang
 
-    def languoids_by_code(self, nodes=None) -> typing.Dict[str, lls.Languoid]:
+    def languoids_by_code(self, nodes: Optional[lls.LanguoidMapType] = None) -> lls.LanguoidMapType:
         """
         Returns a `dict` mapping the three major language code schemes
         (Glottocode, ISO code, and Harald's NOCODE_s) to Languoid objects.
@@ -276,7 +286,7 @@ class Glottolog(API):
                 res[lang.iso] = lang
         return res
 
-    def ascii_tree(self, start: typing.Union[str, lls.Languoid], maxlevel=None):
+    def ascii_tree(self, start: LanguoidOrCode, maxlevel=None):
         """
         Prints an ASCII representation of the languoid tree starting at `start` to `stdout`.
         """
@@ -290,10 +300,10 @@ class Glottolog(API):
 
     def newick_tree(
             self,
-            start: typing.Union[None, str, lls.Languoid] = None,
+            start: Optional[LanguoidOrCode] = None,
             template: str = None,
-            nodes=None,
-            maxlevel: typing.Union[int, config.LanguoidLevel] = None
+            nodes: Optional[lls.LanguoidMapType] = None,
+            maxlevel: Union[int, config.LanguoidLevel] = None
     ) -> str:
         """
         Returns the Newick representation of a (set of) Glottolog classification tree(s).
@@ -302,7 +312,7 @@ class Glottolog(API):
         :param template: Python format string accepting the `Languoid` instance as single \
         variable named `l`, used to format node labels.
         """
-        template = template or lls.Languoid._newick_default_template
+        template = template or lls.Languoid._newick_default_template  # pylint: disable=W0212
         if start:
             return self.languoid(start).newick_node(
                 template=template, nodes=nodes, maxlevel=maxlevel, level=1).newick + ';'
@@ -317,8 +327,8 @@ class Glottolog(API):
                     # An isolate: we wrap it in a pseudo-family with the same name and ID.
                     fam = lls.Languoid.from_name_id_level(
                         lang.dir.parent, lang.name, lang.id, 'family', _api=self)
-                    ns = '({0}){1}:1'.format(ns, template.format(l=fam))  # noqa: E741
-                trees.append('{0};'.format(ns))
+                    ns = f'({ns}){template.format(l=fam)}:1'  # noqa: E741
+                trees.append(f'{ns};')
         return '\n'.join(trees)
 
     @functools.cached_property
@@ -330,18 +340,25 @@ class Glottolog(API):
         """
         return references.BibFiles.from_path(self.references_path(), api=self)
 
-    def refs_by_languoid(self, *bibfiles, **kw):
-        nodes = kw.get('nodes')
+    def refs_by_languoid(
+            self,
+            *bibfiles: Union[references.BibFile, str],
+            nodes: Optional[lls.LanguoidMapType] = None,
+    ) -> tuple[dict[lls.Glottocode, list[references.Entry]], dict[str, references.Entry]]:
+        """
+        Get references from bibfiles keyed by associated Glottocodes.
+        """
         if bibfiles:
             bibfiles = [
                 bib if isinstance(bib, references.BibFile) else self.bibfiles[bib]
                 for bib in bibfiles]
         else:
             bibfiles = self.bibfiles
-        all_ = {}
+
+        all_: dict[str, references.Entry] = {}
         languoids_by_code = self.languoids_by_code(
             nodes or {lang.id: lang for lang in self.languoids()})
-        res = collections.defaultdict(list)
+        res: dict[lls.Glottocode, list[references.Entry]] = collections.defaultdict(list)
         for bib in tqdm(bibfiles):
             for entry in bib.iterentries():
                 all_[entry.id] = entry
@@ -350,24 +367,25 @@ class Glottolog(API):
         return res, all_
 
     @functools.cached_property
-    def hhtypes(self):
+    def hhtypes(self):  # pylint: disable=C0116
         # Note: The file `hhtype.ini` does not exist anymore. This is fixed in HHTypes, when
         # calling `config.get_ini`. Only used when compiling monster.bib.
         return references.HHTypes(self.references_path('hhtype.ini'))
 
     @functools.cached_property
-    def triggers(self):
-        res = {'inlg': [], 'lgcode': []}
+    def triggers(self) -> TriggerDict:  # pylint: disable=C0116
+        res: TriggerDict = {'inlg': [], 'lgcode': []}
         for lang in self.languoids():
-            for type_ in res:
+            for type_ in TriggerDict.__annotations__:
                 if lang.cfg.has_option('triggers', type_):
-                    label = '%s [%s]' % (lang.name, lang.hid or lang.id)
+                    label = f'{lang.name} [{lang.hid or lang.id}]'
                     res[type_].extend([util.Trigger(type_, label, text)
                                        for text in lang.cfg.getlist('triggers', type_)])
         return res
 
     @functools.cached_property
     def macroarea_map(self) -> dict[str, str]:
+        """Maps language codes (Glottocode, ISO code, hid) to the first macroarea name."""
         res = {}
         for lang in self.languoids():
             ma = lang.macroareas[0].name if lang.macroareas else ''
@@ -379,74 +397,11 @@ class Glottolog(API):
         return res
 
     @property
-    def current_editors(self):
+    def current_editors(self) -> list[config.Editors]:  # pylint: disable=C0116
         return sorted([e for e in self.editors.values() if e.current], key=lambda e: int(e.ord))
 
-    def write_languoids_table(self, outdir, version=None):
-        version = version or self.describe()
-        out = outdir / 'glottolog-languoids-{0}.csv'.format(version)
-        md = outdir / (out.name + '-metadata.json')
-        tg = TableGroup.fromvalue({
-            "@context": "http://www.w3.org/ns/csvw",
-            "dc:version": version,
-            "dc:bibliographicCitation":
-                "{0}. "
-                "{1} [Data set]. "
-                "Zenodo. https://doi.org/{2}".format(
-                    ' & '.join([e.name for e in self.current_editors]),
-                    self.publication.zenodo.title_format.format('(Version {0})'.format(version)),
-                    self.publication.zenodo.doi,
-                ),
-            "tables": [load(pycldf.util.pkg_path('components', 'LanguageTable-metadata.json'))],
-        })
-        tg.tables[0].url = out.name
-        for col in [
-            dict(name='LL_Code'),
-            dict(name='Classification', separator='/'),
-            dict(name='Family_Glottocode'),
-            dict(name='Family_Name'),
-            dict(name='Language_Glottocode'),
-            dict(name='Language_Name'),
-            dict(name='Level', datatype=dict(base='string', format='family|language|dialect')),
-            dict(name='Status'),
-        ]:
-            tg.tables[0].tableSchema.columns.append(Column.fromvalue(col))
 
-        langs = []
-        for lang in self.languoids():
-            lid, lname = None, None
-            if lang.level == self.languoid_levels.language:
-                lid, lname = lang.id, lang.name
-            elif lang.level == self.languoid_levels.dialect:
-                for lname, lid, level in reversed(lang.lineage):
-                    if level == self.languoid_levels.language:
-                        break
-                else:  # pragma: no cover
-                    raise ValueError
-            langs.append(dict(
-                ID=lang.id,
-                Name=lang.name,
-                Macroarea=lang.macroareas[0].name if lang.macroareas else None,
-                Latitude=lang.latitude,
-                Longitude=lang.longitude,
-                Glottocode=lang.id,
-                ISO639P3code=lang.iso,
-                LL_Code=lang.identifier.get('multitree'),
-                Classification=[c[1] for c in lang.lineage],
-                Language_Glottocode=lid,
-                Language_Name=lname,
-                Family_Name=lang.lineage[0][0] if lang.lineage else None,
-                Family_Glottocode=lang.lineage[0][1] if lang.lineage else None,
-                Level=lang.level.name,
-                Status=lang.endangerment.status.name if lang.endangerment else None,
-            ))
-
-        tg.to_file(md)
-        tg.tables[0].write(langs, fname=out)
-        return md, out
-
-
-def _ascii_node(n, level, last, maxlevel, prefix, levels):
+def _ascii_node(n, level, last, maxlevel, prefix, levels):  # pylint: disable=R0913,R0917
     nlevel = levels.get(n.level)
     if maxlevel:
         if (isinstance(maxlevel, config.LanguoidLevel) and nlevel > maxlevel) or \

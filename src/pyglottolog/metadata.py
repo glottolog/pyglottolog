@@ -30,7 +30,7 @@ def to_html(text: str, url: str) -> str:
     """
     c2n = html_entities.codepoint2name
     text = text.replace('&', '&amp;')
-    text = ''.join('&{0};'.format(
+    text = ''.join('&{0};'.format(  # pylint: disable=C0209
         c2n[ord(c)]) if ord(c) > 128 and ord(c) in c2n else c for c in text)
     return markdown(text.replace(url, f'[{url}]({url})'))
 

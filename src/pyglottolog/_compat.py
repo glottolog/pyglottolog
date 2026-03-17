@@ -1,24 +1,13 @@
-# Python compatibility backports
-
+"""
+Python compatibility backports
+"""
 import sys
 
-__all__ = ['removesuffix']
+__all__ = ['StrEnum']
 
 
-if sys.version_info < (3, 9):  # pragma: no cover
-    def removesuffix(s: str, suffix: str) -> str:
-        """See https://www.python.org/dev/peps/pep-0616/
-
-        >>> removesuffix('spam.bib', '.bib')
-        'spam'
-        """
-        return s[:-len(suffix)] if suffix and s.endswith(suffix) else s
-
-else:  # pragma: no cover
-    def removesuffix(s: str, suffix: str) -> str:
-        """See https://www.python.org/dev/peps/pep-0616/
-
-        >>> removesuffix('spam.bib', '.bib')
-        'spam'
-        """
-        return s.removesuffix(suffix)
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+    assert StrEnum
+else:
+    from backports.strenum import StrEnum  # pragma: no cover

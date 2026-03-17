@@ -216,13 +216,17 @@ def test_retirements(api_copy, iso_data, mocker):
         mocker.Mock(return_value=[iso.Retirement(
             Id='abc',
             Ref_Name='n',
-            Ret_Reason='C',
+            Ret_Reason=iso.RetReason.C,
             Ret_Remedy='',
             Change_To='xyz',
-            Effective='2019-01-01',
+            Effective='2017-01-01',
             cr=mocker.Mock(Change_Request_Number='007')
         )]))
     iso.retirements(api_copy, mocker.Mock(), max_year=2007)
+    res = api_copy.repos.joinpath(
+        'languoids', 'tree', 'abcd1234', 'abcd1235', 'md.ini').read_text(encoding='utf8')
+    assert 'reason = change' in res
+    assert 'effective = 2017-01-01' in res
 
 
 def test_check_coverage(api_copy, mocker):

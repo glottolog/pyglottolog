@@ -81,7 +81,6 @@ available commands:
                         and dialects subsumed "under" it.
     langdatastats       List all metadata fields used in languoid INI files
                         and their frequency.
-    languoids           Write languoids data to csv files
     show                Display details of a Glottolog object.
     tree                Print the classification tree starting at a specific
                         languoid.
@@ -95,17 +94,4 @@ data in tools, e.g. as [LanguageTable](https://github.com/cldf/cldf/tree/master/
 in a [CLDF](https://cldf.clld.org) dataset.
 
 To do this, the LanguageTable from [glottolog/glottolog-cldf](https://github.com/glottolog/glottolog-cldf)
-could be copied, or one may use `glottolog`'s `languoids` subcommand, which
-dumps basic languoid data into a CSVW file with accompanying metadata:
-
-```shell script
-glottolog languoids [--output=OUTDIR] [--version=VERSION]
-```
-
-This will create a CSVW package, i.e. 
-- a CSV table `glottolog-languoids-VERSION.csv`
-- and a JSON description `glottolog-languoids-VERSION.csv-metadata.json`
-
-where `VERSION` is the result of running `git describe` on the data repository,
-or the version string passed as`--version=VERSION` in case you are running the command
-on an export of the repository or a download from ZENODO.
+can be copied.

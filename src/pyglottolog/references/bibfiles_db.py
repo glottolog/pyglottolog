@@ -16,7 +16,6 @@ from csvw import dsv
 import sqlalchemy as sa
 import sqlalchemy.orm
 
-from .. import _compat
 from ..util import (unique,
                     group_first as groupby_first)
 from . import bibtex
@@ -171,8 +170,7 @@ class BaseDatabase(Connectable):
     def _merged_entry(grp,
                       *, union=UNION_FIELDS, ignore=IGNORE_FIELDS,
                       raw: bool = False,
-                      _sep_join=', '.join,
-                      _removesuffix=_compat.removesuffix):
+                      _sep_join=', '.join):
         # TODO: consider implementing (a subset of?) onlyifnot logic:
         # {'address': 'publisher', 'lgfamily': 'lgcode', 'publisher': 'school',
         # 'journal': 'booktitle'}
@@ -180,11 +178,9 @@ class BaseDatabase(Connectable):
                   else _sep_join(unique(vl for vl, _, _ in values))
                   for field, values in grp if field not in ignore}
 
-        src = {_removesuffix(filename, '.bib')
-               for _, values in grp
-               for _, filename, _ in values}
+        src = {filename.removesuffix('.bib') for _, values in grp for _, filename, _ in values}
 
-        srctrickle = {f"{_removesuffix(filename, '.bib')}#{bibkey}"
+        srctrickle = {f"{filename.removesuffix('.bib')}#{bibkey}"
                       for _, values in grp
                       for _, filename, bibkey in values}
 

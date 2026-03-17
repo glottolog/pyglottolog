@@ -2,7 +2,7 @@
 """
 Languoids are one of the core objects in Glottolog.
 """
-from .languoid import Languoid
+from .languoid import Languoid, LanguoidMapType
 from .models import (
     Glottocode, Glottocodes,
     Country, Reference,
@@ -12,7 +12,7 @@ from .models import (
 )
 
 __all__ = [
-    'Languoid',
+    'Languoid', 'LanguoidMapType',
     'Glottocode', 'Glottocodes',
     'Country', 'Reference',
     'ClassificationComment',

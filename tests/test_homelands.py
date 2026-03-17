@@ -5,7 +5,7 @@ from pyglottolog.homelands import *
 
 def test_compute(api_copy):
     from pyglottolog import homelands
-    if homelands.geo:  # pragma: no cover
+    if homelands.GEO:  # pragma: no cover
         assert compute(api_copy, md)
         assert compute(api_copy, recursive_centroids)
 
