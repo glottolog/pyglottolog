@@ -377,7 +377,7 @@ class Entry:
         return '{0}:{1}'.format(self.bib.id, self.key)
 
     @classmethod
-    def lgcodes(cls, string):
+    def lgcodes(cls, string) -> list[str]:
         if string is None:
             return []
         codes = cls.lgcode_in_brackets_pattern.findall(string)

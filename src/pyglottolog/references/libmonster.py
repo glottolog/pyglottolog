@@ -3,6 +3,7 @@ r"""libmonster.py - mixed support library
 # TODO: consider replacing pauthor in keyid with _bibtex.names
 # TODO: enusure \emph is dropped from titles in keyid calculation
 """
+import dataclasses
 import re
 import logging
 from heapq import nsmallest
@@ -14,23 +15,19 @@ from typing import TypeVar, Callable, Any, Literal, Optional
 
 from csvw.dsv import UnicodeWriter
 
-from ..util import unique, Trigger
+from ..util import unique, Trigger, PathType
 from .bibfiles import Entry
-from .bibtex import EntryType
+from .bibtex import EntryDictType, BibtexTypeAndFields
 from .bibtex_undiacritic import undiacritic
 from .roman import roman, romanint
+from .hhtypes import HHTypes
 
 T = TypeVar('T')
 INF = float('inf')
 log = logging.getLogger('pyglottolog')
 
-# {<bibkey>: (<type>, <fields-dict>)}
-EntryDbType = dict[str, EntryType]
 
-lgcodestr = Entry.lgcodes
-
-
-def map_values(d: dict[str, T], func: Callable[[T, ...], T], *args):
+def map_values(d: dict[str, T], func: Callable[[T, ...], Any], *args):
     """
     Apply func to all values of a dictionary.
 
@@ -196,7 +193,7 @@ def renfn(e, ups):
 INLG = 'inlg'
 
 
-def add_inlg_e(e: EntryDbType, trigs, verbose=True) -> EntryDbType:
+def add_inlg_e(e: EntryDictType, trigs, verbose=True) -> EntryDictType:
     # FIXME: does not honor 'NOT' for now, only maps words to iso codes.
     dh = {word: t.type for t in trigs for _, word in t.clauses}
 
@@ -282,30 +279,45 @@ def keyid(fields, fd, ti=2, infinity=float('inf')):
     return reokkey.sub("", key.lower())
 
 
-def lgcode(arg):
+LgcodeType = str
+KeyType = str
+HHType = str
+DescriptionStatusType = tuple[float, str, KeyType, HHType]
+
+
+def lgcode(arg: BibtexTypeAndFields) -> list[LgcodeType]:
     fields = arg[1]
-    return lgcodestr(fields['lgcode']) if 'lgcode' in fields else []
+    return Entry.lgcodes(fields['lgcode']) if 'lgcode' in fields else []
 
 
-def sd(es, hht):
+def sd(es: EntryDictType, hht: HHTypes) -> list[list[DescriptionStatusType]]:
+    """
+    Lists of ordered description-stats tuples per hhtype.
+    """
     # most signficant piece of descriptive material
     # hhtype, pages, year
-    mi = [(k,
-           (hht.parse(fields.get('hhtype', 'unknown')),
-            fields.get('pages', ''),
-            fields.get('year', ''))) for (k, (typ, fields)) in es.items()]
-    d = accd(mi)
+    mi: list[tuple[str, tuple[list[str], str, str]]] = [
+        (k,
+         (hht.parse(fields.get('hhtype', 'unknown')),
+          fields.get('pages', ''),
+          fields.get('year', ''))) for (k, (typ, fields)) in es.items()]
+    d = key_with_stats_by_hhtype(mi)
     return [sorted(((p, y, k, t.id) for (k, (p, y)) in d[t.id].items()), reverse=True)
             for t in hht if t.id in d]
 
 
-def pcy(pagecountstr):
+def pcy(pagecountstr) -> int:
     if not pagecountstr:
         return 0
     return eval(pagecountstr)  # int(takeafter(pagecountstr, "+"))
 
 
-def accd(mi):
+def key_with_stats_by_hhtype(
+        mi: list[tuple[KeyType, tuple[list[HHType], str, str]]],
+) -> dict[HHType, dict[KeyType, tuple[float, str]]]:
+    """
+    Map hhtypes to dicts {key: description stats}.
+    """
     r = defaultdict(dict)
     for (k, (hhts, pgs, year)) in mi:
         pci = pcy(pagecount(pgs))
@@ -314,81 +326,115 @@ def accd(mi):
     return r
 
 
-def byid(es):
-    return group_pairs([(cfn, k) for (k, tf) in es.items() for cfn in lgcode(tf)])
+def keys_by_lgcode(e: EntryDictType) -> dict[LgcodeType, list[KeyType]]:
+    """
+    >>> e = {'k1': ('misc', {'lgcode': '[aaa], [bbb]'}), 'k2': ('misc', {'lgcode': '[bbb]'})}
+    >>> keys_by_lgcode(e)
+    {'aaa': ['k1'], 'bbb': ['k1', 'k2']}
+    """
+    return group_pairs([(code, key) for key, tf in e.items() for code in lgcode(tf)])
 
 
-def sdlgs(e, hht):
-    eindex = byid(e)
-    fes = map_values(eindex, lambda ks: {k: e[k] for k in ks})
-    fsd = map_values(fes, sd, hht)
-    return fsd, fes
+def sdlgs(e: EntryDictType, hht: HHTypes) -> dict[LgcodeType, list[list[DescriptionStatusType]]]:
+    eindex = keys_by_lgcode(e)
+    # Now expand the lists of keys into an EntryDictType:
+    fes: dict[str, EntryDictType] = map_values(eindex, lambda ks, *_: {k: e[k] for k in ks})
+    return map_values(fes, sd, hht)
 
 
-def lstat(e, hht):
-    (lsd, lse) = sdlgs(e, hht)
-    return map_values(lsd, lambda xs: (xs + [[[None]]])[0][0][-1])
+def lstat(e: EntryDictType, hht: HHTypes) -> dict[LgcodeType, Optional[HHType]]:
+    lsd: dict[LgcodeType, list[list[DescriptionStatusType]]] = sdlgs(e, hht)
+    return map_values(lsd, lambda xs, *_: (xs + [[[None]]])[0][0][-1])
 
 
-def lstat_witness(e, hht):
-    def statwit(xs):
+def lstat_witness(e, hht) -> dict[LgcodeType, tuple[HHType, list[KeyType]]]:
+    def statwit(xs, *_):
         assert xs
         [(typ, ks)] = group_pairs([(t, k) for [p, y, k, t] in xs[0]]).items()
         return typ, ks
-    (lsd, lse) = sdlgs(e, hht)
+
+    lsd: dict[LgcodeType, list[list[DescriptionStatusType]]] = sdlgs(e, hht)
     return map_values(lsd, statwit)
 
 
-def markconservative(
-        m: EntryDbType,
-        trigs,
-        ref,
-        hht,
-        outfn,
-        verbose=True,
-        rank=None,
-) -> EntryDbType:
+@dataclasses.dataclass
+class Report:
+    log: list[tuple[LgcodeType, list[tuple[str, KeyType, str, str]], HHType]] \
+        = dataclasses.field(default_factory=list)
+    no_status: dict[LgcodeType, set[str]] = dataclasses.field(
+        default_factory=lambda: defaultdict(set))
+
+
+def _revise_computerized_assignment(ls, lsafter, mafter, hht, report):
     blamefield = "hhtype"
-    mafter = markall(m, trigs, verbose=verbose, rank=rank)
-    ls = lstat(ref, hht)
-    lsafter = lstat_witness(mafter, hht)
-    log = []
-    no_status = defaultdict(set)
     for (lg, (stat, wits)) in lsafter.items():
-        if not ls.get(lg):
+        if not ls.get(lg):  # No HHType assigned any entry for the language in the reference bib.
             srctrickles = [mafter[k][1].get('srctrickle') for k in wits]
             for t in srctrickles:
                 if t and not t.startswith('iso6393'):
-                    no_status[lg].add(t)
+                    report.no_status[lg].add(t)
             continue
-        if hht[stat] > hht[ls[lg]]:
-            log = log + [
-                (lg, [(mafter[k][1].get(blamefield, "No %s" % blamefield),
-                       k,
-                       mafter[k][1].get('title', 'no title'),
-                       mafter[k][1].get('srctrickle', 'no srctrickle')) for k in wits], ls[lg])]
+        if hht[stat] > hht[ls[lg]]:  # A higher HHType via computerized assignment.
+            report.log.append((
+                lg,
+                [(mafter[k][1].get(blamefield, f"No {blamefield}"),
+                  k,
+                  mafter[k][1].get('title', 'no title'),
+                  mafter[k][1].get('srctrickle', 'no srctrickle')) for k in wits],
+                ls[lg]))
             for k in wits:
                 (t, f) = mafter[k]
                 if blamefield in f:
-                    del f[blamefield]
+                    del f[blamefield]  # Can't be right :). Delete assigned field.
                 mafter[k] = (t, f)
-    for lg in no_status:
-        print(f'{lg} lacks status')
-    with UnicodeWriter(outfn, dialect='excel-tab') as writer:
-        writer.writerows(((lg, was) + mis for (lg, miss, was) in log for mis in miss))
     return mafter
 
 
-def markall(e: EntryDbType, trigs: list[Trigger], verbose=True, rank=None) -> EntryDbType:
+def markconservative(
+        m: EntryDictType,
+        trigs: list[Trigger],
+        ref: EntryDictType,
+        hht: HHTypes,
+        outfn: PathType,
+        verbose=True,
+        rank=None,
+) -> EntryDictType:
     """
-    Apply triggers.
+    Run the computerized assignment of fields based on triggers.
+
+    Then compare the computerized assignments per language code with the assignments based on a
+    reference bibfile (typically hh.bib).
+
+    Since hh.bib is thought to contain the best description for each language, a higher HHType
+    computed for a language based on triggers is considered dubious, and thus deleted when marking
+    conservatively. By the same reasoning, a HHType computed for a language which does not have one
+    in hh.bib is considered dubious.
     """
+    mafter: EntryDictType = markall(m, trigs, verbose=verbose, rank=rank)
+    # HHType assignment in the ref bib - the gold standard.
+    ls: dict[LgcodeType, Optional[HHType]] = lstat(ref, hht)
+    # HHType assignment to the whole db after applying triggers:
+    lsafter: dict[LgcodeType, tuple[HHType, list[KeyType]]] = lstat_witness(mafter, hht)
+
+    report = Report()
+    mafter = _revise_computerized_assignment(ls, lsafter, mafter, hht, report)
+    for lg in report.no_status:
+        print(f'{lg} lacks status')
+    with UnicodeWriter(outfn, dialect='excel-tab') as writer:
+        writer.writerows(((lg, was) + mis for (lg, miss, was) in report.log for mis in miss))
+    return mafter
+
+
+def _get_triggered(
+        e: EntryDictType,
+        trigs: list[Trigger],
+) -> tuple[EntryDictType, dict[str, dict[tuple[str, str], Trigger]], set[str]]:
     # the set of fields triggers relate to:
     trigger_fields = set(t.field for t in trigs)
 
     # Construct the first argument to Trigger.__call__
     # all bibitems lacking any of the potential triggered fields:
-    ei: EntryDbType = {
+    ei: EntryDictType = {
         k: (typ, fields) for k, (typ, fields) in e.items()
         if any(c not in fields for c in trigger_fields)}
     eikeys = set(list(ei.keys()))
@@ -401,14 +447,23 @@ def markall(e: EntryDbType, trigs: list[Trigger], verbose=True, rank=None) -> En
             wk[w].add(k)
 
     triggered: dict[str, dict[tuple[str, str], Trigger]] = defaultdict(lambda: defaultdict(list))
-    for clauses, triggers in Trigger.group(trigs):
+    for _, triggers in Trigger.group(trigs):
         for k in triggers[0](eikeys, wk):
             for t in triggers:
                 triggered[k][t.cls].append(t)
 
+    return ei, triggered, trigger_fields
+
+
+def markall(e: EntryDictType, trigs: list[Trigger], verbose=True, rank=None) -> EntryDictType:
+    """
+    Apply triggers.
+    """
+    ei, triggered, trigger_fields = _get_triggered(e, trigs)
+
     for k, t_by_c in sorted(triggered.items(), key=lambda i: i[0]):
         t, f = e[k]
-        f2 = {a: b for a, b in f.items()}  # A copy of the fields.
+        f2 = dict(f.items())  # A copy of the fields.
         for (field, type_), triggers in sorted(t_by_c.items(), key=lambda i: len(i[1])):
             # Make sure we handle the trigger class with the biggest number of matching
             # triggers last.
@@ -416,6 +471,7 @@ def markall(e: EntryDbType, trigs: list[Trigger], verbose=True, rank=None) -> En
                 # only update the assigned hhtype if something better comes along:
                 if rank(f2[field].split(' (comp')[0]) >= rank(type_):
                     continue
+            # Assign the result of trigger-based computation:
             f2[field] = Trigger.format(type_, triggers)
         e[k] = (t, f2)
 

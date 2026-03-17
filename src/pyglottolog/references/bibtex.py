@@ -18,6 +18,7 @@ from pyglottolog.util import PathType
 
 BibtexTypeAndFields = tuple[str, dict[str, str]]
 EntryType = tuple[str, BibtexTypeAndFields]
+EntryDictType = dict[str, BibtexTypeAndFields]
 FIELDORDER = ['author', 'editor', 'title', 'booktitle', 'journal',
               'school', 'publisher', 'address',
               'series', 'volume', 'number', 'pages', 'year', 'issn', 'url']
@@ -27,7 +28,7 @@ def load(
         filename: PathType,
         preserve_order: bool = False,
         encoding: Optional[str] = None,
-) -> dict[str, BibtexTypeAndFields]:
+) -> EntryDictType:
     """Read entries from a file into a dict."""
     cls = collections.OrderedDict if preserve_order else dict
     return cls(iterentries(filename, encoding))

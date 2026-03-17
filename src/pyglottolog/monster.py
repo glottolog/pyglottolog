@@ -53,13 +53,14 @@ import collections
 from typing import TYPE_CHECKING, Optional
 
 from .references import BibFile
-from .references.libmonster import lgcode, add_inlg_e, markconservative, EntryDbType
+from .references.bibtex import EntryDictType
+from .references.libmonster import lgcode, add_inlg_e, markconservative
 
 if TYPE_CHECKING:
     from pyglottolog.api import Glottolog
 
 
-def macro_area_from_lgcode(m: EntryDbType, lgd: dict[str, str]) -> EntryDbType:
+def macro_area_from_lgcode(m: EntryDictType, lgd: dict[str, str]) -> EntryDictType:
     """Inject a macro_area field into each entry."""
     def inject_macro_area(arg):
         typ, fields = arg
@@ -82,7 +83,7 @@ def compile(api: 'Glottolog', log: Optional[logging.Logger] = None):  # pylint: 
     db = api.bibfiles.to_sqlite(api.build_path('bibfiles.sqlite3'))
 
     log.info('%s compile_monster', time.ctime())
-    m: EntryDbType = dict(db.merged())
+    m: EntryDictType = dict(db.merged())
 
     log.info('%s load hh.bib', time.ctime())
     hhbib = api.bibfiles['hh.bib'].load()
