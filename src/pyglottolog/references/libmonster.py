@@ -3,15 +3,15 @@ r"""libmonster.py - mixed support library
 # TODO: consider replacing pauthor in keyid with _bibtex.names
 # TODO: enusure \emph is dropped from titles in keyid calculation
 """
-import dataclasses
 import re
 import logging
 from heapq import nsmallest
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Sequence, Generator, Iterable, Iterator
+import dataclasses
 from itertools import groupby
 from operator import itemgetter
-from typing import TypeVar, Callable, Any, Literal, Optional
+from typing import TypeVar, Callable, Any, Literal, Optional, Union, TypedDict
 
 from csvw.dsv import UnicodeWriter
 
@@ -25,21 +25,30 @@ from .hhtypes import HHTypes
 T = TypeVar('T')
 INF = float('inf')
 log = logging.getLogger('pyglottolog')
+LgcodeType = str
+KeyType = str
+HHType = str
+DescriptionStatusType = tuple[float, str, KeyType, HHType]
+INLG_FIELD = 'inlg'
+LGCODE_FIELD = 'lgcode'
 
 
-def map_values(d: dict[str, T], func: Callable[[T, ...], Any], *args):
+def map_values(
+        d: Union[dict[str, T], Iterator[tuple[str, T]]],
+        func: Callable[[T, ...], Any], *args) -> Generator[tuple[str, Any]]:
     """
-    Apply func to all values of a dictionary.
+    Apply func to all values of key-value tuples in d.
 
-    :param d: A dictionary.
+    :param d: A dictionary or an iterator of key-value pairs.
     :param func: Callable accepting a value of `d` as first parameter.
     :param args: Additional positional arguments to be passed to `func`.
     :return: `dict` mapping the keys of `d` to the return value of the function call.
 
-    >>> map_values({'a': 1}, lambda x, y: x + y, 3)
+    >>> dict(map_values({'a': 1}, lambda x, y: x + y, 3))
     {'a': 4}
     """
-    return {i: func(v, *args) for i, v in d.items()}
+    for i, v in d.items() if isinstance(d, dict) else d:
+        yield i, func(v, *args)
 
 
 def group_pairs(seq: Sequence[Sequence[Any]]) -> dict[Any, list[Any]]:
@@ -62,6 +71,13 @@ def grp2fd(seq: Sequence[Sequence[Any]]) -> dict[Any, dict[Any, Literal[1]]]:
     return {k: {vv: 1 for vv in v} for k, v in group_pairs(seq).items()}
 
 
+class Author(TypedDict):
+    """Author name components."""
+    lastname: str
+    firstname: Optional[str]
+    jr: Optional[str]
+
+
 reauthor = [re.compile(pattern) for pattern in [
     r"(?P<lastname>[^,]+),\s((?P<jr>[JS]r\.|[I]+),\s)?(?P<firstname>[^,]+)$",
     r"(?P<firstname>[^{][\S]+(\s[A-Z][\S]+)*)\s"
@@ -78,9 +94,10 @@ reauthor = [re.compile(pattern) for pattern in [
 ]]
 
 
-def psingleauthor(n: str) -> Optional[dict[str, str]]:
+def psingleauthor(n: str) -> Optional[Author]:
+    """Try to parse an author name from a string."""
     if not n:
-        return
+        return None
 
     for pattern in reauthor:
         o = pattern.match(n)
@@ -90,7 +107,8 @@ def psingleauthor(n: str) -> Optional[dict[str, str]]:
     return None  # pragma: no cover
 
 
-def pauthor(s):
+def pauthor(s) -> list[Author]:
+    """Parse authors from string."""
     pas = [psingleauthor(a) for a in s.split(' and ')]
     if [a for a in pas if not a]:
         if s:
@@ -103,6 +121,10 @@ recapstart = re.compile(r"\[?[A-Z]")
 
 
 def lowerupper(s: str) -> tuple[list[str], list[str]]:
+    """
+    >>> lowerupper('von der Hofen')
+    (['von', 'der'], ['Hofen'])
+    """
     parts, lower, upper = [x for x in relu.split(s) if x], [], []
     for i, x in enumerate(parts):
         if not recapstart.match(undiacritic(x)):
@@ -140,7 +162,11 @@ rebracketyear = re.compile(r"\[([\d,\-/]+)]")
 reyl = re.compile(r"[,\-/\s\[\]]+")
 
 
-def pyear(s):
+def pyear(s: str) -> str:
+    """
+    >>> pyear('1990 [2001]')
+    '2001'
+    """
     if rebracketyear.search(s):
         s = rebracketyear.search(s).group(1)
     my = [x for x in reyl.split(s) if x.strip()]
@@ -168,7 +194,8 @@ bibord = {k: i for i, k in enumerate(['author',
                                       'url'])}
 
 
-def bibord_iteritems(fields):
+def bibord_iteritems(fields: dict[str, Any]) -> Generator[tuple[str, Any], None, None]:
+    """Yield fields items in canonical order."""
     for f in sorted(fields, key=lambda f: (bibord.get(f, INF), f)):
         yield f, fields[f]
 
@@ -176,13 +203,18 @@ def bibord_iteritems(fields):
 resplittit = re.compile(r"[\(\)\[\]\:\,\.\s\-\?\!\;\/\~\=]+")
 
 
-def wrds(txt):
+def wrds(txt: str) -> list[str]:
+    """
+    >>> wrds('Liberté, Égalité, Fraternité')
+    ['liberte', 'egalite', 'fraternite']
+    """
     txt = undiacritic(txt.lower())
     txt = txt.replace("'", "").replace('"', "")
     return [x for x in resplittit.split(txt) if x]
 
 
-def renfn(e, ups):
+def renfn(e: EntryDictType, ups: Iterable[tuple[KeyType, str, Any]]) -> EntryDictType:
+    """Apply the updates specified in ups to the appropriate entries in e."""
     for k, field, newvalue in ups:
         typ, fields = e[k]
         fields[field] = newvalue
@@ -190,64 +222,56 @@ def renfn(e, ups):
     return e
 
 
-INLG = 'inlg'
-
-
 def add_inlg_e(e: EntryDictType, trigs, verbose=True) -> EntryDictType:
-    # FIXME: does not honor 'NOT' for now, only maps words to iso codes.
+    """Adds inlg field, computed from triggers."""
+    # FIXME:  # pylint: disable=fixme
+    # does not honor 'NOT' for now, only maps words to iso codes.
     dh = {word: t.type for t in trigs for _, word in t.clauses}
 
     # map record keys to lists of words in titles:
     ts = [(k, wrds(fields['title']) + wrds(fields.get('booktitle', '')))
           for (k, (typ, fields)) in e.items()
-          if 'title' in fields and INLG not in fields]
+          if 'title' in fields and INLG_FIELD not in fields]
 
     if verbose:
-        print(len(ts), "without", INLG)
+        print(len(ts), "without", INLG_FIELD)
 
     # map record keys to sets of assigned iso codes, based on words in the title
     ann = [(k, set(dh[w] for w in tit if w in dh)) for k, tit in ts]
 
-    # list of record keys which have been assigned exactly one iso code
+    # list of record keys which have been assigned exactly one language code
     unique_ = [(k, lgs.pop()) for (k, lgs) in ann if len(lgs) == 1]
     if verbose:
         print(len(unique_), "cases of unique hits")
 
-    return renfn(e, [(k, INLG, v) for (k, v) in unique_])
+    return renfn(e, [(k, INLG_FIELD, v) for (k, v) in unique_])
 
 
 rerpgs = re.compile(r"([xivmcl]+)-?([xivmcl]*)")
-
-
 repgs = re.compile(r"([\d]+)-?([\d]*)")
 
 
-def pagecount(pgstr):
+def pagecount(pgstr: str) -> int:
+    """Compute pagecount from a string of page ranges, possibly using roman numerals."""
     rpgs = rerpgs.findall(pgstr)
     pgs = repgs.findall(pgstr)
     rsump = sum(romanint(b) - romanint(a) + 1 if b else romanint(a) for (a, b) in rpgs)
     sump = sum(int(rangecomplete(b, a)) - int(a) + 1 if b else int(a) for (a, b) in pgs)
-    if rsump != 0 and sump != 0:
-        return "%s+%s" % (rsump, sump)
-    if rsump == 0 and sump == 0:
-        return ''
-    return '%s' % (rsump + sump)
+    return rsump + sump
 
 
 rewrdtok = re.compile(r"[a-zA-Z].+")
-
-
 reokkey = re.compile(r"[^a-z\d\-_\[\]]")
 
 
-def keyid(fields, fd, ti=2, infinity=float('inf')):
+def keyid(fields: dict[str, Any], frequency_dict: dict[str, float]) -> str:
+    """Create a hashable key for an entry."""
     if 'author' not in fields:
         if 'editor' not in fields:
             values = ''.join(
                 v for f, v in bibord_iteritems(fields) if f != 'glottolog_ref_id')
             return '__missingcontrib__' + reokkey.sub('_', values.lower())
-        else:
-            astring = fields['editor']
+        astring = fields['editor']
     else:
         astring = fields['author']
 
@@ -262,7 +286,7 @@ def keyid(fields, fd, ti=2, infinity=float('inf')):
     tks = wrds(fields.get("title", "no.title"))  # takeuntil :
     # select the (leftmost) two least frequent words from the title
     types = list(unique(w for w in tks if rewrdtok.match(w)))
-    tk = nsmallest(ti, types, key=lambda w: fd.get(w, infinity))
+    tk = nsmallest(2, types, key=lambda w: frequency_dict.get(w, float('inf')))
     # put them back into the title order (i.e. 'spam eggs' != 'eggs spam')
     order = {w: i for i, w in enumerate(types)}
     tk.sort(key=lambda w: order[w])
@@ -279,48 +303,36 @@ def keyid(fields, fd, ti=2, infinity=float('inf')):
     return reokkey.sub("", key.lower())
 
 
-LgcodeType = str
-KeyType = str
-HHType = str
-DescriptionStatusType = tuple[float, str, KeyType, HHType]
-
-
 def lgcode(arg: BibtexTypeAndFields) -> list[LgcodeType]:
+    """Parse all language codes in the lgcode field."""
     fields = arg[1]
-    return Entry.lgcodes(fields['lgcode']) if 'lgcode' in fields else []
+    return Entry.lgcodes(fields[LGCODE_FIELD]) if LGCODE_FIELD in fields else []
 
 
-def sd(es: EntryDictType, hht: HHTypes) -> list[list[DescriptionStatusType]]:
+def description_status(es: EntryDictType, hht: HHTypes) -> list[list[DescriptionStatusType]]:
     """
     Lists of ordered description-stats tuples per hhtype.
     """
     # most signficant piece of descriptive material
     # hhtype, pages, year
-    mi: list[tuple[str, tuple[list[str], str, str]]] = [
+    d = key_with_stats_by_hhtype(
         (k,
          (hht.parse(fields.get('hhtype', 'unknown')),
           fields.get('pages', ''),
-          fields.get('year', ''))) for (k, (typ, fields)) in es.items()]
-    d = key_with_stats_by_hhtype(mi)
+          fields.get('year', ''))) for (k, (typ, fields)) in es.items())
     return [sorted(((p, y, k, t.id) for (k, (p, y)) in d[t.id].items()), reverse=True)
             for t in hht if t.id in d]
 
 
-def pcy(pagecountstr) -> int:
-    if not pagecountstr:
-        return 0
-    return eval(pagecountstr)  # int(takeafter(pagecountstr, "+"))
-
-
 def key_with_stats_by_hhtype(
-        mi: list[tuple[KeyType, tuple[list[HHType], str, str]]],
+        mi: Iterator[tuple[KeyType, tuple[list[HHType], str, str]]],
 ) -> dict[HHType, dict[KeyType, tuple[float, str]]]:
     """
     Map hhtypes to dicts {key: description stats}.
     """
     r = defaultdict(dict)
     for (k, (hhts, pgs, year)) in mi:
-        pci = pcy(pagecount(pgs))
+        pci = pagecount(pgs)
         for t in hhts:
             r[t][k] = (pci / float(len(hhts)), year)
     return r
@@ -336,31 +348,34 @@ def keys_by_lgcode(e: EntryDictType) -> dict[LgcodeType, list[KeyType]]:
 
 
 def sdlgs(e: EntryDictType, hht: HHTypes) -> dict[LgcodeType, list[list[DescriptionStatusType]]]:
-    eindex = keys_by_lgcode(e)
+    """Map language codes to description stats."""
     # Now expand the lists of keys into an EntryDictType:
-    fes: dict[str, EntryDictType] = map_values(eindex, lambda ks, *_: {k: e[k] for k in ks})
-    return map_values(fes, sd, hht)
+    fes = map_values(keys_by_lgcode(e), lambda ks, *_: {k: e[k] for k in ks})
+    return dict(map_values(fes, description_status, hht))
 
 
 def lstat(e: EntryDictType, hht: HHTypes) -> dict[LgcodeType, Optional[HHType]]:
-    lsd: dict[LgcodeType, list[list[DescriptionStatusType]]] = sdlgs(e, hht)
-    return map_values(lsd, lambda xs, *_: (xs + [[[None]]])[0][0][-1])
+    """Map language codes to best HHType."""
+    return dict(map_values(sdlgs(e, hht), lambda xs, *_: (xs + [[[None]]])[0][0][-1]))
 
 
 def lstat_witness(e, hht) -> dict[LgcodeType, tuple[HHType, list[KeyType]]]:
+    """Map language codes to best HHType and list of associated bibkeys."""
     def statwit(xs, *_):
         assert xs
-        [(typ, ks)] = group_pairs([(t, k) for [p, y, k, t] in xs[0]]).items()
+        [(typ, ks)] = group_pairs([(t, k) for _, _, k, t in xs[0]]).items()
         return typ, ks
 
-    lsd: dict[LgcodeType, list[list[DescriptionStatusType]]] = sdlgs(e, hht)
-    return map_values(lsd, statwit)
+    return dict(map_values(sdlgs(e, hht), statwit))
 
 
 @dataclasses.dataclass
 class Report:
+    """Reporting for conservative marking."""
+    # Language codes with a higher computed HHType than in reference bib:
     log: list[tuple[LgcodeType, list[tuple[str, KeyType, str, str]], HHType]] \
         = dataclasses.field(default_factory=list)
+    # Language codes with a computed HHType but no HHType in reference bib:
     no_status: dict[LgcodeType, set[str]] = dataclasses.field(
         default_factory=lambda: defaultdict(set))
 
@@ -390,7 +405,7 @@ def _revise_computerized_assignment(ls, lsafter, mafter, hht, report):
     return mafter
 
 
-def markconservative(
+def markconservative(  # pylint: disable=R0913,R0917
         m: EntryDictType,
         trigs: list[Trigger],
         ref: EntryDictType,

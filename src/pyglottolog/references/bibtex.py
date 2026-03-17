@@ -1,5 +1,9 @@
 # bibtex.py - bibtex file parsing/serialization
-# TODO: make check fail on non-whitespace between entries (bibtex 'comments')
+"""
+BibTeX parsing functionality.
+"""
+# TODO:  # pylint: disable=fixme
+# make check fail on non-whitespace between entries (bibtex 'comments')
 
 import functools
 import collections
@@ -65,7 +69,7 @@ def iterentries(
 
 
 def debug_pybtex(source, e):  # pragma: no cover  # pylint: disable=C0116
-    start, line, pos = e.error_context_info
+    start, line, _ = e.error_context_info
     print(f'BIBTEX ERROR on line {line}, last parsed lines:')
     print(source[start:start + 500].decode('utf8') + '...')
     raise e

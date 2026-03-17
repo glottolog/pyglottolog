@@ -1,12 +1,13 @@
 # bibfiles.py - ordered collection of bibfiles with load/save api
-
+import logging
 import re
 import math
-import typing
+from typing import Union, TYPE_CHECKING, Optional, Any
 import pathlib
 import datetime
 import functools
 import collections
+from collections.abc import Generator
 import dataclasses
 import unicodedata
 
@@ -18,12 +19,15 @@ from clldutils.inifile import INI
 from . import bibtex
 from . import util
 from ..config import MEDType
+from ..util import PathType
 from .bibfiles_db import Database
+
+if TYPE_CHECKING:
+    from pyglottolog import Glottolog
 
 __all__ = ['BibFiles', 'BibFile', 'Entry']
 
 BIBFILES = 'bibfiles.sqlite3'
-
 DOCTYPES = {k: k for k in ['grammar',
                            'grammar_sketch',
                            'dictionary',
@@ -41,23 +45,26 @@ DOCTYPES = {k: k for k in ['grammar',
                            'bibliographical',
                            'unknown']}
 
-PREF_YEAR_PATTERN = re.compile(r'\[(?P<year>(1|2)[0-9]{3})(\-[0-9]+)?\]')
-
-YEAR_PATTERN = re.compile(r'(?P<year>(1|2)[0-9]{3})')
+PREF_YEAR_PATTERN = re.compile(r'\[(?P<year>[12][0-9]{3})(-[0-9]+)?]')
+YEAR_PATTERN = re.compile(r'(?P<year>[12][0-9]{3})')
 
 
 class BibFiles(list):
     """Ordered collection of `BibFile` objects accessible by filname or index."""
 
     @classmethod
-    def from_path(cls, path: typing.Union[str, pathlib.Path], api=None) -> 'BibFiles':
+    def from_path(cls, path: PathType, api: Optional['Glottolog'] = None) -> 'BibFiles':
         """BibTeX files from `<path>/bibtex/*.bib` if listed in `<path>/BIBFILES.ini`."""
         path = pathlib.Path(path)
         ini = INI.from_file(path / 'BIBFILES.ini', interpolation=None)
         return cls(cls._iterbibfiles(ini, path / 'bibtex', api=api))
 
     @staticmethod
-    def _iterbibfiles(ini, bibtex_path, api=None):
+    def _iterbibfiles(
+            ini: INI,
+            bibtex_path: pathlib.Path,
+            api: Optional['Glottolog'] = None,
+    ) -> Generator['BibFile', None, None]:
         for sec in ini.sections():
             if sec.endswith('.bib'):
                 fpath = bibtex_path / sec
@@ -69,8 +76,7 @@ class BibFiles(list):
         super().__init__(bibfiles)
         self._map = {b.fname.name: b for b in self}
 
-    def __getitem__(self, index_or_filename: typing.Union[int, str])\
-            -> typing.Union['BibFile', 'Entry']:
+    def __getitem__(self, index_or_filename: Union[int, str]) -> Union['BibFile', 'Entry']:
         """Retrieve a bibfile by index or filename or an entry by qualified key.
 
         :param index_or_filename: Either an `int` index, or a bibfile name, or a \
@@ -86,18 +92,13 @@ class BibFiles(list):
             return self._map[index_or_filename]
         return super().__getitem__(index_or_filename)
 
-    def to_sqlite(self, filepath=BIBFILES, verbose=False):
+    def to_sqlite(self, filepath=BIBFILES, verbose=False) -> Database:
         """Return a database with the bibfiles loaded."""
         return Database.from_bibfiles(self, filepath, verbose=verbose)
 
-    def roundtrip_all(self):
+    def roundtrip_all(self) -> list[None]:
         """Load and save all bibfiles with the current settings."""
         return [b.roundtrip() for b in self]
-
-
-def file_if_exists(i, a, value):
-    if value.exists() and not value.is_file():
-        raise ValueError('invalid path')  # pragma: no cover
 
 
 @dataclasses.dataclass
@@ -117,7 +118,7 @@ class BibFile:
     priority: int = 0
     url: str = None  #: URL pointing to the source of the bibliography
     curation: str = None  #: Curation policy for the bibliography at Glottolog
-    api: typing.Any = None
+    api: Any = None
 
     def __post_init__(self):
         self.priority = int(self.priority)
@@ -169,16 +170,18 @@ class BibFile:
         for k, (t, f) in bibtex.iterentries(filename=self.fname, encoding=self.encoding):
             yield Entry(k, t, f, self, self.api)
 
-    def keys(self):
-        return ['{0}:{1}'.format(self.id, e.key) for e in self.iterentries()]
+    def keys(self) -> list[str]:
+        return [f'{self.id}:{e.key}' for e in self.iterentries()]
 
     @property
-    def glottolog_ref_id_map(self) -> typing.Dict[str, str]:
+    def glottolog_ref_id_map(self) -> dict[str, str]:
+        """Maps bibkey to glottolog_ref_id value."""
         return {
             e.key: e.fields['glottolog_ref_id'] for e in self.iterentries()
             if 'glottolog_ref_id' in e.fields}
 
-    def update(self, fname, log=None, keep_old=False):
+    def update(self, fname: PathType, log: Optional[logging.Logger] = None, keep_old=False):
+        """Update the bibfile with the data from fname."""
         entries, new = collections.OrderedDict(), 0
         if keep_old:
             for k, (t, f) in bibtex.iterentries(filename=self.fname, encoding=self.encoding):
@@ -192,7 +195,7 @@ class BibFile:
             entries[key] = (type_, fields)
         self.save(entries)
         if log:  # pragma: no cover
-            log.info('{0} new entries'.format(new))
+            log.info('%s new entries', new)
 
     def load(self, preserve_order=None):
         """Return entries as bibkey -> (entrytype, fields) dict."""
@@ -212,12 +215,13 @@ class BibFile:
     def __str__(self):
         return f'<{self.__class__.__name__} {self.fname.name}>'
 
-    def check(self, log):
+    def check(self, log: logging.Logger) -> tuple[int, str]:
+        """Run checks and report the result."""
         entries = self.load()  # bare BibTeX syntax
         invalid = bibtex.check(filename=self.fname)  # names/macros etc.
-        verdict = ('(%d invalid)' % invalid) if invalid else 'OK'
-        method = log.warn if invalid else log.info
-        method('%s %d %s' % (self, len(entries), verdict))
+        verdict = f'({invalid} invalid)' if invalid else 'OK'
+        method = log.warning if invalid else log.info
+        method('%s %d %s', self, len(entries), verdict)
         return len(entries), verdict
 
     def roundtrip(self):
@@ -230,7 +234,7 @@ class BibFile:
             text = fd.read()
         hist = collections.Counter(text)
         table = '\n'.join(
-            '%d\t%-9r\t%s\t%s' % (n, c, c, unicodedata.name(c, ''))
+            '%d\t%-9r\t%s\t%s' % (n, c, c, unicodedata.name(c, ''))  # pylint: disable=C0209
             for c, n in hist.most_common()
             if include_plain or not 20 <= ord(c) <= 126)
         print(table)
@@ -262,8 +266,8 @@ class Entry:
     key: str
     type: str  #: BibTeX entry type
     fields: dict  #: The metadata of the record
-    bib: str
-    api: typing.Any = None
+    bib: BibFile
+    api: Optional['Glottolog'] = None
 
     # FIXME: add method to apply triggers!
 
@@ -287,7 +291,8 @@ class Entry:
             if self.api else DOCTYPES
 
     @functools.cached_property
-    def weight(self):
+    def weight(self) -> tuple[int, int, int, str]:
+        """The weight which determines ordering when computing MEDs."""
         doctypes = self._defined_doctypes
         index = len(doctypes)
         doctype = None
@@ -309,7 +314,7 @@ class Entry:
         return -index, pages, self.year_int or 0, self.id
 
     @functools.cached_property
-    def med_type(self) -> MEDType:
+    def med_type(self) -> Optional[MEDType]:
         """
         The entry's type on the MED scale.
         """
@@ -323,9 +328,11 @@ class Entry:
             if 'wordlist' in doctypes and index < doctypes.index('wordlist'):
                 return self.api.med_types.phonology_or_text
             return self.api.med_types.wordlist_or_less
+        return None
 
     @functools.cached_property
-    def year_int(self):
+    def year_int(self) -> Optional[int]:
+        """Year as number if possible."""
         if self.fields.get('year'):
             # prefer years in brackets over the first 4-digit number.
             match = PREF_YEAR_PATTERN.search(self.fields.get('year'))
@@ -334,9 +341,11 @@ class Entry:
             match = YEAR_PATTERN.search(self.fields.get('year'))
             if match:
                 return int(match.group('year'))
+        return None
 
     @functools.cached_property
-    def pages_int(self):
+    def pages_int(self) -> Optional[int]:
+        """Number of pages as int."""
         if self.fields.get('numberofpages'):
             try:
                 pages = int(self.fields.get('numberofpages').strip())
@@ -347,9 +356,11 @@ class Entry:
 
         if self.fields.get('pages'):
             return util.compute_pages(self.fields['pages'])[2]
+        return None
 
     @functools.cached_property
-    def publisher_and_address(self):
+    def publisher_and_address(self) -> tuple[Optional[str], Optional[str]]:
+        """Publisher and address values."""
         p = self.fields.get('publisher')
         if p and ':' in p:
             address, publisher = [s.strip() for s in p.split(':', 1)]
@@ -359,9 +370,9 @@ class Entry:
 
     def __str__(self):
         """Return the BibTeX representation of the entry."""
-        res = "@%s{%s" % (self.type, self.key)
+        res = f"@{self.type}{{{self.key}"
         for k, v in bibtex.fieldorder.itersorted(self.fields):
-            res += ',\n    %s = {%s}' % (k, v.strip() if hasattr(v, 'strip') else v)
+            res += f",\n    {k} = {{{v.strip() if hasattr(v, 'strip') else v}}}"
         res += '\n}\n' if self.fields else ',\n}\n'
         return res
 
@@ -374,10 +385,11 @@ class Entry:
         """
         The qualified entry ID, including the provider prefix.
         """
-        return '{0}:{1}'.format(self.bib.id, self.key)
+        return f'{self.bib.id}:{self.key}'
 
     @classmethod
     def lgcodes(cls, string) -> list[str]:
+        """Parse language codes from a string."""
         if string is None:
             return []
         codes = cls.lgcode_in_brackets_pattern.findall(string)
@@ -390,13 +402,15 @@ class Entry:
         return codes
 
     @staticmethod
-    def parse_ca(s):
+    def parse_ca(s: str) -> Optional[str]:
+        """Read a trigger expression form a field value."""
         if s:
             match = re.search('computerized assignment from "(?P<trigger>[^\"]+)"', s)
             if match:
                 return match.group('trigger')
+        return None
 
-    def languoids(self, langs_by_codes: dict) -> typing.Tuple[list, typing.Optional[str]]:
+    def languoids(self, langs_by_codes: dict) -> tuple[list, Optional[str]]:
         """
         Expand the language codes mentioned in a reference's "lgcode" field to `Languoid` objects.
         """
