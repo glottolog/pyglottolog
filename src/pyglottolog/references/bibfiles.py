@@ -1,8 +1,11 @@
 # bibfiles.py - ordered collection of bibfiles with load/save api
+"""
+Functionality to manipulate bibfiles and their entries.
+"""
 import logging
 import re
 import math
-from typing import Union, TYPE_CHECKING, Optional, Any
+from typing import Union, TYPE_CHECKING, Optional, Any, Callable
 import pathlib
 import datetime
 import functools
@@ -86,7 +89,7 @@ class BibFiles(list):
         if isinstance(index_or_filename, str):
             if ':' in index_or_filename:
                 stem, key = index_or_filename.split(':', maxsplit=1)
-                return self._map['{}.bib'.format(stem)][key]
+                return self._map[f'{stem}.bib'][key]
             if not index_or_filename.endswith('.bib'):
                 index_or_filename += '.bib'
             return self._map[index_or_filename]
@@ -102,7 +105,7 @@ class BibFiles(list):
 
 
 @dataclasses.dataclass
-class BibFile:
+class BibFile:  # pylint: disable=R0902
     """
     Represents a BibTeX file, storing a provider's bibliography, providing easy access to its
     records.
@@ -126,7 +129,7 @@ class BibFile:
             else self.sortkey
 
     @property
-    def id(self):
+    def id(self) -> str:  # pylint: disable=C0116
         return self.fname.stem
 
     def __getitem__(self, item: str) -> 'Entry':
@@ -141,9 +144,9 @@ class BibFile:
             m = re.search(
                 b'@[A-Za-z]+{' + re.escape(item.encode(self.encoding)) + rb'[\s,]', string)
             if m:
-                next = string.find(b'\n@', m.end())
-                if next >= 0:
-                    text = string[m.start():next]
+                next_ = string.find(b'\n@', m.end())
+                if next_ >= 0:
+                    text = string[m.start():next_]
                 else:
                     text = string[m.start():]
         if text:
@@ -151,7 +154,8 @@ class BibFile:
                 return Entry(k, t, f, self, self.api)
         raise KeyError(item)
 
-    def visit(self, visitor=None):
+    def visit(self, visitor: Optional[Callable[['Entry'], bool]] = None):
+        """Visit the entries of the bibfile, possibly manipulating them in place."""
         entries = collections.OrderedDict()
         for entry in self.iterentries():
             if visitor is None or visitor(entry) is not True:
@@ -159,18 +163,21 @@ class BibFile:
         self.save(entries)
 
     @property
-    def size(self):
+    def size(self) -> int:
+        """Size of the file in bytes."""
         return self.fname.stat().st_size
 
     @property
-    def mtime(self):
+    def mtime(self) -> datetime.datetime:
+        """Modification time."""
         return datetime.datetime.fromtimestamp(self.fname.stat().st_mtime)
 
-    def iterentries(self):
+    def iterentries(self) -> Generator['Entry', None, None]:  # pylint: disable=C0116
         for k, (t, f) in bibtex.iterentries(filename=self.fname, encoding=self.encoding):
             yield Entry(k, t, f, self, self.api)
 
     def keys(self) -> list[str]:
+        """List of provider-qualified keys of the bibfile"""
         return [f'{self.id}:{e.key}' for e in self.iterentries()]
 
     @property
@@ -224,7 +231,7 @@ class BibFile:
         method('%s %d %s', self, len(entries), verdict)
         return len(entries), verdict
 
-    def roundtrip(self):
+    def roundtrip(self):  # pylint: disable=C0116
         print(self)
         self.save(self.load())
 
@@ -269,7 +276,7 @@ class Entry:
     bib: BibFile
     api: Optional['Glottolog'] = None
 
-    # FIXME: add method to apply triggers!
+    # FIXME: add method to apply triggers!  # pylint: disable=fixme
 
     lgcode_regex = r'[a-z0-9]{4}[0-9]{4}|[a-z]{3}|NOCODE_[A-Z][^\s\]]+'
     lgcode_in_brackets_pattern = re.compile(r"\[(" + lgcode_regex + r")]")
@@ -280,7 +287,7 @@ class Entry:
         return self.weight == other.weight
 
     def __ne__(self, other):
-        return not (self == other)
+        return not self == other
 
     def __lt__(self, other):
         return self.weight < other.weight

@@ -6,11 +6,11 @@ import collections
 from clldutils.clilib import Table, add_format
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     add_format(parser)
 
 
-def run(args):
+def run(args):  # pylint: disable=C0116
     ops = collections.defaultdict(collections.Counter)
 
     for lang in args.repos.languoids():

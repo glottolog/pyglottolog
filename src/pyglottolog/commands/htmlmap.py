@@ -17,7 +17,7 @@ from clldutils.clilib import PathType
 from pyglottolog.cli_util import add_output_dir
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     add_output_dir(parser)
     parser.add_argument(
         '--glottocodes',
@@ -40,6 +40,7 @@ def register(parser):
 
 
 def get_glottocodes(args):
+    """Glottocodes for languoids to display on the map can be specified in various ways."""
     glottocodes = []
     if args.glottocodes:
         glottocodes = args.glottocodes.read_text(encoding='utf8').split()
@@ -55,16 +56,22 @@ def get_glottocodes(args):
     return res
 
 
-def run(args):
+def _include_node(n, glottocodes, languoid_levels):
+    if any((not glottocodes and n.level == languoid_levels.language,
+            glottocodes and n.id in glottocodes)):
+        if n.latitude is not None or glottocodes.get(n.id, (None,))[0] is not None:
+            return True
+    return False
+
+
+def run(args):  # pylint: disable=C0116
     legend = collections.Counter()
     glottocodes = get_glottocodes(args)
 
     nodes = {n.id: n for n in args.repos.languoids()}
     langs = []
     for n in nodes.values():
-        if ((not glottocodes and n.level == args.repos.languoid_levels.language)
-                or (glottocodes and n.id in glottocodes)) \
-                and (n.latitude != None or glottocodes.get(n.id, (None,))[0] != None):  # noqa: W503
+        if _include_node(n, glottocodes, args.repos.languoid_levels):
             fid = n.lineage[0][1] if n.lineage else n.id
             if (not nodes[fid].category.startswith('Pseudo')) or fid == n.id:
                 langs.append((n, fid))
@@ -95,12 +102,11 @@ def run(args):
             "type": "Feature"
         }
 
-    def legend_item(fid, c):
-        return \
-            '<span style="background-color: {0}; border: 1px solid black;">'\
-            '&nbsp;&nbsp;&nbsp;</span> '\
-            '<a href="https://glottolog.org/resource/languoid/id/{1}">{2}</a> ({3})'.format(
-                color_map[fid], fid, nodes[fid].name, c)
+    def legend_item(fid, c) -> str:
+        return (f'<span style="background-color: {color_map[fid]}; border: 1px solid black;">'
+                f'&nbsp;&nbsp;&nbsp;</span> '
+                f'<a href="https://glottolog.org/resource/languoid/id/{fid}">{nodes[fid].name}</a> '
+                f'({c})')
 
     geojson = {
         "features": list(map(l2f, langs)),

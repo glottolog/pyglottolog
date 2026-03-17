@@ -9,7 +9,7 @@ from pyglottolog.languoids import Glottocode, Languoid
 from pyglottolog.cli_util import get_languoid
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     parser.add_argument(
         'parent',
         help='Parent languoid specified by Glottocode or directory',
@@ -30,7 +30,7 @@ def register(parser):
     )
 
 
-def run(args):
+def run(args):  # pylint: disable=C0116
     if Glottocode.pattern.match(args.parent):
         args.parent = get_languoid(args, args.parent).dir
     else:
@@ -45,4 +45,4 @@ def run(args):
         args.level,
         **dict(prop.split('=') for prop in args.props))
 
-    print("Info written to %s" % lang.write_info(outdir=args.parent))
+    print(f"Info written to {lang.write_info(outdir=args.parent)}")

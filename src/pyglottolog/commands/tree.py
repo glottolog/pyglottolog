@@ -8,7 +8,7 @@ from pyglottolog.util import sprint
 from pyglottolog.cli_util import get_languoid
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     parser.add_argument(
         'root',
         metavar='<GLOTTOCODE>|<ISO-CODE>',
@@ -36,18 +36,19 @@ In addition to Languoid attributes and properties specified as "{{l.<attr>}}",
 e.g. "{{l.id}}" for the Glottocode of a Languoid, the following custom format specs
 can be used:
 {}""".format(
-            '\n'.join('"l:{0}": {1[1]}; '.format(k, v) for k, v in Languoid._format_specs.items())),
+            '\n'.join(f'"l:{k}": {v[1]}; '
+                      for k, v in Languoid._format_specs.items())),  # pylint: disable=W0212
         default=None,
     )
 
 
-def run(args):
+def run(args):  # pylint: disable=C0116
     root = get_languoid(args, args.root)
 
     if args.maxlevel is not None:
         try:
             args.maxlevel = int(args.maxlevel)
-        except Exception:
+        except Exception:  # pylint: disable=W0718
             args.maxlevel = args.repos.languoid_levels[args.maxlevel] \
                 if args.maxlevel in args.repos.languoid_levels else None
     if args.newick:
