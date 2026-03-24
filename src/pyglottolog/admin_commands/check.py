@@ -6,7 +6,7 @@ import collections
 import dataclasses
 
 import pyglottolog
-from pyglottolog.languoids import Reference
+from pyglottolog.languoids import Reference, LanguoidMapType, Languoid
 from pyglottolog.util import message
 from pyglottolog.cli_util import LanguoidStats
 import pyglottolog.iso
@@ -31,14 +31,31 @@ def register(parser):  # pylint: disable=C0116
 
 
 @dataclasses.dataclass
-class Stats:
+class LanguoidLookup:
+    by_id: LanguoidMapType = dataclasses.field(default_factory=dict)
+    by_hid: LanguoidMapType = dataclasses.field(default_factory=dict)
+    by_name: dict[str, set[Languoid]] = dataclasses.field(
+        default_factory=lambda: collections.defaultdict(set))
     by_level: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
     by_category: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
 
-    def update(self, lang, levels):
+    def update(self, lang, levels, log):
+        if lang.id in self.by_id:
+            log.error(message(
+                lang.id, f'duplicate glottocode\n{self.by_id[lang.id].dir}\n{lang.dir}'))
+        self.by_id[lang.id] = lang
+
         self.by_level.update([lang.level.name])
         if lang.level == levels.language:
             self.by_category.update([lang.category])
+
+        self.by_name[lang.name].add(lang)
+        if lang.hid is not None:
+            if lang.hid in self.by_hid:
+                log.error(message(
+                    lang.hid, f'duplicate hid\n{self.by_hid[lang.hid].dir}\n{lang.dir}'))
+            else:
+                self.by_hid[lang.hid] = lang
 
     @staticmethod
     def _log_counter(counter, name):
@@ -64,114 +81,111 @@ def run(args):  # pylint: disable=C0116
     def info(obj, msg):
         args.log.info(message(obj, msg))
 
-    if not args.tree_only:
-        for bibfile in args.repos.bibfiles:
+    refkeys = set()
+    for bibfile in args.repos.bibfiles:
+        if not args.tree_only:
             bibfile.check(args.log)
+        refkeys = refkeys.union(bibfile.keys())
 
     if args.bib_only:
         return
-
-    refkeys = set()
-    for bibfile in args.repos.bibfiles:
-        refkeys = refkeys.union(bibfile.keys())
 
     iso = args.repos.iso
     iso.log = args.log
     info(iso, 'checking ISO codes')
     info(args.repos, 'checking tree')
 
-    stats = Stats()
-    languoids, hid = {}, {}
-    names = collections.defaultdict(set)
+    _check_config(args.repos, refkeys, args.log)
 
-    for p in pathlib.Path(pyglottolog.__file__).parent.joinpath('config').glob('*.ini'):
-        for obj in getattr(args.repos, p.stem).values():
-            ref_id = getattr(obj, 'reference_id', None)
-            if ref_id and ref_id not in refkeys:
-                error(obj, f'missing reference: {ref_id}')
-
-    if args.old_languoids and not args.repos.build_path('languoids.json').exists():
-        raise ValueError()  # pragma: no cover
-    old_languoid_stats = LanguoidStats.from_json(args.repos)
-    languoids = old_languoid_stats.check(args.repos, args.log)
-
-    for lang in languoids.values():
-        ancestors = lang.ancestors_from_nodemap(languoids)
-        children = lang.children_from_nodemap(languoids)
-
-        if lang.latitude and not (-90 <= lang.latitude <= 90):
-            error(lang, f'invalid latitude: {lang.latitude}')
-        if lang.longitude and not (-180 <= lang.longitude <= 180):
-            error(lang, f'invalid longitude: {lang.longitude}')
-
-        assert isinstance(lang.countries, list)
-        assert isinstance(lang.macroareas, list)
-        assert (lang.timespan is None) or isinstance(lang.timespan, tuple)
-
-        if 'sources' in lang.cfg:
-            for ref in Reference.from_list(lang.cfg.getlist('sources', 'glottolog')):
-                if ref.key not in refkeys:
-                    error(lang, f'missing source: {ref}')
-
-        for attr in ['classification_comment', 'ethnologue_comment']:
-            obj = getattr(lang, attr)
-            if obj:
-                obj.check(lang, refkeys, args.log)
-
-        names[lang.name].add(lang)
-        stats.update(lang, args.repos.languoid_levels)
-
+    stats = LanguoidLookup()
+    for lang in args.repos.languoids():
+        stats.update(lang, args.repos.languoid_levels, args.log)
         if iso and lang.iso:
             iso.check_lang(args.repos, lang)
 
-        if lang.hid is not None:
-            if lang.hid in hid:
-                error(lang.hid, f'duplicate hid\n{languoids[hid[lang.hid]].dir}\n{lang.dir}')
-            else:
-                hid[lang.hid] = lang.id
+    for lang in stats.by_id.values():
+        _check_lang_attrs(lang, args.repos, refkeys, args.log)
+        _check_level_consistency(lang, args.repos, stats.by_id, args.log)
 
-        if not lang.id.startswith('unun9') and lang.id not in args.repos.glottocodes:
-            error(lang, 'unregistered glottocode')
-        for attr in ['level', 'name']:
-            if not getattr(lang, attr):
-                error(lang, f'missing {attr}')  # pragma: no cover
-        if lang.level == args.repos.languoid_levels.language:
-            parent = ancestors[-1] if ancestors else None
-            if parent and parent.level != args.repos.languoid_levels.family:  # pragma: no cover
-                error(lang, f'invalid nesting of language under {parent.level}')
-            for child in children:
-                if child.level != args.repos.languoid_levels.dialect:  # pragma: no cover
-                    error(child, f'invalid nesting of {child.level} under language')
-        elif lang.level == args.repos.languoid_levels.family:
-            for d in lang.dir.iterdir():
-                if d.is_dir():
-                    break
-            else:
-                error(lang, 'family without children')  # pragma: no cover
-
-        if lang.endangerment:
-            lang.endangerment.check(lang, refkeys, args.log)
-
-        timespan = lang.timespan
-        if timespan and not (
-                lang.endangerment and lang.endangerment.status == args.repos.aes_status.extinct):
-            error(lang, 'timespan specified for non-extinct languoid')  # pragma: no cover
+    if args.old_languoids:
+        if not args.repos.build_path(LanguoidStats.__fname__).exists():
+            raise ValueError()  # pragma: no cover
+        old_languoid_stats = LanguoidStats.from_json(args.repos)
+        old_languoid_stats.check(stats.by_id, args.log)
 
     iso.check_coverage()
 
     bookkeeping_gc = args.repos.language_types.bookkeeping.pseudo_family_id
-    for name, gcs in sorted(names.items()):
+    for name, gcs in sorted(stats.by_name.items()):
         if len(gcs) > 1:
             # duplicate names:
             method = error
             if len([1 for n in gcs if n.level != args.repos.languoid_levels.dialect]) <= 1:
                 # at most one of the languoids is not a dialect, just warn
                 method = warn  # pragma: no cover
-            if len([1 for n in gcs
-                    if (not n.lineage) or (n.lineage[0][1] != bookkeeping_gc)]) <= 1:
+            if len([1 for n in gcs if (not n.lineage) or (n.lineage[0][1] != bookkeeping_gc)]) <= 1:
                 # at most one of the languoids is not in bookkeping, just warn
                 method = warn  # pragma: no cover
-            method(name, 'duplicate name: {0}'.format(', '.join(sorted(
-                ['{0} <{1}>'.format(n.id, n.level.name[0]) for n in gcs]))))
+            method(name, 'duplicate name: {0}'.format(  # pylint: disable=C0209
+                ', '.join(sorted([f'{n.id} <{n.level.name[0]}>' for n in gcs]))))
 
     stats.log()
+
+
+def _check_config(api, refkeys, log):
+    for p in pathlib.Path(pyglottolog.__file__).parent.joinpath('config').glob('*.ini'):
+        for obj in getattr(api, p.stem).values():
+            ref_id = getattr(obj, 'reference_id', None)
+            if ref_id and ref_id not in refkeys:
+                log.error(message(obj, f'missing reference: {ref_id}'))
+
+
+def _check_lang_attrs(lang, api, refkeys, log):
+    if lang.latitude and not (-90 <= lang.latitude <= 90):
+        log.error(message(lang, f'invalid latitude: {lang.latitude}'))
+    if lang.longitude and not (-180 <= lang.longitude <= 180):
+        log.error(message(lang, f'invalid longitude: {lang.longitude}'))
+
+    assert isinstance(lang.countries, list)
+    assert isinstance(lang.macroareas, list)
+    assert (lang.timespan is None) or isinstance(lang.timespan, tuple)
+
+    if 'sources' in lang.cfg:
+        for ref in Reference.from_list(lang.cfg.getlist('sources', 'glottolog')):
+            if ref.key not in refkeys:
+                log.error(message(lang, f'missing source: {ref}'))
+
+    for attr in ['classification_comment', 'ethnologue_comment', 'endangerment']:
+        obj = getattr(lang, attr)
+        if obj:
+            obj.check(lang, refkeys, log)
+
+    if not lang.id.startswith('unun9') and lang.id not in api.glottocodes:
+        log.error(message(lang, 'unregistered glottocode'))
+
+    for attr in ['level', 'name']:
+        if not getattr(lang, attr):
+            log.error(message(lang, f'missing {attr}'))  # pragma: no cover
+
+    timespan = lang.timespan
+    if timespan and not (
+            lang.endangerment and lang.endangerment.status == api.aes_status.extinct):
+        log.error(message(lang, 'timespan specified for non-extinct languoid'))  # pragma: no cover
+
+
+def _check_level_consistency(lang, api, languoids, log):
+    ancestors = lang.ancestors_from_nodemap(languoids)
+    children = lang.children_from_nodemap(languoids)
+    if lang.level == api.languoid_levels.language:
+        parent = ancestors[-1] if ancestors else None
+        if parent and parent.level != api.languoid_levels.family:  # pragma: no cover
+            log.error(message(lang, f'invalid nesting of language under {parent.level}'))
+        for child in children:
+            if child.level != api.languoid_levels.dialect:  # pragma: no cover
+                log.error(message(child, f'invalid nesting of {child.level} under language'))
+    elif lang.level == api.languoid_levels.family:
+        for d in lang.dir.iterdir():
+            if d.is_dir():
+                break
+        else:
+            log.error(message(lang, 'family without children'))  # pragma: no cover

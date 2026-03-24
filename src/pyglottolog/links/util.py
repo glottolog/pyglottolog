@@ -56,7 +56,8 @@ class LinkProvider:  # pylint: disable=R0903
             raise NotImplementedError()  # pragma: no cover
 
 
-class Test(LinkProvider):
+class Test(LinkProvider):  # pylint: disable=R0903
+    """Used to test the cli."""
     def iterupdated(self, languoids: Iterable[Languoid]) -> Generator[Languoid, None, None]:
         for lang in languoids:
             yield lang

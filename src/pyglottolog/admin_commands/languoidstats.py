@@ -25,4 +25,4 @@ def run(args):  # pylint: disable=C0116
         return
 
     stats = LanguoidStats.from_json(args.repos)
-    stats.check(args.repos, args.log)
+    stats.check({lg.id: lg for lg in args.repos.languoids()}, args.log)

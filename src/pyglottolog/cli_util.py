@@ -65,16 +65,11 @@ class LanguoidStats:
     def to_json(self, api):
         dump(dataclasses.asdict(self), api.build_path(self.__fname__), indent=2)
 
-    def check(self, api, log):
+    def check(self, languoids, log):
         """Compare stats with current status in repos."""
         current = LanguoidStats()
-        languoids = {}
-        for lang in api.languoids():
+        for lang in languoids.values():
             current.update(lang)
-            if lang.id in languoids:
-                log.error(message(
-                    lang.id, f'duplicate glottocode\n{languoids[lang.id].dir}\n{lang.dir}'))
-            languoids[lang.id] = lang
 
         if self.language:
             for gc in set(self.language) - set(current.language):
@@ -90,4 +85,3 @@ class LanguoidStats:
 
             if old and old != new:
                 log.info(f'{field.name}: \t{len(old - new)} deleted,\t{len(new - old)} added')
-        return languoids

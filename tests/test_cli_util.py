@@ -25,12 +25,12 @@ def test_LanguoidStats_check(api_copy, caplog, tmp_path):
     lang._api = api_copy
     lang.level = api_copy.languoid_levels.language
     stats.update(lang)
-    stats.check(api_copy, logging.getLogger(__name__))
+    stats.check({lg.id: lg for lg in api_copy.languoids()}, logging.getLogger(__name__))
     assert len(caplog.records) == 1
     assert caplog.records[0].levelname == 'ERROR'
 
     # Fake demotion of a language to a dialect:
     stats.update(api_copy.languoid('abcd1236'))
     stats.language.append(stats.dialect.pop())
-    stats.check(api_copy, logging.getLogger(__name__))
+    stats.check({lg.id: lg for lg in api_copy.languoids()}, logging.getLogger(__name__))
     assert 'WARNING' in {rec.levelname for rec in caplog.records}

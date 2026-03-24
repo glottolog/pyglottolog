@@ -87,11 +87,12 @@ def test_check(capsys, _main, mocker, api_copy):
     _main('check --tree-only', log=log)
     msgs = [a[0] for a, _ in log.error.call_args_list]
     assert any('duplicate glottocode' in m for m in msgs)
-    assert len(msgs) == 30
+    assert len(msgs) == 32
 
     (api_copy.tree / 'abcd1235').rename(api_copy.tree / 'abcd1238')
     log = mocker.Mock()
-    _main('check --tree-only', log=log)
+    _main('languoidstats write', log=log)
+    _main('check --tree-only --old-languoids', log=log)
     msgs = [a[0] for a, _ in log.error.call_args_list]
     assert any('duplicate hid' in m for m in msgs)
     assert len(msgs) >= 9
