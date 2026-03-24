@@ -25,7 +25,7 @@ from ..config import MEDType
 from ..util import PathType
 from .bibfiles_db import Database
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from pyglottolog import Glottolog
 
 __all__ = ['BibFiles', 'BibFile', 'Entry']
@@ -335,7 +335,7 @@ class Entry:
             if 'wordlist' in doctypes and index < doctypes.index('wordlist'):
                 return self.api.med_types.phonology_or_text
             return self.api.med_types.wordlist_or_less
-        return None
+        return None  # pragma: no cover
 
     @functools.cached_property
     def year_int(self) -> Optional[int]:

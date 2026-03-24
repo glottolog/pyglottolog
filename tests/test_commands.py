@@ -1,5 +1,4 @@
 import shlex
-import logging
 
 import pytest
 

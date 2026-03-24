@@ -65,7 +65,7 @@ def update(newbib, bibfile, log):  # pragma: no cover
     bibfile.update(newbib, log=log)
     bibfile.visit(fix_entry_type)
     bibfile.visit(unescape_latex)
-    bibfile.check(log)
+    bibfile.check_lang(log)
     with Table(argparse.Namespace(format='simple'), 'entry type', '#') as t:
         t.extend(list(stats.most_common()))
         t.append(['TOTAL', sum(stats.values())])

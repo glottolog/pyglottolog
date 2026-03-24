@@ -1,17 +1,21 @@
+"""
+Glottolog config data, i.e. controlled vocabularies of several kinds.
+"""
 import types
 import pathlib
 import functools
 import collections
 import dataclasses
-from typing import Optional
+from typing import Optional, Union, Any
 
 from clldutils.misc import nfilter
 from clldutils.inifile import INI
 from clldutils.jsonlib import load
 
+from pyglottolog.util import PathType
+
 __all__ = [
-    'AES', 'AESSource', 'Macroarea', 'DocumentType', 'LanguageType', 'LanguoidLevel',
-    'Config']
+    'AES', 'AESSource', 'Macroarea', 'DocumentType', 'LanguageType', 'LanguoidLevel', 'Config']
 
 
 @dataclasses.dataclass
@@ -20,18 +24,20 @@ class ConfigObject:
     Factory to turn INI file sections into instances of dataclasses.
     """
     @classmethod
-    def from_section(cls, cfg, section, fname):
+    def from_section(cls, cfg: INI, section: str, fname: pathlib.Path) -> 'ConfigObject':
+        """Initialize a config object from a section of an INI file."""
         fields = set(f.name for f in dataclasses.fields(cls))
 
         kw = {'name' if 'id' in cfg[section] else 'id': section}
         kw.update(cfg[section].items())
         res = cls(**{k: v for k, v in kw.items() if fields is None or k in fields})
-        res._fname = fname
+        res._fname = fname  # pylint: disable=W0201
         return res
 
 
 @dataclasses.dataclass
 class Editors(ConfigObject):
+    """Glottolog editors."""
     id: str
     current: bool = True
     affiliation: str = ''
@@ -41,12 +47,12 @@ class Editors(ConfigObject):
     github: str = None
 
     def __post_init__(self):
-        self.current = eval(self.current)
+        self.current = eval(self.current)  # pylint: disable=W0123
 
 
 @functools.total_ordering
 @dataclasses.dataclass
-class AES(ConfigObject):
+class AES(ConfigObject):  # pylint: disable=R0902
     """
     AES status values
 
@@ -105,15 +111,16 @@ class Macroarea(ConfigObject):
     reference_id: str
 
     @property
-    def geojson(self):
-        fname = self._fname.parent / 'macroareas' / 'voronoi' / '{}.geojson'.format(
-            self.name.lower().replace(' ', '_'))
+    def geojson(self) -> Optional[dict[str, Any]]:
+        """Get the GeoJSON representation of the geographic extent of the macroarea."""
+        fname = self._fname.parent.joinpath(
+            'macroareas', 'voronoi', f"{self.name.lower().replace(' ', '_')}.geojson")
         return load(fname) if fname.exists() else None
 
 
 @functools.total_ordering
 @dataclasses.dataclass
-class DocumentType(ConfigObject):
+class DocumentType(ConfigObject):  # pylint: disable=R0902
     """
     Document types categorize Glottolog references
     """
@@ -128,7 +135,7 @@ class DocumentType(ConfigObject):
 
     def __post_init__(self):
         self.rank = int(self.rank)
-        self.triggers = nfilter(self.triggers.split('\n'))
+        self.triggers = nfilter(self.triggers.split('\n'))  # pylint: disable=E1101
 
     def __lt__(self, other):
         return self.rank < other.rank
@@ -191,11 +198,13 @@ class LanguoidLevel(ConfigObject):
         return self.ordinal == other.ordinal
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """Just a mnemonic shortcut."""
         return self.id
 
 
-def get_ini(fname, **kw):
+def get_ini(fname: PathType, **kw) -> INI:
+    """Get an initialized INI object loaded with data from a file."""
     fname = pathlib.Path(fname)
     if not fname.exists():
         # For old-style (<=3.4) repository layout we ship the config data with pyglottolog:
@@ -216,14 +225,16 @@ class Config(collections.OrderedDict):
     __defaults__ = {}
 
     @classmethod
-    def from_ini(cls, fname, object_class):
+    def from_ini(cls, fname: PathType, object_class: type) -> 'Config':
+        """Initialize from a file."""
         ini = get_ini(fname)
         d = collections.OrderedDict()
         for sec in ini.sections():
             if object_class is types.SimpleNamespace:
                 kw = {'name' if 'id' in ini[sec] else 'id': sec, '_fname': fname}
                 kw.update({
-                    k: eval(v) if v in ('True', 'False') else v for k, v in ini[sec].items()})
+                    k: eval(v) if v in ('True', 'False') else v  # pylint: disable=W0123
+                    for k, v in ini[sec].items()})
                 obj = cls(**kw)
             else:
                 obj = object_class.from_section(ini, sec, fname)
@@ -237,7 +248,8 @@ class Config(collections.OrderedDict):
             return self[item]
         return dict.__getattribute__(self, item)
 
-    def get(self, item, default=None):
+    def get(self, item: Union[str, ConfigObject], default=None) -> Any:
+        """Flexible getter for config data."""
         if isinstance(item, str) and item in self:
             return self[item]
         if isinstance(item, ConfigObject) and getattr(item, 'id', None) in self:

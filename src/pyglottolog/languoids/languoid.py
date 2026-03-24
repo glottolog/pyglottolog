@@ -20,7 +20,7 @@ from .models import (
     ClassificationComment, EthnologueComment, ISORetirement,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from pyglottolog import Glottolog
 
 __all__ = ['Languoid']

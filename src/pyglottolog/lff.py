@@ -24,7 +24,7 @@ from pyglottolog.config import LanguoidLevel
 from .languoids import Languoid, Glottocode
 from .util import PathType
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from pyglottolog import Glottolog
 
 ISOLATE_ID = '-isolate-'

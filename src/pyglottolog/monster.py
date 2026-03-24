@@ -56,7 +56,7 @@ from .references import BibFile
 from .references.bibtex import EntryDictType
 from .references.libmonster import lgcode, add_inlg_e, markconservative
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from pyglottolog.api import Glottolog
 
 

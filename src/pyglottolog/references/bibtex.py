@@ -89,7 +89,7 @@ def save(
 
 class SupportsWrite(Protocol):  # pylint: disable=C0115,R0903
     def write(self, s: str):  # pylint: disable=C0116
-        ...
+        ...  # pragma: no cover
 
 
 def dump(

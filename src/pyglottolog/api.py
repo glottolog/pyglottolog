@@ -12,7 +12,6 @@ from collections.abc import Generator
 
 from clldutils.path import walk, git_describe
 from clldutils.apilib import API
-import clldutils.iso_639_3
 import pycountry
 from termcolor import colored
 from tqdm import tqdm
@@ -22,6 +21,7 @@ from . import languoids as lls
 from . import references
 from . import config
 from .languoids import models
+from .iso import get_iso, CheckingISO
 
 __all__ = ['Glottolog']
 
@@ -89,7 +89,7 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
         return f'<Glottolog repos {git_describe(self.repos)} at {self.repos}>'
 
     def describe(self) -> str:  # pylint: disable=C0116
-        return git_describe(self.repos)
+        return git_describe(self.repos)  # pragma: no cover
 
     def references_path(self, *comps: str) -> pathlib.Path:
         """
@@ -188,12 +188,12 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
         return self._cfg('publication')
 
     @functools.cached_property
-    def iso(self) -> clldutils.iso_639_3.ISO:
+    def iso(self) -> CheckingISO:
         """
         :return: `clldutils.iso_639_3.ISO` instance, fed with the data of the latest \
         ISO code table zip found in the `build` directory.
         """
-        return util.get_iso(self.build_path())
+        return get_iso(self.build_path())
 
     @functools.cached_property
     def _tree_dirs(self):

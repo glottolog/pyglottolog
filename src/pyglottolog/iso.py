@@ -16,12 +16,12 @@ from clldutils import iso_639_3
 from csvw import dsv
 
 from .references.bibtex import save, EntryType
-from .util import PathType
+from .util import PathType, message
 from ._compat import StrEnum
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from pyglottolog import Glottolog
-    from pyglottolog.languoids.languoid import Languoid, LanguoidMapType
+    from pyglottolog.languoids.languoid import Languoid
 
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 CACHE_DIR = 'iso_639_3_cache'
@@ -391,53 +391,69 @@ def retirements(api: 'Glottolog', log: logging.Logger, max_year: Optional[int] =
         lang.write_info()
 
 
-def check_coverage(
-        iso: iso_639_3.ISO,
-        iso_in_gl: 'LanguoidMapType',
-        iso_splits: list['Languoid'],
-) -> Generator[LogMessageType, None, None]:
-    """Report isocodes not associated with any Glottolog languoid."""
-    changed_to = set(itertools.chain(*[code.change_to for code in iso.retirements]))
-    for code in sorted(iso.languages):
-        if code.type == 'Individual/Living':
-            if code not in changed_to:
-                if code.code not in iso_in_gl:
-                    yield 'info', repr(code), 'missing'
-    for lang in iso_splits:
-        isocode = iso[lang.iso]
-        missing = [s.code for s in isocode.change_to if s.code not in iso_in_gl]
-        if missing:
-            yield 'warn', lang, f"{repr(isocode)} missing new codes: {', '.join(missing)}"
+class CheckingISO(iso_639_3.ISO):
+    def __init__(self, zippath):
+        super().__init__(zippath)
+        self.log = None
+        self._splits = []
+        self._in_gl = {}
 
+    def check_lang(
+            self,
+            api: 'Glottolog',
+            lang: 'Languoid',
+    ):
+        if lang.iso not in self:
+            self.log.warning(message(lang, 'invalid ISO-639-3 code [%s]' % lang.iso))
+            return
 
-def check_lang(
-        api: 'Glottolog',
-        isocode: iso_639_3.Code,
-        lang: 'Languoid',
-        iso_splits: list['Languoid'] = None,
-) -> Optional[LogMessageType]:
-    """
-    Check for retired isocodes associated with languoids.
-    Return constituents of a log message for cases we want to flag.
-    """
-    iso_splits = [] if iso_splits is None else iso_splits
-    fid = lang.lineage[0][1] if lang.lineage else None
-    if isocode.is_retired and \
-            fid not in [api.language_types.bookkeeping.pseudo_family_id,
-                        api.language_types.unattested.pseudo_family_id]:
-        # A retired isocode associated with a "regular" languoid.
-        if isocode.type == 'Retirement/split':
-            iso_splits.append(lang)
-        else:
-            if isocode.type == 'Retirement/merge' and lang.level == api.languoid_levels.dialect:
-                # Retired isocodes that are mergers but show up as dialects in Glottolog: This is
-                # desired behaviour and shouldn't generate a warning in glottolog check
-                pass
+        isocode = self[lang.iso]
+        if lang.iso in self._in_gl:
+            self.log.error(message(
+                isocode,
+                'duplicate: {0}, {1}'.format(
+                    self._in_gl[lang.iso].id, lang.id)))  # pragma: no cover
+        self._in_gl[lang.iso] = lang
+
+        fid = lang.lineage[0][1] if lang.lineage else None
+        if isocode.is_retired and \
+                fid not in [api.language_types.bookkeeping.pseudo_family_id,
+                            api.language_types.unattested.pseudo_family_id]:
+            # A retired isocode associated with a "regular" languoid.
+            if isocode.type == 'Retirement/split':
+                self._splits.append(lang)
             else:
+                if isocode.type == 'Retirement/merge' and lang.level == api.languoid_levels.dialect:
+                    # Retired isocodes that are mergers but show up as dialects in Glottolog: This
+                    # is desired behaviour and shouldn't generate a warning in glottolog check
+                    return
                 msg = repr(isocode)
-                level = 'info'
                 if len(isocode.change_to) == 1:
-                    level = 'warn'
                     msg += f' changed to [{isocode.change_to[0].code}]'
-                return level, lang, msg
-    return None  # pragma: no cover
+                    self.log.warning(message(lang, msg))
+                    return
+                self.log.info(message(lang, msg))
+
+    def check_coverage(self):
+        """Report isocodes not associated with any Glottolog languoid."""
+        changed_to = set(itertools.chain(*[code.change_to for code in self.retirements]))
+        for code in sorted(self.languages):
+            if code.type == 'Individual/Living':
+                if code not in changed_to:
+                    if code.code not in self._in_gl:
+                        self.log.info(message(repr(code), 'missing'))
+        for lang in self._splits:
+            isocode = self[lang.iso]
+            missing = [s.code for s in isocode.change_to if s.code not in self._in_gl]
+            if missing:  # pragma: no cover
+                self.log.warning(message(
+                    lang, f"{repr(isocode)} missing new codes: {', '.join(missing)}"))
+
+
+def get_iso(d: PathType) -> CheckingISO:
+    """Retrieve an initialized ISO 639-3 object."""
+    zips = sorted(list(pathlib.Path(d).glob('iso-639-3_Code_Tables_*.zip')), key=lambda p: p.name)
+    if zips:
+        return CheckingISO(zips[-1])
+
+    return CheckingISO(iso_639_3.download_tables(d))  # pragma: no cover

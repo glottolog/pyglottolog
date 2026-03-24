@@ -11,7 +11,6 @@ from typing import Any, Union, Callable, TypeVar
 from collections.abc import Sequence, Iterable, Generator
 
 from termcolor import colored
-from clldutils.iso_639_3 import ISO, download_tables
 
 T = TypeVar('T')
 PathType = Union[str, pathlib.Path]
@@ -54,15 +53,6 @@ def wrap(
 def message(obj: Any, msg: str) -> str:  # pylint: disable=C0116
     obj = colored(f'{obj}', 'blue', attrs=['bold'])
     return f'{obj}: {msg}'
-
-
-def get_iso(d: PathType) -> ISO:
-    """Retrieve an initialized ISO 639-3 object."""
-    zips = sorted(list(pathlib.Path(d).glob('iso-639-3_Code_Tables_*.zip')), key=lambda p: p.name)
-    if zips:
-        return ISO(zips[-1])
-
-    return ISO(download_tables(d))  # pragma: no cover
 
 
 TriggerClauseType = tuple[bool, str]

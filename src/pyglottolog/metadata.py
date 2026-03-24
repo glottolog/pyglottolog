@@ -12,7 +12,7 @@ from clldutils.jsonlib import dump
 
 from pyglottolog import config
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from pyglottolog import Glottolog
 
 

@@ -7,7 +7,7 @@ from clldutils.path import TemporaryDirectory
 from linglit.bibtex import merge
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     parser.add_argument(
         'bibkey',
         choices=['cldf', 'benjamins', 'glossa', 'langsci', 'dplace', 'ldh', 'jocp'],
@@ -23,7 +23,7 @@ def register(parser):
     )
 
 
-def run(args):  # pragma: no cover
+def run(args):  # pragma: no cover  # pylint: disable=C0116
     with TemporaryDirectory() as tmp:
         if args.merge:
             merge(args.bib, tmp / args.bib.name, delatex=True)

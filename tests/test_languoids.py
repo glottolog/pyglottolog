@@ -1,11 +1,22 @@
+import logging
 import pathlib
 
 import pytest
 
 
 from pyglottolog.languoids import (Languoid,
-    Glottocodes, Glottocode, Country, Reference,
+    Glottocodes, Glottocode, Country, Reference, Endangerment,
     ClassificationComment, EthnologueComment, Link)
+
+
+def test_Endangerment(api, caplog):
+    e = Endangerment(
+        list(api.aes_status.values())[0],
+        list(api.aes_sources.values())[0],
+        '[label](url)', '2024-11-11')
+    e.check(api.languoid('abcd1234'), [], logging.getLogger(__name__))
+    assert caplog.records[0].levelname == 'ERROR'
+    assert 'comment' in caplog.records[0].message
 
 
 def test_Link():
@@ -80,6 +91,7 @@ def test_Reference():
     ref = Reference('bib:key', '12-34', 'German')
     assert '{0}'.format(ref) == '**bib:key**:12-34<trigger "German">'
     Reference.from_list(['{0}'.format(ref)])
+    assert len(Reference.from_list([ref])) == 1
 
     with pytest.raises(ValueError):
         Reference.from_list(['abc'])
@@ -201,6 +213,14 @@ def test_classification_setter(api, tmpdir):
     l.write_info(pathlib.Path(str(tmpdir)))
     ini = pathlib.Path(str(tmpdir)).joinpath('abcd1234', 'md.ini').read_text(encoding='utf8')
     assert '\tabc\n\tdef' in ini
+
+
+def test_Languoid_update_names(api):
+    lang = api.languoid('abcd1235')
+    assert 'other' not in lang.names
+    lang.update_names(['aname', 'bname'], 'other')
+    assert lang.names['other'] == ['aname', 'bname']
+    assert lang.update_names(['aname', 'bname'], 'other') is False
 
 
 def test_Languoid_sorting(api):

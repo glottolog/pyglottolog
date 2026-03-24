@@ -24,9 +24,9 @@ def test_release(_main):
 
 
 def test_update_links(_main, capsys):
-    _main('updatelinks none')
+    _main('updatelinks test')
     out, _ = capsys.readouterr()
-    assert '0 languoids updated' in out
+    assert '1 languoids updated' in out
 
 
 def test_lff(capsys, _main, api_copy, encoding='utf-8'):
@@ -48,6 +48,12 @@ def test_lff(capsys, _main, api_copy, encoding='utf-8'):
 def test_index(api_copy, _main):
     _main('langindex')
     assert len(list(api_copy.repos.joinpath('languoids').glob('*.md'))) == 10
+
+
+def test_languoidstats(api_copy, _main):
+    _main('languoidstats', 'write')
+    assert api_copy.build_path('languoids.json').exists()
+    _main('languoidstats', 'check')
 
 
 def test_update_macroareas(_main, capsys):
@@ -92,7 +98,6 @@ def test_check(capsys, _main, mocker, api_copy):
 
 
 def test_check_2(_main, mocker, caplog):
-    mocker.patch('pyglottolog.iso.check_lang', lambda _, i, l, **kw: ('warn', l, 'xyz'))
     _main('check --tree-only', log=logging.getLogger(__name__))
     for record in caplog.records:
         print(record.message)

@@ -4,7 +4,7 @@ Recreate tree from lff.txt and dff.txt
 from pyglottolog import lff
 
 
-def run(args):
+def run(args):  # pylint: disable=C0116
     try:
         lff.lff2tree(args.repos, args.log)
     except ValueError:  # pragma: no cover

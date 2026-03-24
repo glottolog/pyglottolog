@@ -1,4 +1,5 @@
 import contextlib
+import logging
 from io import BytesIO
 
 import pytest
@@ -229,60 +230,46 @@ def test_retirements(api_copy, iso_data, mocker):
     assert 'effective = 2017-01-01' in res
 
 
-def test_check_coverage(api_copy, mocker):
-    assert len(list(iso.check_coverage(api_copy.iso, {}, []))) == 1
-    api_copy.iso['aaa']._change_to = ['aaa']
-    assert len(list(iso.check_coverage(api_copy.iso, {}, [mocker.Mock(iso='aaa')]))) == 2
+def test_CheckingISO(api, caplog):
+    checker = iso.CheckingISO(api.build_path('iso-639-3_Code_Tables_12345678.zip'))
+    checker.log = logging.getLogger(__name__)
 
+    lang = api.languoid('abcd1234')  # iso=aaa
 
-def test_check_lang(api_copy, mocker):
-    res = iso.check_lang(
-        api_copy,
-        Code(
-            dict(
-                Id='abc',
-                Ret_Reason='S',
-                Change_To='xyz',
-                Ret_Remedy='x',
-                Ref_Name='l',
-                Effective='2019-01-01'),
-            'Retirements',
-            None),
-        api_copy.languoid('abcd1235'))
-    assert res is None
+    with caplog.at_level(logging.INFO):
+        checker.check_lang(api, lang)
+        checker.check_lang(api, lang)
+        assert caplog.records[0].levelname == 'ERROR', 'Duplicate iso code not detected!'
 
-    lang = api_copy.languoid('abcd1235')
-    res = iso.check_lang(
-        api_copy,
-        Code(
-            dict(
-                Id='abc',
-                Ret_Reason='M',
-                Change_To='xyz',
-                Ret_Remedy='x',
-                Ref_Name='l',
-                Effective='2019-01-01'),
-            'Retirements',
-            dict(xyz=mocker.Mock(is_retired=False))),
-        lang)
-    assert res[0] == 'warn'
+    lang.iso = 'xxx'
+    with caplog.at_level(logging.INFO):
+        checker.check_lang(api, lang)
+        assert caplog.records[-1].levelname == 'WARNING', 'Unknown iso code not detected!'
 
+    lang = api.languoid('abcd1235')  # iso=abc
+    with caplog.at_level(logging.INFO):
+        checker.check_lang(api, lang)
+
+    lang = api.languoid('abcd1237')
+    lang.iso = 'bbb'
+    with caplog.at_level(logging.INFO):
+        checker.check_lang(api, lang)
+
+    lang.iso = 'ccc'
+    with caplog.at_level(logging.INFO):
+        checker.check_lang(api, lang)
+
+    lang.iso = 'abx'
+    with caplog.at_level(logging.INFO):
+        checker.check_lang(api, lang)
+
+    lang.iso = 'abc'
     lang.level = 'dialect'
-    res = iso.check_lang(
-        api_copy,
-        Code(
-            dict(
-                Id='abc',
-                Ret_Reason='M',
-                Change_To='xyz',
-                Ret_Remedy='x',
-                Ref_Name='l',
-                Effective='2019-01-01'),
-            'Retirements',
-            None),
-        lang)
-    assert res is None
+    with caplog.at_level(logging.INFO):
+        checker.check_lang(api, lang)
 
+    checker.check_coverage()
+    assert len(caplog.records) == 6
 
 
 def test_code_details(iso_data):

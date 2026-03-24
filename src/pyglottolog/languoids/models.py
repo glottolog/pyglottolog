@@ -21,7 +21,7 @@ from ..util import message
 from ..config import AESSource, AES
 from ..references import Entry
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from . import Languoid
 
 __all__ = [

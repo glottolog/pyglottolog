@@ -1,11 +1,18 @@
+"""
+LinkProvider implementations.
+"""
 import itertools
 import collections
+from collections.abc import Generator, Iterable
 
 from clldutils.path import TemporaryDirectory
 import cldfzenodo
 
+from pyglottolog.languoids import Languoid
 
-def read_grouped_cldf_languages(doi):  # pragma: no cover
+
+def read_grouped_cldf_languages(doi):
+    """Read language information from CLDF datasets."""
     rec = cldfzenodo.Record.from_concept_doi(doi)
     with TemporaryDirectory() as tmp:
         ds = rec.download_dataset(tmp)
@@ -17,7 +24,12 @@ def read_grouped_cldf_languages(doi):  # pragma: no cover
         yield gc, list(langs)
 
 
-class LinkProvider(object):
+class LinkProvider:  # pylint: disable=R0903
+    """
+    Glottolog includes links from languoid's info pages to related info on other sites.
+    Some of this info is curated by Glottolog, but most of it is aggregated from links included
+    in the other resource. Extracting this information is the job of a `LinkProvider`.
+    """
     __domain__ = None
     __doi__ = None
     __url_template__ = None
@@ -26,10 +38,9 @@ class LinkProvider(object):
     def __init__(self, repos=None):
         self.repos = repos
 
-    def iterupdated(self, languoids):  # pragma: no cover
+    def iterupdated(self, languoids: Iterable[Languoid]) -> Generator[Languoid, None, None]:
+        """Run through the proposed links and update languoids as needed."""
         if self.__domain__ and self.__doi__ and self.__url_template__:
-            # FIXME: Ideally, we'd want the CLDF data to specify full URLs for languages via a
-            # valueUrl property on the ID column (or the LanguageTable?).
             res = collections.defaultdict(list)
             for gc, langs in read_grouped_cldf_languages(self.__doi__):
                 for lang in langs:
@@ -42,45 +53,37 @@ class LinkProvider(object):
                 if lang.update_links(self.__domain__, res.get(lang.id, [])):
                     yield lang
         else:
-            raise NotImplementedError()
+            raise NotImplementedError()  # pragma: no cover
 
 
-class Crubadan(LinkProvider):  # pragma: no cover
-    def iterupdated(self, languoids):
+class Test(LinkProvider):
+    def iterupdated(self, languoids: Iterable[Languoid]) -> Generator[Languoid, None, None]:
         for lang in languoids:
-            if lang.update_links('crubadan.org', []):
-                yield lang
+            yield lang
+            break
 
 
-class PHOIBLE(LinkProvider):  # pragma: no cover
+class PHOIBLE(LinkProvider):  # pragma: no cover  # pylint: disable=R0903,C0115
     __domain__ = 'phoible.org'
     __doi__ = '10.5281/zenodo.2562766'
 
     def iterupdated(self, languoids):  # pragma: no cover
         urls = {}
-        for gc, langs in read_grouped_cldf_languages(self.__doi__):
-            urls[gc] = ['https://{0}/languages/{1}'.format(self.__domain__, gc)]
+        for gc, _ in read_grouped_cldf_languages(self.__doi__):
+            urls[gc] = [f'https://{self.__domain__}/languages/{gc}']
         for lang in languoids:
             if lang.update_links(self.__domain__, urls.get(lang.id, [])):
                 yield lang
 
 
-class APICS(LinkProvider):  # pragma: no cover
-    __inactive__ = True
-    __domain__ = "apics-online.info"
-    __doi__ = '10.5281/zenodo.3823887'
-    __url_template__ = 'https://' + __domain__ + '/contributions/{0[id]}'
-    __label_template__ = '{0[name]}'
-
-
-class WALS(LinkProvider):  # pragma: no cover
+class WALS(LinkProvider):  # pragma: no cover  # pylint: disable=R0903,C0115
     __domain__ = "wals.info"
     __doi__ = '10.5281/zenodo.3606197'
     __url_template__ = 'https://' + __domain__ + '/languoid/lect/wals_code_{0[id]}'
     __label_template__ = '{0[name]}'
 
 
-class Grambank(LinkProvider):  # pragma: no cover
+class Grambank(LinkProvider):  # pragma: no cover  # pylint: disable=R0903,C0115
     __inactive__ = True
     __domain__ = "grambank.clld.org"
     __doi__ = '10.5281/zenodo.7740139'
@@ -88,7 +91,7 @@ class Grambank(LinkProvider):  # pragma: no cover
     __label_template__ = '{0[name]}'
 
 
-class Lexibank(LinkProvider):  # pragma: no cover
+class Lexibank(LinkProvider):  # pragma: no cover  # pylint: disable=R0903,C0115
     __inactive__ = True
     __domain__ = "lexibank.clld.org"
     __doi__ = '10.5281/zenodo.5227817'
