@@ -2,6 +2,7 @@
 Utilities used in Glottolog commands.
 """
 import dataclasses
+import logging
 import pathlib
 from typing import TYPE_CHECKING, Optional
 
@@ -9,10 +10,10 @@ from clldutils.clilib import ParserError, PathType
 from clldutils.jsonlib import load, dump
 
 from pyglottolog.util import message
-from pyglottolog.languoids import Glottocode
+from pyglottolog.languoids import Glottocode, Languoid, LanguoidMapType
 
 if TYPE_CHECKING:  # pragma: no cover
-    from pyglottolog.languoids import Languoid
+    from pyglottolog import Glottolog
 
 __all__ = ['add_output_dir', 'get_languoid']
 
@@ -39,7 +40,12 @@ def get_languoid(args, spec: str) -> Optional['Languoid']:
 
 @dataclasses.dataclass
 class LanguoidStats:
-    """Stores languoid stats and makes comparison simple."""
+    """
+    Stores languoid stats and makes comparison simple.
+
+    This is used to ensure compliance with the policy to never delete language-level Glottocodes
+    between to releases.
+    """
     language: list[Glottocode] = dataclasses.field(default_factory=list)
     family: list[Glottocode] = dataclasses.field(default_factory=list)
     dialect: list[Glottocode] = dataclasses.field(default_factory=list)
@@ -47,26 +53,30 @@ class LanguoidStats:
     __fname__ = 'languoids.json'
 
     @classmethod
-    def from_json(cls, api):
+    def from_json(cls, api: 'Glottolog') -> 'LanguoidStats':
+        """Inititialize stats from a JSON file in the build directory."""
         if api.build_path(cls.__fname__).exists():
             return cls(**load(api.build_path(cls.__fname__)))
         return cls()
 
     @classmethod
-    def from_tree(cls, api):
+    def from_tree(cls, api: 'Glottolog') -> 'LanguoidStats':
+        """Initialize stats from a the languoid tree in the repository."""
         res = cls()
         for lang in api.languoids():
             res.update(lang)
         return res
 
-    def update(self, lang):
+    def update(self, lang: 'Languoid'):
+        """Add lang to stats."""
         getattr(self, lang.level.name).append(lang.id)
 
-    def to_json(self, api):
+    def to_json(self, api: 'Glottolog'):
+        """Dump stats to a JSON file."""
         dump(dataclasses.asdict(self), api.build_path(self.__fname__), indent=2)
 
-    def check(self, languoids, log):
-        """Compare stats with current status in repos."""
+    def check(self, languoids: LanguoidMapType, log: logging.Logger):
+        """Compare stats with current status in repos as conveyed by languoids."""
         current = LanguoidStats()
         for lang in languoids.values():
             current.update(lang)

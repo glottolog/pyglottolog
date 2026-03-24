@@ -1,6 +1,7 @@
 """
 Check the glottolog data for consistency.
 """
+import logging
 import pathlib
 import collections
 import dataclasses
@@ -32,6 +33,7 @@ def register(parser):  # pylint: disable=C0116
 
 @dataclasses.dataclass
 class LanguoidLookup:
+    """Easy languoid lookup by various attributes."""
     by_id: LanguoidMapType = dataclasses.field(default_factory=dict)
     by_hid: LanguoidMapType = dataclasses.field(default_factory=dict)
     by_name: dict[str, set[Languoid]] = dataclasses.field(
@@ -39,7 +41,8 @@ class LanguoidLookup:
     by_level: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
     by_category: collections.Counter[str] = dataclasses.field(default_factory=collections.Counter)
 
-    def update(self, lang, levels, log):
+    def update(self, lang: Languoid, levels, log: logging.Logger):
+        """Update the lookup tables and counts, adding data about a new languoid."""
         if lang.id in self.by_id:
             log.error(message(
                 lang.id, f'duplicate glottocode\n{self.by_id[lang.id].dir}\n{lang.dir}'))
@@ -60,13 +63,14 @@ class LanguoidLookup:
     @staticmethod
     def _log_counter(counter, name):
         msg = [name + ':']
-        maxl = max([len(k) for k in counter.keys()]) + 1
+        maxl = max(len(k) for k in counter.keys()) + 1
         for k, l in counter.most_common():
             msg.append(('{0:<%s} {1:>8,}' % maxl).format(k + ':', l))
         msg.append(('{0:<%s} {1:>8,}' % maxl).format('', sum(list(counter.values()))))
         print('\n'.join(msg))
 
     def log(self):
+        """Print summary stats about languoids in the repos."""
         self._log_counter(self.by_level, 'Languoids by level')
         self._log_counter(self.by_category, 'Languages by category')
 
@@ -81,9 +85,11 @@ def run(args):  # pylint: disable=C0116
     def info(obj, msg):
         args.log.info(message(obj, msg))
 
+    # Store all available BibTeX keys to check references in languoid info files.
     refkeys = set()
     for bibfile in args.repos.bibfiles:
         if not args.tree_only:
+            # Check the BibTeX formatting.
             bibfile.check(args.log)
         refkeys = refkeys.union(bibfile.keys())
 
@@ -141,9 +147,9 @@ def _check_config(api, refkeys, log):
 
 
 def _check_lang_attrs(lang, api, refkeys, log):
-    if lang.latitude and not (-90 <= lang.latitude <= 90):
+    if lang.latitude and not -90 <= lang.latitude <= 90:
         log.error(message(lang, f'invalid latitude: {lang.latitude}'))
-    if lang.longitude and not (-180 <= lang.longitude <= 180):
+    if lang.longitude and not -180 <= lang.longitude <= 180:
         log.error(message(lang, f'invalid longitude: {lang.longitude}'))
 
     assert isinstance(lang.countries, list)

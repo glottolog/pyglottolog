@@ -392,27 +392,25 @@ def retirements(api: 'Glottolog', log: logging.Logger, max_year: Optional[int] =
 
 
 class CheckingISO(iso_639_3.ISO):
+    """
+    ISO 639-3 code registry together with methods to run checks.
+    """
     def __init__(self, zippath):
         super().__init__(zippath)
         self.log = None
         self._splits = []
         self._in_gl = {}
 
-    def check_lang(
-            self,
-            api: 'Glottolog',
-            lang: 'Languoid',
-    ):
+    def check_lang(self, api: 'Glottolog', lang: 'Languoid'):
+        """Check attrributes of a languoid in comparison with the associated ISO code."""
         if lang.iso not in self:
-            self.log.warning(message(lang, 'invalid ISO-639-3 code [%s]' % lang.iso))
+            self.log.warning(message(lang, f'invalid ISO-639-3 code [{lang.iso}]'))
             return
 
         isocode = self[lang.iso]
         if lang.iso in self._in_gl:
             self.log.error(message(
-                isocode,
-                'duplicate: {0}, {1}'.format(
-                    self._in_gl[lang.iso].id, lang.id)))  # pragma: no cover
+                isocode, f'duplicate: {self._in_gl[lang.iso].id}, {lang.id}'))  # pragma: no cover
         self._in_gl[lang.iso] = lang
 
         fid = lang.lineage[0][1] if lang.lineage else None
