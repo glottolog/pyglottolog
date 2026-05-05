@@ -18,7 +18,6 @@ build/glottocode2wikidata.csv
 """
 from csvw.dsv import reader
 import requests
-from clldutils.clilib import confirm
 
 from .util import LinkProvider
 

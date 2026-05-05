@@ -1,7 +1,7 @@
 # Changes
 
 
-## [4.0.0] - unreleased
+## [4.0.0] - 2026-05-05
 
 - Drop py3.8 compat
 - Remove dependency on `attrs`
