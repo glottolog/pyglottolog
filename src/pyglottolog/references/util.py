@@ -1,36 +1,41 @@
+"""
+Utilities for the handling of pages fields.
+"""
 import re
+from typing import Optional
 
 from .roman import romanint
 
 ROMAN = r'[ivxlcdmIVXLCDM]+'
-
 ROMANPATTERN = re.compile(ROMAN + '$')
-
 ARABIC = r'[0-9]+'
-
 ARABICPATTERN = re.compile(ARABIC + '$')
-
 SEPPAGESPATTERN = re.compile(
-    r'(?P<n1>{0}|{1})\s*(,|;|\.|\+|/)\s*(?P<n2>{0}|{1})'.format(ROMAN, ARABIC))
-
+    r'(?P<n1>{0}|{1})\s*([,;.+/])\s*(?P<n2>{0}|{1})'.format(  # pylint: disable=C0209
+        ROMAN, ARABIC))
 PAGES_PATTERN = re.compile(
-    r'(?P<start>{0}|{1})\s*\-\-?\s*(?P<end>{0}|{1})'.format(ROMAN, ARABIC))
-
+    r'(?P<start>{0}|{1})\s*--?\s*(?P<end>{0}|{1})'.format(  # pylint: disable=C0209
+        ROMAN, ARABIC))
 ART_NO_PATTERN = re.compile(r'\(art\.\s*[0-9]+\)')
 
 MAX_PAGE = 10_000
 
 
-def get_int(s):
+def get_int(s: str) -> Optional[int]:
+    """
+    >>> get_int('X')
+    10
+    """
     s = s.strip()
     try:
         return int(s)
     except ValueError:
         if ROMANPATTERN.match(s):
             return romanint(s.lower())
+    return None
 
 
-def compute_pages(pages):
+def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], int]]:
     """
 
     >>> compute_pages('x+23')
@@ -79,9 +84,7 @@ def compute_pages(pages):
     m = SEPPAGESPATTERN.match(pages)
     if m:
         number = sum(map(get_int, [m.group('n1'), m.group('n2')]))
-        if number > MAX_PAGE:
-            number = None
-        return (None, None, number)
+        return (None, None, number if number <= MAX_PAGE else None)
 
     # next case: ranges:
     start = None

@@ -50,15 +50,21 @@ deduplication and annotation in the process.
 import time
 import logging
 import collections
+from typing import TYPE_CHECKING, Optional
 
 from .references import BibFile
+from .references.bibtex import EntryDictType
 from .references.libmonster import lgcode, add_inlg_e, markconservative
 
+if TYPE_CHECKING:  # pragma: no cover
+    from pyglottolog.api import Glottolog
 
-def macro_area_from_lgcode(m, lgd):
+
+def macro_area_from_lgcode(m: EntryDictType, lgd: dict[str, str]) -> EntryDictType:
+    """Inject a macro_area field into each entry."""
     def inject_macro_area(arg):
         typ, fields = arg
-        mas = set(lgd[x] for x in lgcode((typ, fields)) if x in lgd and lgd[x])
+        mas = {lgd[x] for x in lgcode((typ, fields)) if x in lgd and lgd[x]}
         if mas:
             fields['macro_area'] = ', '.join(sorted(mas))
         return typ, fields
@@ -66,28 +72,28 @@ def macro_area_from_lgcode(m, lgd):
     return {k: inject_macro_area(tf) for k, tf in m.items()}
 
 
-def compile(api, log=None, rebuild=False):
+def compile(api: 'Glottolog', log: Optional[logging.Logger] = None):  # pylint: disable=W0622
+    """Create the monster BibTeX file, merging all Glottolog refproviders."""
     log = log or logging.getLogger('pyglottolog')
     previous = api.references_path('monster.csv')
     replacements = api.references_path('replacements.json')
-    monster = BibFile(
-        fname=api.build_path('monster-utf8.bib'), encoding='utf-8', sortkey='bibkey')
+    monster = BibFile(fname=api.build_path('monster-utf8.bib'), encoding='utf-8', sortkey='bibkey')
 
-    log.info('%s open/rebuild bibfiles db' % time.ctime())
-    db = api.bibfiles.to_sqlite(api.build_path('bibfiles.sqlite3'), rebuild=rebuild)
+    log.info('%s open/rebuild bibfiles db', time.ctime())
+    db = api.bibfiles.to_sqlite(api.build_path('bibfiles.sqlite3'))
 
-    log.info('%s compile_monster' % time.ctime())
-    m = dict(db.merged())
+    log.info('%s compile_monster', time.ctime())
+    m: EntryDictType = dict(db.merged())
 
-    log.info('%s load hh.bib' % time.ctime())
+    log.info('%s load hh.bib', time.ctime())
     hhbib = api.bibfiles['hh.bib'].load()
 
     # Annotate with macro_area from lgcode when lgcode is assigned manually
-    log.info('%s macro_area_from_lgcode' % time.ctime())
+    log.info('%s macro_area_from_lgcode', time.ctime())
     m = macro_area_from_lgcode(m, api.macroarea_map)
 
     # Annotate with hhtype
-    log.info('%s annotate hhtype' % time.ctime())
+    log.info('%s annotate hhtype', time.ctime())
     m = markconservative(
         m,
         api.hhtypes.triggers,
@@ -97,7 +103,7 @@ def compile(api, log=None, rebuild=False):
         rank=lambda l_: api.hhtypes[l_])
 
     # Annotate with lgcode
-    log.info('%s annotate lgcode' % time.ctime())
+    log.info('%s annotate lgcode', time.ctime())
     m = markconservative(
         m,
         api.triggers['lgcode'],
@@ -106,34 +112,34 @@ def compile(api, log=None, rebuild=False):
         api.build_path('monstermark-lgc.txt'))
 
     # Annotate with inlg
-    log.info('%s add_inlg_e' % time.ctime())
+    log.info('%s add_inlg_e', time.ctime())
     m = add_inlg_e(m, api.triggers['inlg'])
 
     # Print some statistics
     stats = collections.Counter()
     log.info(time.ctime())
-    for t, f in m.values():
+    for _, f in m.values():
         stats.update(['entry'])
         for field in ['lgcode', 'hhtype', 'macro_area']:
             if field in f:
                 stats.update([field])
-    log.info("# entries {0}".format(stats['entry']))
+    log.info("# entries %s", stats['entry'])
     for field in ['lgcode', 'hhtype', 'macro_area']:
-        log.info("with {0}: {1}".format(field, stats[field]))
+        log.info("with %s: %s", field, stats[field])
 
     # Update the CSV with the previous mappings for later reference
-    log.info('%s update_previous' % time.ctime())
+    log.info('%s update_previous', time.ctime())
     db.to_csvfile(previous)
 
-    log.info('%s save_replacements' % time.ctime())
+    log.info('%s save_replacements', time.ctime())
     db.to_replacements(replacements)
 
     # Trickling back
-    log.info('%s trickle' % time.ctime())
+    log.info('%s trickle', time.ctime())
     db.trickle(api.bibfiles)
 
     # Save
-    log.info('%s save as utf8' % time.ctime())
+    log.info('%s save as utf8', time.ctime())
     monster.save(m)
 
-    log.info('%s done.' % time.ctime())
+    log.info('%s done.', time.ctime())

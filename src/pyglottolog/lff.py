@@ -1,13 +1,31 @@
+"""
+Convert between Glottolog's Languoid trees and the lff format.
+
+Abkhaz-Adyge [abkh1242] aaa
+    Ubykh [ubyk1235]uby
+Abkhaz-Adyge [abkh1242] aaa; Abkhaz-Abaza [abkh1243]
+    Abaza [abaz1241]abq
+    Abkhazian [abkh1244]abk
+"""
 import re
 import os
 import shutil
 import logging
+import pathlib
 import operator
 import collections
+from collections.abc import Sequence, Generator
+import dataclasses
+from typing import TYPE_CHECKING, Optional
 
 from clldutils.path import readlines
 
+from pyglottolog.config import LanguoidLevel
 from .languoids import Languoid, Glottocode
+from .util import PathType
+
+if TYPE_CHECKING:  # pragma: no cover
+    from pyglottolog import Glottolog
 
 ISOLATE_ID = '-isolate-'
 LINEAGE_SEP = ';'
@@ -15,17 +33,80 @@ NAME_AND_ID_PATTERN = re.compile(
     r'(?P<name>[^\[;]+)'
     r'(\[(?P<gc>(' + Glottocode.regex + ')|' + ISOLATE_ID + r')?])\s*'
     r'(?P<hid>[a-z]{3}|NOCODE_[^;]+)?$')
+LineageType = tuple[str, str, str, str]
+NameGcIsoType = tuple[str, str, str]
 
 
-def parse_languoid(s, log):
+@dataclasses.dataclass
+class LffLanguoid:
+    """
+    In lff, the core languoid data and the classification are read from different lines.
+    Here, we combine this info.
+    """
+    languoid: Languoid
+    lineage: list[LineageType]
+
+
+@dataclasses.dataclass
+class Registry:
+    """Registry, handing out new Glottocodes if necessary."""
+    api: 'Glottolog'
+    new: dict[tuple[str, LanguoidLevel], Glottocode] = dataclasses.field(default_factory=dict)
+
+    def get(self, name: str, level: LanguoidLevel) -> str:
+        """Get a (possibly newly minted) Glottocode from the registry."""
+        glottocode = self.new.get((name, level))
+        if not glottocode:  # Mint a new Glottocode.
+            glottocode = self.new[name, level] = self.api.glottocodes.new(name)
+        return glottocode
+
+
+@dataclasses.dataclass
+class OldTree:
+    """We store the old Languoids from the tree, to be updated with new data read from lff."""
+    tree: dict[str, Languoid]
+
+    def updated_language(self, lg: Languoid, log: logging.Logger) -> Languoid:
+        """Update a Languoid object from the old tree with new data and return it."""
+        old_lang = self.tree[lg.id]
+        if old_lang.level != lg.level:
+            log.info('%s from %s to %s', old_lang, old_lang.level, lg.level)
+            old_lang.level = lg.level
+        if old_lang.name != lg.name:
+            old_lang.add_name(old_lang.name)
+            old_lang.name = lg.name
+        if old_lang.iso != lg.iso:
+            old_lang.iso = lg.iso
+        if lg.hid and old_lang.hid != lg.hid:
+            old_lang.hid = lg.hid
+        return old_lang
+
+    def updated_group(self, id_, name, level, log) -> Languoid:
+        """Update a family-level Languoid from the old tree with new data and return it."""
+        group = self.tree[id_]
+        if group.level != level:
+            log.info('%s from %s to %s', group, group.level, level)
+            group.level = level
+        if name != group.name:
+            # rename a subgroup!
+            group.add_name(group.name)
+            group.name = name
+        return group
+
+
+def parse_languoid(s: str, log) -> NameGcIsoType:
+    """
+    >>> parse_languoid('Sprache [abcd1234] iso', None)
+    ('Sprache', 'abcd1234', 'iso')
+    """
     match = NAME_AND_ID_PATTERN.match(s.strip())
     if not match or not match.group('name').strip():
-        log.error('Invalid languoid spec: {0}'.format(s))
+        log.error('Invalid languoid spec: %s', s)
         raise ValueError()
     return match.group('name').strip(), match.group('gc'), match.group('hid')
 
 
-def rmtree(d, **kw):
+def rmtree(d: PathType):
     """More performant way to remove large directory structures."""
     d = str(d)
     for path in (os.path.join(d, f) for f in os.listdir(d)):
@@ -36,46 +117,78 @@ def rmtree(d, **kw):
     os.rmdir(d)
 
 
-def languoid(api, log, new, path, lname, glottocode, isocode, level):
-    if not glottocode:
-        glottocode = new.get((lname, level))
-    if not glottocode:
-        new[lname, level] = glottocode = api.glottocodes.new(lname)
+def _iter_lineage(  # pylint: disable=R0913,R0917
+        path,
+        level,
+        llevels,
+        lname,
+        glottocode,
+        registry,
+        log,
+) -> Generator[LineageType, None, None]:
+    for i, (name, id_, hid) in enumerate(path):
+        if id_ == ISOLATE_ID:
+            if i != 0 or len(path) != 1:
+                log.error(
+                    'invalid classification line for languoid: %s [%s]', lname, glottocode)
+                raise ValueError('invalid isolate line')
+            break
+        _level = llevels.family
+        if level == llevels.dialect:
+            _level = llevels.language if i == 0 else llevels.dialect
 
-    lineage = []
+        if not id_:
+            id_ = registry.get(name, _level)
+
+        yield (name, id_, _level, hid)
+
+
+def languoid(  # pylint: disable=R0913,R0917
+        api: 'Glottolog',
+        log: logging.Logger,
+        registry: Registry,
+        path: Sequence[tuple[str, str, str]],
+        name_gc_iso: NameGcIsoType,
+        level: LanguoidLevel,
+) -> LffLanguoid:
+    """
+    Instantiate a Languoid from lff.
+    """
+    lname, glottocode, isocode = name_gc_iso
+    if not glottocode:
+        glottocode = registry.get(lname, level)
+
+    lineage: list[LineageType] = []
     if path:
-        for i, (name, id_, hid) in enumerate(path):
-            if id_ == ISOLATE_ID:
-                if i != 0 or len(path) != 1:
-                    log.error(
-                        'invalid classification line for languoid: {0} [{1}]'.format(
-                            lname, glottocode))
-                    raise ValueError('invalid isolate line')
-                break
-            _level = api.languoid_levels.family
-            if level == api.languoid_levels.dialect:
-                _level = api.languoid_levels.language if i == 0 else api.languoid_levels.dialect
-
-            if not id_:
-                id_ = new.get((name, _level))
-            if not id_:
-                new[name, _level] = id_ = api.glottocodes.new(name)
-
-            lineage.append((name, id_, _level, hid))
+        lineage = list(_iter_lineage(
+            path,
+            level,
+            api.languoid_levels,
+            lname,
+            glottocode,
+            registry, log
+        ))
 
     lang = Languoid.from_name_id_level(
         api.tree, lname, glottocode, level, lineage=[(r[0], r[1], r[2]) for r in lineage], _api=api)
     if (isocode in api.iso) or (isocode is None):
         lang.iso = isocode
     lang.hid = isocode
-    return lang, lineage
+    return LffLanguoid(lang, lineage)
 
 
-def read_lff(api, log, new, level, fname=None):
+def read_lff(
+        api: 'Glottolog',
+        log: logging.Logger,
+        new: Registry,
+        level: LanguoidLevel,
+        fname: Optional[PathType] = None,
+) -> Generator[LffLanguoid, None, None]:
+    """Yield languoids as read from a lff file."""
     assert level in [api.languoid_levels.language, api.languoid_levels.dialect]
-    log.info('reading {0}s from {1}'.format(level.name, fname))
+    log.info('reading %ss from %s', level.name, fname)
 
-    fname = fname or api.build_path('%sff.txt' % level.name[0])
+    fname = fname or api.build_path(f'{level.name[0]}ff.txt')
 
     path = None
     for line in readlines(fname):
@@ -88,16 +201,23 @@ def read_lff(api, log, new, level, fname=None):
             # leading whitespace => a language/dialect spec.
             if path is None:
                 raise ValueError('language line without classification line')
-            name, id_, hid = parse_languoid(line.strip(), log)
-            yield languoid(api, log, new, path, name, id_, hid, level)
+            name_gc_iso = parse_languoid(line.strip(), log)
+            yield languoid(api, log, new, path, name_gc_iso, level)
         else:
             path = [parse_languoid(s.strip(), log) for s in line.split(LINEAGE_SEP)]
 
 
-def lang2tree(api, log, lang, lineage, out, old_tree):
+def lang2tree(
+        api: 'Glottolog',
+        log: logging.Logger,
+        lg: LffLanguoid,
+        out: pathlib.Path,
+        old_tree: OldTree,
+):
+    """Update directories/files in the Glottolog languoids tree for an item from lff."""
     groupdir = out
 
-    for spec in lineage:
+    for spec in lg.lineage:
         hid = -1
         name, id_, level = spec[:3]
         if len(spec) == 4:
@@ -106,15 +226,8 @@ def lang2tree(api, log, lang, lineage, out, old_tree):
         groupdir = groupdir.joinpath(id_)
         if not groupdir.exists():
             groupdir.mkdir()
-            if id_ in old_tree:
-                group = old_tree[id_]
-                if group.level != level:
-                    log.info('{0} from {1} to {2}'.format(group, group.level, level))
-                    group.level = level
-                if name != group.name:
-                    # rename a subgroup!
-                    group.add_name(group.name)
-                    group.name = name
+            if id_ in old_tree.tree:
+                group = old_tree.updated_group(id_, name, level, log)
             else:
                 group = Languoid.from_name_id_level(api.tree, name, id_, level, _api=api)
 
@@ -125,24 +238,35 @@ def lang2tree(api, log, lang, lineage, out, old_tree):
                     group.hid = hid
             group.write_info(groupdir)
 
-    langdir = groupdir.joinpath(lang.id)
+    langdir = groupdir.joinpath(lg.languoid.id)
     langdir.mkdir()
 
-    if lang.id in old_tree:
-        old_lang = old_tree[lang.id]
-        if old_lang.level != lang.level:
-            log.info('{0} from {1} to {2}'.format(old_lang, old_lang.level, lang.level))
-            old_lang.level = lang.level
-        if old_lang.name != lang.name:
-            old_lang.add_name(old_lang.name)
-            old_lang.name = lang.name
-        if old_lang.iso != lang.iso:
-            old_lang.iso = lang.iso
-        if lang.hid and old_lang.hid != lang.hid:
-            old_lang.hid = lang.hid
-        old_lang.write_info(langdir)
-    else:
-        lang.write_info(langdir)
+    if lg.languoid.id in old_tree.tree:
+        lg.languoid = old_tree.updated_language(lg.languoid, log)
+    lg.languoid.write_info(langdir)
+
+
+@dataclasses.dataclass
+class ConsistencyChecker:
+    """
+    In lff, classification info may be redundant.
+    Thus, upon reading we make sure it is consistent.
+    """
+    languoids: dict[str, tuple[str, str, str]] = dataclasses.field(default_factory=dict)
+
+    def checked(self, lg: LffLanguoid, log) -> LffLanguoid:
+        """Check whether classification info across branches is consistent."""
+        assert lg.languoid.id not in self.languoids
+        for n, gc, _level, hid in lg.lineage:
+            if gc in self.languoids:
+                if self.languoids[gc] != (n, _level, hid):
+                    log.error('%s: %s vs %s', gc, self.languoids[gc], (n, _level, hid))
+                    raise ValueError('inconsistent languoid data')
+            else:
+                self.languoids[gc] = (n, _level, hid)
+        self.languoids[lg.languoid.id] = (
+            lg.languoid.name, lg.languoid.level, lg.languoid.iso or lg.languoid.hid)
+        return lg
 
 
 def lff2tree(api, log=logging.getLogger(__name__)):
@@ -160,87 +284,77 @@ def lff2tree(api, log=logging.getLogger(__name__)):
     - rm old tree
     - copy new tree
     """
-    builddir = api.build_path('tree')
-    old_tree = {lang.id: lang for lang in api.languoids()}
-    out = api.tree
+    old_tree: OldTree = OldTree({lang.id: lang for lang in api.languoids()})
 
-    if out.exists():
-        if builddir.exists():
+    if api.tree.exists():
+        if api.build_path('tree').exists():
             try:
-                rmtree(builddir)
-            except Exception:  # pragma: no cover
+                rmtree(api.build_path('tree'))
+            except Exception:  # pragma: no cover  # pylint: disable=W0718
                 pass
-            if builddir.exists():  # pragma: no cover
-                raise ValueError('please remove %s before proceeding' % builddir)
+            if api.build_path('tree').exists():  # pragma: no cover
+                raise ValueError(f'please remove {api.build_path("tree")} before proceeding')
         # move the old tree out of the way
-        shutil.move(out, builddir)
-    out.mkdir()
+        shutil.move(api.tree, api.build_path('tree'))
+    api.tree.mkdir()
 
-    new = {}
+    checker = ConsistencyChecker()
+    new = Registry(api)
     languages = {}
-    languoids = {}
+    for lg in read_lff(api, log, new, api.languoid_levels.language, api.build_path('lff.txt')):
+        languages[lg.languoid.id] = checker.checked(lg, log)
+        lang2tree(api, log, lg, api.tree, old_tree)
 
-    def checked(lang, lin):
-        assert lang.id not in languoids
-        for n, gc, _level, hid in lin:
-            if gc in languoids:
-                if languoids[gc] != (n, _level, hid):
-                    log.error(
-                        '{0}: {1} vs {2}'.format(gc, languoids[gc], (n, _level, hid)))
-                    raise ValueError('inconsistent languoid data')
-            else:
-                languoids[gc] = (n, _level, hid)
-        languoids[lang.id] = (lang.name, lang.level, lang.iso or lang.hid)
-        return lang
-
-    for lang, lineage in read_lff(
-            api, log, new, api.languoid_levels.language, api.build_path('lff.txt')):
-        languages[lang.id] = checked(lang, lineage)
-        lang2tree(api, log, lang, lineage, out, old_tree)
-
-    for lang, lineage in read_lff(
-            api, log, new, api.languoid_levels.dialect, api.build_path('dff.txt')):
-        lang = checked(lang, lineage)
-        if not lang.lineage or lang.lineage[0][1] not in languages:
-            log.error('missing language in dff: {0[0]} [{0[1]}]'.format(lang.lineage[0]))
+    for lg in read_lff(api, log, new, api.languoid_levels.dialect, api.build_path('dff.txt')):
+        lg = checker.checked(lg, log)
+        if not lg.lineage or lg.lineage[0][1] not in languages:
+            log.error(
+                'missing language in dff: %s [%s]',
+                lg.lineage[0][0], lg.lineage[0][1])
             raise ValueError('invalid language referenced')
 
-        lin = languages[lang.lineage[0][1]].lineage + lang.lineage
-        lang2tree(api, log, lang, lin, out, old_tree)
+        lg.lineage = languages[lg.lineage[0][1]].lineage + lg.lineage
+        lang2tree(api, log, lg, api.tree, old_tree)
 
     duplicates = False
     for name, getter in [('name', operator.itemgetter(0)), ('hid', operator.itemgetter(2))]:
-        count = collections.Counter(getter(spec) for spec in languoids.values())
+        count = collections.Counter(getter(spec) for spec in checker.languoids.values())
         for thing, n in count.most_common():
             if thing is None:
                 continue
             if n < 2:
                 break
-            log.error('duplicate {0}: {1} ({2})'.format(name, thing, n))
+            log.error('duplicate %s: %s (%s)', name, thing, n)
             duplicates = True
     if duplicates:
         raise ValueError('duplicates found')
 
 
-def format_comp(lang, gc=None):
-    res = '{0} [{1}]'.format(lang.name, gc or lang.id)
+def format_comp(lang, gc=None) -> str:
+    """Tree nodes in lff are formatted as <name> [<glottocode>] <iso-or-hid>"""
+    res = f'{lang.name} [{gc or lang.id}]'
     if lang.iso:
-        res += ' {0}'.format(lang.iso)
+        res += f' {lang.iso}'
     elif lang.hid:
-        res += ' {0}'.format(lang.hid)
+        res += f' {lang.hid}'
     return res
 
 
-def format_language(lang):
-    return '    {0}'.format(format_comp(lang))
+def format_language(lang) -> str:
+    """Language (or dialect) lines in lff are indented."""
+    return f'    {format_comp(lang)}'
 
 
-def format_classification(api, lang, agg):
+def format_classification(
+        api: 'Glottolog',
+        lang: Languoid,
+        parents: dict[str, Languoid]) -> str:
+    """<languoid>; <languoid> ..."""
     if not lang.lineage:
         return format_comp(lang, gc=ISOLATE_ID)
     comps = []
     for _, gc, _ in lang.lineage:
-        a = agg[gc]
+        a = parents[gc]
         if lang.level == api.languoid_levels.language or \
                 (lang.level == api.languoid_levels.dialect and  # noqa: W504
                  a.level != api.languoid_levels.family):
@@ -248,10 +362,18 @@ def format_classification(api, lang, agg):
     return (LINEAGE_SEP + ' ').join(comps)
 
 
-def tree2lff(api, log=logging.getLogger(__name__)):
-    languoids = {api.languoid_levels.dialect: collections.defaultdict(list),
-                 api.languoid_levels.language: collections.defaultdict(list)}
+def tree2lff(
+        api: 'Glottolog',
+        log: logging.Logger = logging.getLogger(__name__),
+):
+    """Format a languoid tree in the lff format."""
+    languoids: dict[LanguoidLevel, dict[str, list[str]]] = {
+        api.languoid_levels.dialect: collections.defaultdict(list),
+        api.languoid_levels.language: collections.defaultdict(list)}
 
+    # We collect a mapping from Glottocode to Languoid while already formatting the classifications.
+    # This is possible, because `api.languoids` returns a Languoid only after all its parents have
+    # been returned.
     agg = {}
     for lang in api.languoids():
         agg[lang.id] = lang
@@ -260,11 +382,11 @@ def tree2lff(api, log=logging.getLogger(__name__)):
                 format_language(lang))
 
     for level, languages in languoids.items():
-        ff = api.build_path('%sff.txt' % level.name[0])
+        ff = api.build_path(f'{level.name[0]}ff.txt')
         with ff.open('w', encoding='utf8') as fp:
             fp.write('# -*- coding: utf-8 -*-\n')
             for path in sorted(languages):
                 fp.write(path + '\n')
                 for lang in sorted(languages[path]):
                     fp.write(lang + '\n')
-        log.info('{0}s written to {1}'.format(level.name, ff.as_posix()))
+        log.info('%ss written to %s', level.name, ff.as_posix())

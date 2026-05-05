@@ -1,15 +1,20 @@
+"""
+Functionality to massage evobib into shape for Glottolog.
+"""
+import pathlib
+import argparse
 from subprocess import check_output
 from collections import Counter, OrderedDict
 
-from clldutils.markup import Table
+from clldutils.clilib import Table
 
 from pyglottolog import latex
 
 latex.register()
-URL = 'https://github.com/lingpy/bibliography/raw/master/evobib-converted.bib'
 
 
-def bibtool(bib):  # pragma: no cover
+def bibtool(bib: pathlib.Path):  # pragma: no cover
+    """Run bibtool to normalize the BibTeX."""
     args = ['bibtool', '-R']
     for k, v in [
         ('print.align.key', '0'),
@@ -23,7 +28,7 @@ def bibtool(bib):  # pragma: no cover
         ('new.entry.type', 'thesis'),
         ('new.entry.type', 'report'),
     ]:
-        args.append('--{0}="{1}"'.format(k, v))
+        args.append(f'--{k}="{v}"')
     args.append(bib.name)
     res = check_output(args, cwd=str(bib.parent))
     with bib.open(mode='wb') as fp:
@@ -31,10 +36,12 @@ def bibtool(bib):  # pragma: no cover
 
 
 def update(newbib, bibfile, log):  # pragma: no cover
+    """Update the bib provider version from the upstream curated file."""
     bibtool(newbib)
     stats = Counter()
 
     def fix_entry_type(entry):
+        """We translate some biblatex entry types."""
         type_ = entry.type.lower()
         type_map = {
             'thesis': 'phdthesis',
@@ -58,8 +65,7 @@ def update(newbib, bibfile, log):  # pragma: no cover
     bibfile.update(newbib, log=log)
     bibfile.visit(fix_entry_type)
     bibfile.visit(unescape_latex)
-    bibfile.check(log)
-    res = Table('entry type', '#')
-    res.extend(list(stats.most_common()))
-    res.append(['TOTAL', sum(stats.values())])
-    print('\n' + res.render(tablefmt='simple'))
+    bibfile.check_lang(log)
+    with Table(argparse.Namespace(format='simple'), 'entry type', '#') as t:
+        t.extend(list(stats.most_common()))
+        t.append(['TOTAL', sum(stats.values())])

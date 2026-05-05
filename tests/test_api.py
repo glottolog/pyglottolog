@@ -52,10 +52,7 @@ def test_editors(api):
         e.id for e in sorted(api.editors.values(), key=lambda i: int(i.ord))
         if e.current]
     assert eids[0] == 'hammarstroem'
-
-
-def test_paths(api):
-    assert api.ftsindex
+    assert api.current_editors
 
 
 def test_languoid(api):

@@ -1,6 +1,5 @@
 """Load references from .bib files into sqlite3, hash, assign ids (split/merge)."""
 
-import collections
 import contextlib
 import difflib
 import functools
@@ -8,39 +7,34 @@ import itertools
 import logging
 import operator
 import pathlib
-import typing
+from typing import Optional, Union
+import collections
+from collections.abc import Generator
 
 from clldutils import jsonlib
 from csvw import dsv
 import sqlalchemy as sa
 import sqlalchemy.orm
 
-from .. import _compat
 from ..util import (unique,
                     group_first as groupby_first)
 from . import bibtex
 
 __all__ = ['Database']
 
+assert sqlalchemy.orm
 UNION_FIELDS = {'fn', 'asjp_name', 'isbn'}
-
 IGNORE_FIELDS = {'crossref', 'numnote', 'glotto_id'}
-
 REF_ID_FIELD = 'glottolog_ref_id'
-
 ENCODING = 'utf-8'
-
 SQLALCHEMY_FUTURE = True
-
 PAGE_SIZE = 32_768
-
 ENTRYTYPE = 'ENTRYTYPE'
-
 
 log = logging.getLogger('pyglottolog')
 
 
-def distance(left, right,
+def distance(left, right,  # pylint: disable=W0102
              *, weight={'author': 3, 'year': 3, 'title': 3, ENTRYTYPE: 2}):
     """Simple measure of the difference between two BibTeX field dicts."""
     if not (left or right):
@@ -64,15 +58,13 @@ class Connectable:
 
     def __init__(self, filepath,
                  *, future: bool = SQLALCHEMY_FUTURE,
-                 paramstyle: typing.Optional[str] = 'qmark'):
+                 paramstyle: Optional[str] = 'qmark'):
         self.filepath = pathlib.Path(filepath)
         self._engine = sa.create_engine(f'sqlite:///{self.filepath}',
                                         future=future,
                                         paramstyle=paramstyle)
 
-    def connect(self,
-                *, pragma_bulk_insert: bool = False,
-                page_size: typing.Optional[int] = None):
+    def connect(self, *, pragma_bulk_insert: bool = False, page_size: Optional[int] = None):
         """Connect to engine, optionally apply SQLite PRAGMAs, return conn."""
         conn = self._engine.connect()
 
@@ -99,14 +91,12 @@ class BaseDatabase(Connectable):
     """Collection of parsed .bib files loaded into a SQLite database."""
 
     @classmethod
-    def from_bibfiles(cls, bibfiles, filepath, *, rebuild: bool = False,
-                      page_size: typing.Optional[int] = PAGE_SIZE,
+    def from_bibfiles(cls, bibfiles, filepath, *,
+                      page_size: Optional[int] = PAGE_SIZE,
                       verbose: bool = False):
         """Load ``bibfiles`` if needed, hash, split/merge, return the database."""
         self = cls(filepath)
         if self.filepath.exists():
-            if not rebuild and self.is_uptodate(bibfiles):
-                return self
             self.filepath.unlink()
 
         with self.connect(page_size=page_size) as conn:
@@ -130,11 +120,6 @@ class BaseDatabase(Connectable):
             conn.commit()
 
         return self
-
-    def is_uptodate(self, bibfiles, *, verbose: bool = False):
-        """Does the db have the same filenames, sizes, and mtimes as ``bibfiles``?"""
-        with self.connect() as conn:
-            return File.same_as(conn, bibfiles, verbose=verbose)
 
     def __iter__(self, *, chunksize: int = 100):
         """Yield pairs of ``(Entry.id, Entry.hash)`` and unmerged field values."""
@@ -169,7 +154,10 @@ class BaseDatabase(Connectable):
                               for field, g in groupby_field(grp)]
                     yield id_hash, fields
 
-    def merged(self, *, ref_id_field: str = REF_ID_FIELD):
+    def merged(
+            self, *,
+            ref_id_field: str = REF_ID_FIELD,
+    ) -> Generator[bibtex.EntryType, None, None]:
         """Yield ``(bibkey, (entrytype, fields))`` entries merged by ``Entry.id``."""
         for (id_, hash_), grp in self:
             entrytype, fields = self._merged_entry(grp)
@@ -177,28 +165,24 @@ class BaseDatabase(Connectable):
             yield hash_, (entrytype, fields)
 
     @staticmethod
-    def _merged_entry(grp,
+    def _merged_entry(grp,  # pylint: disable=W0102
                       *, union=UNION_FIELDS, ignore=IGNORE_FIELDS,
                       raw: bool = False,
-                      _sep_join=', '.join,
-                      _removesuffix=_compat.removesuffix):
-        # TODO: consider implementing (a subset of?) onlyifnot logic:
+                      _sep_join=', '.join):
+        # TODO: consider implementing (a subset of?) onlyifnot logic:  # pylint: disable=fixme
         # {'address': 'publisher', 'lgfamily': 'lgcode', 'publisher': 'school',
         # 'journal': 'booktitle'}
         fields = {field: values[0][0] if field not in union
                   else _sep_join(unique(vl for vl, _, _ in values))
                   for field, values in grp if field not in ignore}
 
-        src = {_removesuffix(filename, '.bib')
-               for _, values in grp
-               for _, filename, _ in values}
+        src = {filename.removesuffix('.bib') for _, values in grp for _, filename, _ in values}
 
-        srctrickle = {f"{_removesuffix(filename, '.bib')}#{bibkey}"
+        srctrickle = {f"{filename.removesuffix('.bib')}#{bibkey}"
                       for _, values in grp
                       for _, filename, bibkey in values}
 
-        fields.update(src=_sep_join(sorted(src)),
-                      srctrickle=_sep_join(sorted(srctrickle)))
+        fields.update(src=_sep_join(sorted(src)), srctrickle=_sep_join(sorted(srctrickle)))
 
         if raw:
             return fields
@@ -206,10 +190,10 @@ class BaseDatabase(Connectable):
         return entrytype, fields
 
 
-class Indexable:
+class Indexable:  # pylint: disable=R0903
     """Retrieve entry from individual .bib file, or merged entry from old or new grouping."""
 
-    def __getitem__(self, key: typing.Union[typing.Tuple[str, str], int, str]):
+    def __getitem__(self, key: Union[tuple[str, str], int, str]):
         """
         Entry by ``(filename, bibkey)`` or merged entry by ``refid`` (old grouping)
         or ``hash`` (current grouping).
@@ -217,7 +201,7 @@ class Indexable:
         if not isinstance(key, (tuple, int, str)):
             raise TypeError(f'key must be tuple, int, or str: {key!r}')  # pragma: no cover
 
-        with self.connect() as conn:
+        with self.connect() as conn:  # pylint: disable=E1101
             if isinstance(key, tuple):
                 filename, bibkey = key
                 entry = self._get_file_entry(conn, filename, bibkey)
@@ -245,7 +229,7 @@ class Indexable:
         return fields.pop(ENTRYTYPE), fields
 
     @classmethod
-    def _get_merged_entry(cls, conn, *, key: typing.Union[int, str],
+    def _get_merged_entry(cls, conn, *, key: Union[int, str],
                           raw: bool = True,
                           _get_field=operator.attrgetter('field')):
         """Return merged entry from old or new grouping."""
@@ -267,22 +251,18 @@ class Indexable:
 
         if not grp:
             raise KeyError(key)
-        return cls._merged_entry(grp, raw=raw)
+        return cls._merged_entry(grp, raw=raw)   # pylint: disable=E1101
 
 
 class Exportable:
     """Write merged references into .bib file, ``bibfiles``, etc."""
 
-    def to_bibfile(self, filepath,
-                   *, encoding: str = ENCODING,
-                   _sortkey: typing.Optional[str] = None):
+    def to_bibfile(self, filepath, *, encoding: str = ENCODING, _sortkey: Optional[str] = None):
         """Write merged references into combined .bib file at ``filepath``."""
-        bibtex.save(self.merged(), str(filepath),
-                    sortkey=_sortkey, encoding=encoding)
+        bibtex.save(self.merged(),   # pylint: disable=E1101
+                    str(filepath), sortkey=_sortkey, encoding=encoding)
 
-    def to_csvfile(self, filename,
-                   *, dialect: str = 'excel',
-                   encoding: str = ENCODING):
+    def to_csvfile(self, filename, *, dialect: str = 'excel', encoding: str = ENCODING):
         """Write a CSV file with one row for each entry in each .bib file."""
         select_rows = (sa.select(File.name.label('filename'),
                                  Entry.bibkey,
@@ -294,36 +274,32 @@ class Exportable:
                                  'hash',
                                  Entry.id))
 
-        with self.execute(select_rows) as result, \
-             dsv.UnicodeWriter(filename, encoding=encoding, dialect=dialect) as writer:
-            header = list(result.keys())
-            writer.writerow(header)
-            writer.writerows(result)
+        with self.execute(select_rows) as result:  # pylint: disable=E1101
+            with dsv.UnicodeWriter(filename, encoding=encoding, dialect=dialect) as writer:
+                header = list(result.keys())
+                writer.writerow(header)
+                writer.writerows(result)
 
-    def to_replacements(self, filename,
-                        *, indent: typing.Optional[int] = 4):
+    def to_replacements(self, filename, *, indent: Optional[int] = 4):
         """Write a JSON file with 301s from merged ``glottolog_ref_id``s."""
         select_pairs = (sa.select(Entry.refid.label('id'),
                                   Entry.id.label('replacement'))
                         .where(Entry.id != Entry.refid)
                         .order_by('replacement'))
 
-        with self.execute(select_pairs) as result:
+        with self.execute(select_pairs) as result:  # pylint: disable=E1101
             pairs = result.mappings().all()
 
         with jsonlib.update(filename, default=[], indent=indent) as repls:
             # RowMapping is not JSON serializable
             repls.extend(map(dict, pairs))
 
-    def trickle(self, bibfiles, *, ref_id_field: str = REF_ID_FIELD):
+    def trickle(self, bibfiles, *, ref_id_field: str = REF_ID_FIELD):  # pylint: disable=R0914
         """Write new/changed ``glottolog_ref_id``s back into ``bibfiles``."""
-        with self.connect() as conn:
+        with self.connect() as conn:  # pylint: disable=E1101
             assert Entry.allid(conn=conn)
 
-        if not self.is_uptodate(bibfiles, verbose=True):
-            raise RuntimeError('trickle with an outdated db')  # pragma: no cover
-
-        changed = (Entry.id != sa.func.coalesce(Entry.refid, -1))
+        changed = Entry.id != sa.func.coalesce(Entry.refid, -1)
 
         select_files = (sa.select(File.pk,
                                   File.name.label('filename'))
@@ -339,7 +315,7 @@ class Exportable:
                           .where(changed)
                           .order_by(sa.func.lower(Entry.bibkey)))
 
-        with self.connect() as conn:
+        with self.connect() as conn:  # pylint: disable=E1101
             files = conn.execute(select_files).all()
             for file_pk, filename in files:
                 bf = bibfiles[filename]
@@ -348,7 +324,7 @@ class Exportable:
 
                 changed_entries = conn.execute(select_changed, {'file_pk': file_pk})
                 for bibkey, refid, new in changed_entries:
-                    entrytype, fields = entries[bibkey]
+                    _, fields = entries[bibkey]
                     old = fields.pop(ref_id_field, None)
                     assert old == refid
                     if old is None:
@@ -364,8 +340,8 @@ class Exportable:
 class Debugable:
     """Show details about splitted and combined references."""
 
-    def stats(self, *, field_files: bool = False):
-        with self.connect() as conn:
+    def stats(self, *, field_files: bool = False):  # pylint: disable=C0116
+        with self.connect() as conn:  # pylint: disable=E1101
             Entry.stats(conn=conn)
             Value.fieldstats(conn=conn, with_files=field_files)
             Entry.hashstats(conn=conn)
@@ -385,7 +361,7 @@ class Debugable:
                                  .where(other.hash != Entry.hash))
                           .order_by('refid', 'hash', 'filename', 'bibkey'))
 
-        with self.connect() as conn:
+        with self.connect() as conn:  # pylint: disable=E1101
             result = conn.execute(select_entries)
             for refid, group in groupby_first(result):
                 self._print_group(conn, group)
@@ -408,13 +384,13 @@ class Debugable:
                                     Entry.refid.desc(),
                                     'filename', 'bibkey'))
 
-        with self.connect() as conn:
+        with self.connect() as conn:  # pylint: disable=E1101
             merge = functools.partial(merge_new_cand_old, conn,
                                       keyfunc=operator.attrgetter('refid'))
             result = conn.execute(select_entries)
             for hash_, group in groupby_first(result):
                 self._print_group(conn, group)
-                new, _, old = merge(group, hash_=hash_)
+                _, _, old = merge(group, hash_=hash_)
                 print(f'-> {old}\n')
 
     def show_identified(self):
@@ -468,7 +444,7 @@ class Debugable:
         self._show(select_entries)
 
     def _show(self, sql):
-        with self.connect() as conn:
+        with self.connect() as conn:  # pylint: disable=E1101
             result = conn.execute(sql)
             for _, group in groupby_first(result):
                 self._print_group(conn, group)
@@ -479,10 +455,8 @@ class Debugable:
         for row in group:
             out(row)
         for row in group:
-            hashfields = Value.hashfields(conn,
-                                          filename=row.filename,
-                                          bibkey=row.bibkey)
-            out('\t%r, %r, %r, %r' % hashfields)
+            hashfields = Value.hashfields(conn, filename=row.filename, bibkey=row.bibkey)
+            out('\t%r, %r, %r, %r' % hashfields)  # pylint: disable=C0209
 
 
 class Database(Debugable, Exportable, Indexable, BaseDatabase):
@@ -490,42 +464,15 @@ class Database(Debugable, Exportable, Indexable, BaseDatabase):
 
 
 @registry.mapped
-class File:
+class File:  # pylint: disable=too-few-public-methods
     """Filesystem metadata and priority setting of a .bib file."""
 
     __tablename__ = 'file'
 
     pk = sa.Column(sa.Integer, primary_key=True)
-
-    name = sa.Column(sa.Text, sa.CheckConstraint("name != ''"), nullable=False,
-                     unique=True)
-
+    name = sa.Column(sa.Text, sa.CheckConstraint("name != ''"), nullable=False, unique=True)
     size = sa.Column(sa.Integer, sa.CheckConstraint('size > 0'), nullable=False)
-    mtime = sa.Column(sa.DateTime, nullable=False)
-
     priority = sa.Column(sa.Integer, nullable=False)
-
-    @classmethod
-    def same_as(cls, conn, bibfiles, *, verbose: bool = False):
-        """Return whether all sizes and mtimes are the same as in ``bibfiles``."""
-        ondisk = {b.fname.name: (b.size, b.mtime) for b in bibfiles}
-
-        select_files = (sa.select(cls.name, cls.size, cls.mtime)
-                        .order_by('name'))
-        result = conn.execute(select_files)
-        indb = {name: (size, mtime) for name, size, mtime in result}
-
-        if ondisk == indb:
-            return True
-
-        if verbose:
-            ondisk_names, indb_names = (d.keys() for d in (ondisk, indb))
-            print(f'missing in db: {list(ondisk_names - indb_names)}')
-            print(f'missing on disk: {list(indb_names - ondisk_names)}')
-            common = ondisk_names & indb_names
-            differing = [c for c in common if ondisk[c] != indb[c]]
-            print(f'differing in size/mtime: {differing}')
-        return False
 
 
 @registry.mapped
@@ -535,42 +482,35 @@ class Entry:
     __tablename__ = 'entry'
 
     pk = sa.Column(sa.Integer, primary_key=True)
-
     file_pk = sa.Column(sa.ForeignKey('file.pk'), nullable=False)
-
-    bibkey = sa.Column(sa.Text, sa.CheckConstraint("bibkey != ''"),
-                       nullable=False)
+    bibkey = sa.Column(sa.Text, sa.CheckConstraint("bibkey != ''"), nullable=False)
 
     # old REF_ID_FIELD from bibfiles (previous hash grouping)
-    refid = sa.Column(sa.Integer, sa.CheckConstraint('refid > 0'),
-                      index=True)
+    refid = sa.Column(sa.Integer, sa.CheckConstraint('refid > 0'), index=True)
 
     # current grouping: m:n with refid (splits/merges)
-    hash = sa.Column(sa.Text, sa.CheckConstraint("hash != ''"),
-                     index=True)
+    hash = sa.Column(sa.Text, sa.CheckConstraint("hash != ''"), index=True)
 
     # split-resolved refid: every srefid maps to exactly one hash
-    srefid = sa.Column(sa.Integer, sa.CheckConstraint('srefid > 0'),
-                       index=True)
+    srefid = sa.Column(sa.Integer, sa.CheckConstraint('srefid > 0'), index=True)
 
     # new REF_ID_FIELD to ``trickle()`` into bibfiles (current hash grouping)
-    id = sa.Column(sa.Integer, sa.CheckConstraint('id > 0'),
-                   index=True)
+    id = sa.Column(sa.Integer, sa.CheckConstraint('id > 0'), index=True)
 
     __table_args__ = (sa.UniqueConstraint(file_pk, bibkey),)
 
     @classmethod
-    def allhash(cls, *, conn):
+    def allhash(cls, *, conn):  # pylint: disable=C0116
         select_allhash = sa.select(~sa.exists().where(cls.hash == sa.null()))
         return conn.execute(select_allhash).scalar_one()
 
     @classmethod
-    def allid(cls, *, conn):
+    def allid(cls, *, conn):  # pylint: disable=C0116
         select_allid = sa.select(~sa.exists().where(cls.id == sa.null()))
         return conn.execute(select_allid).scalar_one()
 
     @classmethod
-    def onetoone(cls, *, conn):
+    def onetoone(cls, *, conn):  # pylint: disable=C0116
         other = sa.orm.aliased(cls)
         diff_id = sa.and_(other.hash == cls.hash, other.id != cls.id)
         diff_hash = sa.and_(other.id == cls.hash, other.hash != cls.hash)
@@ -581,7 +521,7 @@ class Entry:
         return conn.execute(select_onetoone).scalar_one()
 
     @classmethod
-    def stats(cls, *, conn, out=log.info):
+    def stats(cls, *, conn, out=log.info):  # pylint: disable=C0116
         out('entry stats:')
         select_n = (sa.select(File.name.label('filename'),
                               sa.func.count().label('n'))
@@ -589,14 +529,14 @@ class Entry:
                     .group_by(cls.file_pk))
         result = conn.execute(select_n)
         for r in result:
-            out(f'{r.filename} {r.n:d}')
+            out('%s %d', r.filename, r.n)
 
         select_total = sa.select(sa.func.count()).select_from(cls)
         total = conn.execute(select_total).scalar_one()
-        out(f'{total:d} entries total')
+        out('%d entries total', total)
 
     @classmethod
-    def hashstats(cls, *, conn, out=print):
+    def hashstats(cls, *, conn, out=print):  # pylint: disable=C0116
         select_total = sa.select(sa.func.count(cls.hash.distinct()).label('distinct'),
                                  sa.func.count(cls.hash).label('total'))
 
@@ -646,7 +586,8 @@ class Entry:
         out(f'{multiple:6d}', 'in multiple files', sep='\t')
 
     @classmethod
-    def hashidstats(cls, *, conn, out=print, ref_id_field: str = REF_ID_FIELD):
+    def hashidstats(  # pylint: disable=C0116
+            cls, *, conn, out=print, ref_id_field: str = REF_ID_FIELD):
         sq = (sa.select(sa.func.count(cls.refid.distinct()).label('hash_nid'))
               .where(cls.hash != sa.null())
               .group_by(cls.hash)
@@ -677,8 +618,8 @@ class Entry:
             out(f'1 {ref_id_field} {r.id_nhash:d} keyids: {r.n:d}')
 
     @classmethod
-    def windowed(cls, conn, *, key_column: str, size: int):
-        key_column = cls.__table__.c[key_column]
+    def windowed(cls, conn, *, key_column: str, size: int):  # pylint: disable=C0116
+        key_column = cls.__table__.c[key_column]  # pylint: disable=E1101
         select_keys = (sa.select(key_column.distinct())
                        .order_by(key_column))
 
@@ -694,16 +635,13 @@ class Value:
     __tablename__ = 'value'
 
     entry_pk = sa.Column(sa.ForeignKey('entry.pk'), primary_key=True)
-
-    field = sa.Column(sa.Text, sa.CheckConstraint("field != ''"),
-                      primary_key=True)
-
+    field = sa.Column(sa.Text, sa.CheckConstraint("field != ''"), primary_key=True)
     value = sa.Column(sa.Text, nullable=False)
 
     __table_args__ = ({'info': {'without_rowid': True}},)
 
     @classmethod
-    def hashfields(cls, conn, *, filename, bibkey,
+    def hashfields(cls, conn, *, filename, bibkey,  # pylint: disable=C0116
                    _fields=('author', 'editor', 'year', 'title')):
         # also: extra_hash, volume (if not journal, booktitle, or series)
         select_items = (sa.select(cls.field, cls.value)
@@ -717,7 +655,7 @@ class Value:
         return tuple(map(fields.get, _fields))
 
     @classmethod
-    def fieldstats(cls, *, conn, with_files: bool = False, out=print):
+    def fieldstats(cls, *, conn, with_files: bool = False, out=print):  # pylint: disable=C0116
         tmpl = '{n:6d}\t{field}'
         select_n = (sa.select(cls.field,
                               sa.func.count().label('n'))
@@ -735,7 +673,7 @@ class Value:
             out(tmpl.format_map(r))
 
 
-def dbapi_insert(conn, model, *, column_keys: typing.List[str],
+def dbapi_insert(conn, model, *, column_keys: list[str],
                  executemany: bool = False,
                  paramstyle: str = 'qmark'):
     """Return callable for raw dbapi insertion of ``column_keys`` into ``model``.
@@ -759,16 +697,14 @@ def import_bibfiles(conn, bibfiles, *, ref_id_field=REF_ID_FIELD):
     """Import bibfiles with raw dbapi."""
     log.info('importing bibfiles into a new db')
 
-    insert_file = dbapi_insert(conn, File,
-                               column_keys=['name', 'size', 'mtime', 'priority'])
-    insert_entry = dbapi_insert(conn, Entry,
-                                column_keys=['file_pk', 'bibkey', 'refid'])
+    insert_file = dbapi_insert(conn, File, column_keys=['name', 'size', 'priority'])
+    insert_entry = dbapi_insert(conn, Entry, column_keys=['file_pk', 'bibkey', 'refid'])
     insert_values = dbapi_insert(conn, Value,
                                  column_keys=['entry_pk', 'field', 'value'],
                                  executemany=True)
 
     for b in bibfiles:
-        file = (b.fname.name, b.size, b.mtime, b.priority)
+        file = (b.fname.name, b.size, b.priority)
         file_pk = insert_file(file).lastrowid
         for e in b.iterentries():
             entry = (file_pk, e.key, e.fields.get(ref_id_field))
@@ -781,7 +717,7 @@ def import_bibfiles(conn, bibfiles, *, ref_id_field=REF_ID_FIELD):
 
 def generate_hashes(conn):
     """Assign ``Entry.hash`` to all .bib entries for grouping."""
-    from .libmonster import wrds, keyid
+    from .libmonster import wrds, keyid  # pylint: disable=C0415
 
     words = collections.Counter()
     select_titles = (sa.select(Value.value)
@@ -790,13 +726,12 @@ def generate_hashes(conn):
     for titles in result.scalars().partitions(10_000):
         for title in titles:
             words.update(wrds(title))
-    # TODO: consider dropping stop words/hapaxes from freq. distribution
+    # TODO: consider dropping stop words/hapaxes from freq. distribution  # pylint: disable=fixme
     print(f'{len(words):6d}',
           f'title words (from {sum(words.values()):d} tokens)', sep='\t')
 
     def windowed_entries(chunksize: int = 500):
-        select_files = (sa.select(File.pk)
-                        .order_by(File.name))
+        select_files = (sa.select(File.pk).order_by(File.name))
 
         files = conn.execute(select_files).scalars().all()
 
@@ -824,8 +759,7 @@ def generate_hashes(conn):
                     .compile().string)
     update_entry = functools.partial(conn.connection.executemany, update_entry)
 
-    groupby_entry_pk = functools.partial(itertools.groupby,
-                                         key=operator.attrgetter('pk'))
+    groupby_entry_pk = functools.partial(itertools.groupby, key=operator.attrgetter('pk'))
 
     for first, last in windowed_entries():
         result = conn.execute(select_bfv, {'first': first, 'last': last})
@@ -876,9 +810,7 @@ def assign_ids(conn, *, verbose: bool = False):
     assert Entry.allid(conn=conn)
     assert Entry.onetoone(conn=conn)
 
-    count_superseded = (sa.select(sa.func.count())
-                        .where(Entry.id != Entry.srefid))
-
+    count_superseded = (sa.select(sa.func.count()).where(Entry.id != Entry.srefid))
     n_superseded = conn.execute(count_superseded).scalar_one()
     print(f'{n_superseded:d} supersede pairs')
 
@@ -888,7 +820,6 @@ def reset_entries(conn):
     update_entries = (sa.update(Entry)
                       .values(id=sa.null(),
                               srefid=Entry.refid))
-
     return conn.execute(update_entries).rowcount
 
 
@@ -925,26 +856,20 @@ def resolve_splits(conn, *, verbose: bool = False):
             for row in group:
                 print(row)
             for row in group:
-                hashfields = Value.hashfields(conn,
-                                              filename=row.filename,
-                                              bibkey=row.bibkey)
-                print('\t%r, %r, %r, %r' % hashfields)
+                hashfields = Value.hashfields(conn, filename=row.filename, bibkey=row.bibkey)
+                print('\t%r, %r, %r, %r' % hashfields)  # pylint: disable=C0209
             print(f'-> {new}')
             print(f'{refid:d}: {separated:d} separated from {new}\n')
 
     return n_split
 
 
-def split_old_cand_new(conn, group, *, refid: int,
-                       _get_merged_entry=Database._get_merged_entry):
+def split_old_cand_new(conn, group, *, refid: int,  # pylint: disable=C0116
+                       _get_merged_entry=Database._get_merged_entry):  # pylint: disable=W0212
     old = _get_merged_entry(conn, key=refid)
-
     cand = [(hash_, _get_merged_entry(conn, key=hash_))
             for hash_ in unique(r.hash for r in group)]
-
-    new = min(cand, key=lambda p: distance(old, p[1]))[0]
-
-    return old, cand, new
+    return old, cand, min(cand, key=lambda p: distance(old, p[1]))[0]
 
 
 def resolve_merges(conn, *, verbose: bool = False):
@@ -975,9 +900,7 @@ def resolve_merges(conn, *, verbose: bool = False):
 
     for hash_, group in groupby_first(conn.execute(select_merge)):
         n_merged += len(group)
-
         _, _, old = merge(group, hash_=hash_)
-
         params = {'eq_hash': hash_, 'ne_srefid': old, 'new_id': old}
         merged = conn.execute(update_merge, params).rowcount
 
@@ -985,26 +908,20 @@ def resolve_merges(conn, *, verbose: bool = False):
             for row in group:
                 print(row)
             for row in group:
-                hashfields = Value.hashfields(conn,
-                                              filename=row.filename,
-                                              bibkey=row.bibkey)
-                print('\t%r, %r, %r, %r' % hashfields)
+                hashfields = Value.hashfields(conn, filename=row.filename, bibkey=row.bibkey)
+                print('\t%r, %r, %r, %r' % hashfields)  # pylint: disable=C0209
             print(f'-> {old}')
             print(f'{hash_}: {merged:d} merged into {old:d}\n')
 
     return n_merged
 
 
-def merge_new_cand_old(conn, group, *, hash_: str, keyfunc,
-                       _get_merged_entry=Database._get_merged_entry):
+def merge_new_cand_old(conn, group, *, hash_: str, keyfunc,  # pylint: disable=C0116
+                       _get_merged_entry=Database._get_merged_entry):  # pylint: disable=W0212
     new = _get_merged_entry(conn, key=hash_)
-
     cand = [(key, _get_merged_entry(conn, key=key))
             for key in unique(keyfunc(r) for r in group)]
-
-    old = min(cand, key=lambda p: distance(new, p[1]))[0]
-
-    return new, cand, old
+    return new, cand, min(cand, key=lambda p: distance(new, p[1]))[0]
 
 
 def assign_unchanged(conn):
@@ -1020,8 +937,7 @@ def assign_unchanged(conn):
 def update_identified(conn):
     """Set id on identified entries."""
     other = sa.orm.aliased(Entry)
-
-    update_identified = (sa.update(Entry)
+    update_identified = (sa.update(Entry)  # pylint: disable=W0621
                          .where(Entry.refid == sa.null())
                          .where(sa.exists()
                                 .where(other.hash == Entry.hash)
@@ -1050,11 +966,8 @@ def assign_new_and_separated(conn):
                   .compile().string)
 
     nextid = conn.execute(select_nextid).scalar_one()
-
     new_hashes = conn.execute(select_new)
-
     params = ((id_, hash_) for id_, (hash_,) in enumerate(new_hashes, nextid))
-
     dbapi_cursor = conn.connection.executemany(update_new, params)
     # https://docs.python.org/3/library/sqlite3.html#sqlite3.Cursor.rowcount
     return 0 if dbapi_cursor.rowcount == -1 else dbapi_cursor.rowcount

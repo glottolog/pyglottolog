@@ -1,5 +1,7 @@
 # hhtypes.py
-
+"""
+Handling content of hhtype fields.
+"""
 import re
 import functools
 import itertools
@@ -11,17 +13,18 @@ __all__ = ['HHType', 'HHTypes']
 
 
 @functools.total_ordering
-class HHType(object):
-
+class HHType:
+    """HH type, aka document type."""
     def __init__(self, s, p):
-        self.name = s
-        self.id = p.get(s, 'id')
-        self.rank = p.getint(s, 'rank')
-        self.abbv = p.get(s, 'abbv')
-        self.bibabbv = p.get(s, 'bibabbv')
-        self.description = p.get(s, 'description')
-        self.triggers = [Trigger('hhtype', self.id, t)
-                         for t in p.get(s, 'triggers').strip().splitlines() or []]
+        self.name: str = s
+        self.id: str = p.get(s, 'id')
+        self.rank: int = p.getint(s, 'rank')
+        self.abbv: str = p.get(s, 'abbv')
+        self.bibabbv: str = p.get(s, 'bibabbv')
+        self.description: str = p.get(s, 'description')
+        self.triggers: list[Trigger] = [
+            Trigger('hhtype', self.id, t)
+            for t in p.get(s, 'triggers').strip().splitlines() or []]
 
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id} rank={self.rank}>'
@@ -33,8 +36,8 @@ class HHType(object):
         return self.rank < other.rank
 
 
-class HHTypes(object):
-
+class HHTypes:
+    """List-like container of HH types, aka document types."""
     _rekillparen = re.compile(r" \([^)]*\)")
 
     _respcomsemic = re.compile(r"[;,]\s?")
@@ -45,7 +48,7 @@ class HHTypes(object):
         self._type_by_id = {t.id: t for t in self._types}
 
     @classmethod
-    def parse(cls, s):
+    def parse(cls, s: str) -> list[str]:  # pylint: disable=C0116
         return cls._respcomsemic.split(cls._rekillparen.sub("", s))
 
     def __iter__(self):
@@ -63,6 +66,5 @@ class HHTypes(object):
         return self._type_by_id.get(item, self._type_by_id.get('unknown'))
 
     @functools.cached_property
-    def triggers(self):
-        flattened = itertools.chain.from_iterable(t.triggers for t in self)
-        return list(flattened)
+    def triggers(self) -> list[Trigger]:  # pylint: disable=C0116
+        return list(itertools.chain.from_iterable(t.triggers for t in self))

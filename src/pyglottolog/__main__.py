@@ -17,14 +17,17 @@ import pyglottolog.admin_commands
 
 
 def main(**kw):
+    """Read-only commands."""
     return _main(pyglottolog.commands, **kw)
 
 
 def admin_main(**kw):
+    """Admin commands, i.e. command that change the data."""
     return _main(pyglottolog.admin_commands, **kw)
 
 
-def _main(commands, args=None, catch_all=False, parsed_args=None, log=None, test=False):
+def _main(  # pylint: disable=R0913,R0917
+        commands, args=None, catch_all=False, parsed_args=None, log=None, test=False):
     try:
         repos = Config.from_file().get_clone('glottolog')
     except KeyError:  # pragma: no cover
@@ -63,17 +66,17 @@ def _main(commands, args=None, catch_all=False, parsed_args=None, log=None, test
             stack.enter_context(Catalog(args.repos, tag=args.repos_version))
         try:
             args.repos = Glottolog(args.repos)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=W0718
             print(e)
-            return _main(commands, args=[args._command, '-h'])
-        args.log.info('glottolog/glottolog at {0}'.format(args.repos.repos))
+            return _main(commands, args=[args._command, '-h'])  # pylint: disable=W0212
+        args.log.info('glottolog/glottolog at %s', args.repos.repos)
         try:
             return args.main(args) or 0
         except KeyboardInterrupt:  # pragma: no cover
             return 0
         except ParserError as e:
             print(e)
-            return _main(commands, args=[args._command, '-h'])
+            return _main(commands, args=[args._command, '-h'])  # pylint: disable=W0212
         except Exception as e:  # pragma: no cover
             if catch_all:
                 print(e)

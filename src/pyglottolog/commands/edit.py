@@ -7,14 +7,14 @@ import subprocess
 from pyglottolog.cli_util import get_languoid
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     parser.add_argument(
         'languoid',
         metavar='<GLOTTOCODE>|<ISO-CODE>',
     )
 
 
-def run(args):
+def run(args):  # pylint: disable=C0116
     lang = get_languoid(args, args.languoid)
     if sys.platform.startswith('os2'):  # pragma: no cover
         cmd = 'open'

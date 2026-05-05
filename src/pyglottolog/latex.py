@@ -44,8 +44,8 @@ def _registry(encoding):  # pragma: no cover
     else:
         return None  # pragma: no cover
 
-    class Codec(codecs.Codec):
-        def encode(self, input, errors='strict'):  # pragma: no cover
+    class Codec(codecs.Codec):  # pylint: disable=C0115
+        def encode(self, input, errors='strict'):  # pragma: no cover  # pylint: disable=W0622
             """Convert unicode string to latex."""
             output = []
             for c in input:
@@ -53,7 +53,7 @@ def _registry(encoding):  # pragma: no cover
                     try:
                         output.append(c.encode(encoding))
                         continue
-                    except Exception:
+                    except Exception:  # pylint: disable=W0718
                         pass
                 if ord(c) in latex_equivalents:
                     output.append(latex_equivalents[ord(c)])
@@ -61,7 +61,7 @@ def _registry(encoding):  # pragma: no cover
                     output += ['{\\char', str(ord(c)), '}']
             return ''.join(output), len(input)
 
-        def decode(self, input, errors='strict'):
+        def decode(self, input, errors='strict'):  # pylint: disable=W0622
             """Convert latex source string to unicode."""
             if encoding:
                 input = str(input, encoding, errors)
@@ -75,15 +75,15 @@ def _registry(encoding):  # pragma: no cover
             return ''.join(x), len(input)
 
     class StreamWriter(Codec, codecs.StreamWriter):
-        pass
+        """a writer"""
 
     class StreamReader(Codec, codecs.StreamReader):
-        pass
+        """a reader"""
 
     return (Codec().encode, Codec().decode, StreamReader, StreamWriter)
 
 
-def _tokenize(tex):  # pragma: no cover
+def _tokenize(tex):  # pragma: no cover  # pylint: disable=R0912
     """Convert latex source into sequence of single-token substrings."""
     start = 0
     try:
@@ -128,7 +128,7 @@ def _tokenize(tex):  # pragma: no cover
                     pos += 1
 
 
-class _unlatex(object):  # pragma: no cover
+class _unlatex:  # pragma: no cover
 
     """Convert tokenized tex into sequence of unicode strings.  Helper for decode()."""
 
@@ -165,10 +165,10 @@ class _unlatex(object):  # pragma: no cover
             if c in _l2u:
                 self.pos += delta
                 return chr(_l2u[c])
-            elif len(c) == 2 and c[1] == 'i' and (c[0], '\\i') in _l2u:
+            if len(c) == 2 and c[1] == 'i' and (c[0], '\\i') in _l2u:
                 self.pos += delta       # correct failure to undot i
                 return chr(_l2u[(c[0], '\\i')])
-            elif len(c) == 1 and c[0].startswith('\\char') and c[0][5:].isdigit():
+            if len(c) == 1 and c[0].startswith('\\char') and c[0][5:].isdigit():
                 self.pos += delta
                 return chr(int(c[0][5:]))
 
@@ -186,7 +186,7 @@ class _unlatex(object):  # pragma: no cover
         t = self[offset]
         if t in _blacklist:
             return
-        elif t == '{':
+        if t == '{':
             for delta, c in self.candidates(offset + 1):
                 if self[offset + delta + 1] == '}':
                     yield delta + 2, c
@@ -486,7 +486,7 @@ for _i in range(0x0020, 0x007f):
         latex_equivalents[_i] = chr(_i)
 
 # Characters that should be ignored and not output in tokenization
-_ignore = set([chr(i) for i in list(range(32)) + [127]]) - set('\t\n\r')
+_ignore = {chr(i) for i in list(range(32)) + [127]} - set('\t\n\r')
 
 # Regexp of chars not in blacklist, for quick start of tokenize
 _stoppers = re.compile('[\x00-\x1f!$\\-?\\{~\\\\`\']')
@@ -499,7 +499,7 @@ _l2u = {
     r'\ ': ord(' ')  # unexpanding space makes no sense in non-TeX contexts
 }
 
-for _tex in latex_equivalents:
+for _tex in latex_equivalents:  # pylint: disable=C0206
     if _tex <= 0x0020 or (_tex <= 0x007f and len(latex_equivalents[_tex]) <= 1):
         continue    # boring entry
     _toks = tuple(_tokenize(latex_equivalents[_tex]))

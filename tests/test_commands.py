@@ -1,5 +1,4 @@
 import shlex
-import logging
 
 import pytest
 
@@ -65,21 +64,6 @@ def test_create(capsys, _main, api_copy):
         (api_copy.repos / 'languoids' / 'tree' / 'abcd1234').as_posix()))
 
 
-def test_fts(capsys, _main):
-    with pytest.raises(SystemExit):
-        _main('refsearch "Harzani year:1334"')
-
-    _main('searchindex')
-    _main('refsearch "Harzani year:1334"')
-    assert "'Abd-al-'Ali Karang" in capsys.readouterr()[0]
-
-    _main('langsearch id:abcd*')
-    assert "abcd1234" in capsys.readouterr()[0]
-
-    _main('langsearch classification')
-    assert "abcd1234" in capsys.readouterr()[0]
-
-
 def test_metadata(capsys, _main):
     _main('langdatastats')
     assert "longitude" in capsys.readouterr()[0]
@@ -105,13 +89,6 @@ def test_tree(capsys, _main):
     assert out.splitlines()[-1] == \
            "('language [abcd1235][abc]-l-':1," \
            "'language2 [abcd1237]-l-':1)'family [abcd1234][aaa]':1;"
-
-
-def test_languoids(capsys, _main, tmp_path):
-    _main('languoids --output={0}'.format(tmp_path.as_posix()))
-    out, _ = capsys.readouterr()
-    assert '-metadata.json' in out
-    assert tmp_path.glob('*.csv')
 
 
 def test_htmlmap(_main, tmp_path):

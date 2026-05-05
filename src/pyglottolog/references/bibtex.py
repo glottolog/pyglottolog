@@ -1,37 +1,49 @@
 # bibtex.py - bibtex file parsing/serialization
+"""
+BibTeX parsing functionality.
+"""
+# TODO:  # pylint: disable=fixme
+# make check fail on non-whitespace between entries (bibtex 'comments')
 
-# TODO: make check fail on non-whitespace between entries (bibtex 'comments')
-
-import typing
-import pathlib
 import functools
 import collections
 import unicodedata
+from typing import Union, Optional, Literal, Protocol
+from collections.abc import Iterable, Generator
 
 from simplepybtex.database.input.bibtex import LowLevelParser, Parser, UndefinedMacro
 from simplepybtex.scanner import PybtexSyntaxError
 from simplepybtex.exceptions import PybtexError
 from simplepybtex.textutils import whitespace_re
-from simplepybtex.bibtex.utils import split_name_list
-from simplepybtex.database import Person
 
 from clldutils.path import memorymapped
 
+from pyglottolog.util import PathType
+
+BibtexTypeAndFields = tuple[str, dict[str, str]]
+EntryType = tuple[str, BibtexTypeAndFields]
+EntryDictType = dict[str, BibtexTypeAndFields]
 FIELDORDER = ['author', 'editor', 'title', 'booktitle', 'journal',
               'school', 'publisher', 'address',
               'series', 'volume', 'number', 'pages', 'year', 'issn', 'url']
 
 
-def load(filename, preserve_order=False, encoding=None):
+def load(
+        filename: PathType,
+        preserve_order: bool = False,
+        encoding: Optional[str] = None,
+) -> EntryDictType:
+    """Read entries from a file into a dict."""
     cls = collections.OrderedDict if preserve_order else dict
     return cls(iterentries(filename, encoding))
 
 
-def identity(x):  # pragma: no cover
+def identity(x):  # pragma: no cover  # pylint: disable=C0116
     return x
 
 
-def iterentries_from_text(text, encoding='utf-8'):
+def iterentries_from_text(text, encoding='utf-8') -> Generator[EntryType, None, None]:
+    """Read entries from text or file-like objects."""
     if hasattr(text, 'read'):
         text = text.read(-1)
     if not isinstance(text, str):
@@ -43,51 +55,50 @@ def iterentries_from_text(text, encoding='utf-8'):
         yield bibkey, (entrytype, fields)
 
 
-def iterentries(filename: typing.Union[str, pathlib.Path], encoding=None)\
-        -> typing.Generator[typing.Tuple[str, typing.Tuple[str, dict]], None, None]:
+def iterentries(
+        filename: PathType,
+        encoding: Optional[str] = None,
+) -> Generator[EntryType, None, None]:
+    """Read entries from a file."""
     encoding = encoding or 'utf8'
     with memorymapped(str(filename)) as source:
         try:
-            for bibkey, (entrytype, fields) in iterentries_from_text(source, encoding):
-                yield bibkey, (entrytype, fields)
+            yield from iterentries_from_text(source, encoding)
         except PybtexSyntaxError as e:  # pragma: no cover
             debug_pybtex(source, e)
 
 
-def debug_pybtex(source, e):  # pragma: no cover
-    start, line, pos = e.error_context_info
-    print('BIBTEX ERROR on line %d, last parsed lines:' % line)
+def debug_pybtex(source, e):  # pragma: no cover  # pylint: disable=C0116
+    start, line, _ = e.error_context_info
+    print(f'BIBTEX ERROR on line {line}, last parsed lines:')
     print(source[start:start + 500].decode('utf8') + '...')
     raise e
 
 
-def names(s):
-    for name in split_name_list(s):
-        try:
-            yield Name.from_string(name)
-        except PybtexError as e:  # pragma: no cover
-            print(repr(e))
-
-
-class Name(collections.namedtuple('Name', 'prelast last given lineage')):
-
-    __slots__ = ()
-
-    @classmethod
-    def from_string(cls, name):
-        person = Person(name)
-        ntypes = ('prelast_names', 'last_names', 'first_names', 'middle_names', 'lineage_names')
-        prelast, last, first, middle, lineage = (' '.join(getattr(person, part)) for part in ntypes)
-        given = ' '.join(n for n in (first, middle) if n)
-        return cls(prelast, last, given, lineage)
-
-
-def save(entries, filename, sortkey, encoding='utf-8', normalize='NFC'):
+def save(
+        entries: Union[dict[str, BibtexTypeAndFields], Iterable[EntryType]],
+        filename: PathType,
+        sortkey: Optional[Literal['bibkey']],
+        encoding='utf-8',
+        normalize: Optional[Literal['', 'NFC', 'NFKC', 'NFD', 'NFKD']] = 'NFC',
+):
+    """Write entries as BibTeX to disk."""
     with open(str(filename), 'w', encoding=encoding, errors='strict') as fd:
         dump(entries, fd, sortkey, normalize)
 
 
-def dump(entries, fd, sortkey=None, normalize='NFC'):
+class SupportsWrite(Protocol):  # pylint: disable=C0115,R0903
+    def write(self, s: str):  # pylint: disable=C0116
+        ...  # pragma: no cover
+
+
+def dump(
+        entries: Union[dict[str, BibtexTypeAndFields], Iterable[EntryType]],
+        fd: SupportsWrite,
+        sortkey: Optional[Literal['bibkey']] = None,
+        normalize: Optional[Literal['', 'NFC', 'NFKC', 'NFD', 'NFKD']] = 'NFC',
+):
+    """Write entries in BibTeX format to fd."""
     assert sortkey in [None, 'bibkey']
     if sortkey is None:
         if isinstance(entries, collections.OrderedDict):  # pragma: no cover
@@ -100,7 +111,7 @@ def dump(entries, fd, sortkey=None, normalize='NFC'):
         items = (
             (bibkey, entries[bibkey])
             for bibkey in sorted(entries, key=lambda bibkey: bibkey.lower()))
-    r"""Reserved characters (* -> en-/decoded by latexcodec)
+    _ = r"""Reserved characters (* -> en-/decoded by latexcodec)
     * #: \#
       $: \$
       %: \%
@@ -119,12 +130,12 @@ def dump(entries, fd, sortkey=None, normalize='NFC'):
         normalize = functools.partial(unicodedata.normalize, normalize)
     else:  # pragma: no cover
         normalize = identity
-    fd.write(u'# -*- coding: utf-8 -*-\n')
+    fd.write('# -*- coding: utf-8 -*-\n')
     for bibkey, (entrytype, fields) in items:
-        fd.write(u'@%s{%s' % (entrytype, bibkey))
+        fd.write(f'@{entrytype}{{{bibkey}')
         for k, v in fieldorder.itersorted(fields):
-            fd.write(u',\n    %s = {%s}' % (k, normalize(v.strip())))
-        fd.write(u'\n}\n' if fields else u',\n}\n')
+            fd.write(f',\n    {k} = {{{normalize(v.strip())}}}')
+        fd.write('\n}\n' if fields else ',\n}\n')
 
 
 class Ordering(dict):
@@ -152,7 +163,8 @@ class Ordering(dict):
 fieldorder = Ordering.fromlist(FIELDORDER)
 
 
-def check(filename, encoding=None):
+def check(filename: PathType, encoding: Optional[str] = None) -> int:
+    """Parse a bibtex file and report error count."""
     parser = CheckParser(encoding=encoding)
     parser.parse_file(str(filename))
     return parser.error_count
@@ -166,7 +178,7 @@ class CheckParser(Parser):
         self.error_count = 0
 
     def handle_error(self, error):  # pragma: no cover
-        print('%r' % error)
+        print(f'{error!r}')
         self.error_count += 1
         if not isinstance(error, UndefinedMacro):
             raise error

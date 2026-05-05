@@ -6,11 +6,11 @@ from csvw.dsv import UnicodeWriter
 from pyglottolog.cli_util import add_output_dir
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     add_output_dir(parser)
 
 
-def run(args):
+def run(args):  # pylint: disable=C0116
     nodes = list(args.repos.languoids())
 
     res = {}
@@ -21,7 +21,7 @@ def run(args):
     for node in nodes:
         if node.level == args.repos.languoid_levels.family or node.id in res:
             continue
-        for nid in res:
+        for nid in res:  # pylint: disable=C0206
             matched = False
             for lineage in node.lineage:
                 if lineage[1] == nid:

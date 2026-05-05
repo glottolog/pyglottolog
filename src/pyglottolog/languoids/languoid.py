@@ -1,20 +1,27 @@
+"""
+An OO wrapper for languoid data access and manipulation.
+"""
 import os
 import re
-import typing
+from typing import Union, Optional, TYPE_CHECKING, Any
 import pathlib
 import datetime
 import warnings
 import functools
 import configparser
+from collections.abc import Sequence, Generator, Iterable
 
 from clldutils.inifile import INI
 from newick import Node
 
+from pyglottolog import config
 from .models import (
     Glottocode, Country, Reference, Endangerment, Link,
     ClassificationComment, EthnologueComment, ISORetirement,
 )
-from pyglottolog import config
+
+if TYPE_CHECKING:  # pragma: no cover
+    from pyglottolog import Glottolog
 
 __all__ = ['Languoid']
 
@@ -28,9 +35,11 @@ ISO_8601_INTERVAL = re.compile(
     r'(?P<end_date>\d{1,4}-\d{2}-\d{2})',
     flags=re.ASCII)
 
+NameIdLevelType = tuple[str, Glottocode, config.LanguoidLevel]
+
 
 @functools.total_ordering
-class Languoid(object):
+class Languoid:  # pylint: disable=too-many-public-methods
     """
     Info on languoids is encoded in the INI files and in the directory hierarchy of
     :attr:`pyglottolog.Glottolog.tree`.
@@ -53,13 +62,13 @@ class Languoid(object):
     """
     section_core = 'core'
 
-    def __init__(
+    def __init__(  # pylint: disable=R0913,R0917
             self,
             cfg: INI,
-            lineage: typing.Union[None, typing.List[typing.Tuple[str, str, str]]] = None,
-            id_: typing.Union[None, str] = None,
-            directory: typing.Union[None, pathlib.Path] = None,
-            tree: typing.Union[None, pathlib.Path] = None,
+            lineage: Optional[list[tuple[str, str, str]]] = None,
+            id_: Optional[str] = None,
+            directory: Optional[pathlib.Path] = None,
+            tree: Optional[pathlib.Path] = None,
             _api=None):
         """
         Refer to the factory methods for typical use cases of instantiating a `Languoid`:
@@ -81,13 +90,18 @@ class Languoid(object):
         self.lineage = [
             (name, id, _api.languoid_levels.get(level) if _api else level)
             for name, id, level in lineage]
-        self.cfg = cfg
-        self.dir = directory or tree.joinpath(*[id for name, id, _ in self.lineage])
-        self._id = id_
+        self.cfg: INI = cfg
+        self.dir: pathlib.Path = directory or tree.joinpath(*[id for name, id, _ in self.lineage])
+        self._id: Glottocode = id_
         self._api = _api
 
     @classmethod
-    def from_dir(cls, directory: pathlib.Path, nodes=None, _api=None, **kw):
+    def from_dir(
+            cls,
+            directory: pathlib.Path,
+            nodes: Optional[dict[str, NameIdLevelType]] = None,
+            _api=None,
+            **kw):
         """
         Create a `Languoid` from a directory, named with the Glottocode and containing `md.ini`.
 
@@ -97,10 +111,10 @@ class Languoid(object):
         if _api and _api.cache and directory.name in _api.cache:
             return _api.cache[directory.name]
 
-        if nodes is None:
-            nodes = {}
         cfg = INI.from_file(directory.joinpath(INFO_FILENAME), interpolation=None)
 
+        if nodes is None:
+            nodes: dict[str, NameIdLevelType] = {}
         lineage = []
         for parent in directory.parents:
             id_ = parent.name
@@ -119,14 +133,14 @@ class Languoid(object):
         return res
 
     @classmethod
-    def from_name_id_level(cls, tree, name, id, level, **kw):
+    def from_name_id_level(cls, tree, name, id_, level, **kw):
         """
         This method is used in `pyglottolog.lff` to instantiate `Languoid` s for new nodes
         encountered in "lff"-format trees.
         """
         cfg = INI(interpolation=None)
-        cfg.read_dict(dict(core=dict(name=name)))
-        res = cls(cfg, kw.pop('lineage', []), id_=Glottocode(id), tree=tree)
+        cfg.read_dict(dict(core=dict(name=name)))  # pylint: disable=R1735
+        res = cls(cfg, kw.pop('lineage', []), id_=Glottocode(id_), tree=tree)
         for k, v in kw.items():
             setattr(res, k, v)
         # Note: Setting the level behaves differently when `_api` is available, so must be done
@@ -145,7 +159,7 @@ class Languoid(object):
             lambda l_: '-l-' if getattr(l_.level, 'id', l_.level) == 'language' else '',
             "Languoid level in case of languages"),
         'newick_iso': (
-            lambda l_: '[{0}]'.format(l_.iso) if l_.iso else '',
+            lambda l_: f'[{l_.iso}]' if l_.iso else '',
             "Bracketed ISO code or nothing"),
     }
     _newick_default_template = "'{l:newick_name} [{l.id}]{l:newick_iso}{l:newick_level}'"
@@ -168,10 +182,10 @@ class Languoid(object):
         return self.id < other.id
 
     def __repr__(self):
-        return '<%s %s>' % (getattr(self.level, 'name', self.level).capitalize(), self.id)
+        return f"<{getattr(self.level, 'name', self.level).capitalize()} {self.id}>"
 
     def __str__(self):
-        return '%s [%s]' % (self.name, self.id)
+        return f'{self.name} [{self.id}]'
 
     def _set(self, key, value, section=None):
         section = section or self.section_core
@@ -186,7 +200,13 @@ class Languoid(object):
             return type_(res)
         return res
 
-    def newick_node(self, nodes=None, template=None, maxlevel=None, level=0) -> Node:
+    def newick_node(
+            self,
+            nodes: Optional['LanguoidMapType'] = None,
+            template=None,
+            maxlevel=None,
+            level=0,
+    ) -> Node:
         """
         Return a `newick.Node` representing the subtree of the Glottolog classification starting
         at the languoid.
@@ -207,7 +227,7 @@ class Languoid(object):
                 nn.newick_node(nodes=nodes, template=template, maxlevel=maxlevel, level=level + 1))
         return n
 
-    def write_info(self, outdir: typing.Union[None, pathlib.Path] = None):
+    def write_info(self, outdir: Optional[pathlib.Path] = None) -> pathlib.Path:
         """
         Write `Languoid` metadata as INI file to `outdir/<INFO_FILENAME>`.
         """
@@ -231,16 +251,16 @@ class Languoid(object):
     # Accessing info of a languoid
     # -------------------------------------------------------------------------
     @property
-    def glottocode(self):
+    def glottocode(self) -> Glottocode:  # pylint: disable=C0116
         """Alias for `id`"""
         return self._id
 
     @property
-    def id(self):
+    def id(self) -> Glottocode:  # pylint: disable=C0116
         return self._id
 
     @property
-    def category(self):
+    def category(self) -> Optional[str]:
         """
         Languoid category.
 
@@ -262,6 +282,7 @@ class Languoid(object):
                         self.id in pseudo_families or fid in pseudo_families:
                     cat = 'Pseudo ' + cat
             return cat
+        return None  # pragma: no cover
 
     @property
     def isolate(self) -> bool:
@@ -271,12 +292,18 @@ class Languoid(object):
         """
         return getattr(self.level, 'id', self.level) == 'language' and not self.lineage
 
-    def children_from_nodemap(self, nodes):
-        # A faster alternative to `children` when the relevant languoids have already been
-        # read from disc.
+    def children_from_nodemap(self, nodes: 'LanguoidMapType') -> list['Languoid']:
+        """
+        A faster alternative to `children` when the relevant languoids have already been
+        read from disc.
+        """
         return [nodes[d.name] for d in self.dir.iterdir() if d.is_dir()]
 
-    def descendants_from_nodemap(self, nodes, level=None):
+    def descendants_from_nodemap(self, nodes: 'LanguoidMapType', level=None) -> list['Languoid']:
+        """
+        A faster alternative to `descendants` when the relevant languoids have already
+        been read from disc.
+        """
         if isinstance(level, str):
             level = self._api.languoid_levels.get(level)
         return [
@@ -285,7 +312,7 @@ class Languoid(object):
             ((level is None) or n.level == level)]
 
     @property
-    def children(self) -> typing.List['Languoid']:
+    def children(self) -> list['Languoid']:
         """
         List of direct descendants of the languoid in the classification tree.
 
@@ -297,12 +324,15 @@ class Languoid(object):
         """
         return [Languoid.from_dir(d, _api=self._api) for d in self.dir.iterdir() if d.is_dir()]
 
-    def ancestors_from_nodemap(self, nodes):
-        # A faster alternative to `ancestors` when the relevant languoids have already
-        # been read from disc.
+    def ancestors_from_nodemap(self, nodes: 'LanguoidMapType') -> list['Languoid']:
+        """
+        A faster alternative to `ancestors` when the relevant languoids have already
+        been read from disc.
+        """
         return [nodes[lineage[1]] for lineage in self.lineage]
 
-    def iter_ancestors(self):
+    def iter_ancestors(self) -> Generator['Languoid', None, None]:
+        """Yield ancestors going up the directory tree."""
         for parent in self.dir.parents:
             id_ = parent.name
             if Glottocode.pattern.match(id_):
@@ -311,13 +341,13 @@ class Languoid(object):
                 # we ignore leading non-languoid-dir path components.
                 break
 
-    def iter_descendants(self):
+    def iter_descendants(self) -> Generator['Languoid', None, None]:  # pylint: disable=C0116
         for child in self.children:
             yield child
             yield from child.iter_descendants()
 
     @property
-    def ancestors(self) -> typing.List['Languoid']:
+    def ancestors(self) -> list['Languoid']:
         """
         List of ancestors of the languoid in the classification tree, from root (i.e. top-level
         family) to parent node.
@@ -331,7 +361,7 @@ class Languoid(object):
         return list(reversed(list(self.iter_ancestors())))
 
     @property
-    def parent(self) -> typing.Union['Languoid', None]:
+    def parent(self) -> Optional['Languoid']:
         """
         Parent languoid or `None`.
 
@@ -344,10 +374,10 @@ class Languoid(object):
         try:
             return next(self.iter_ancestors())
         except StopIteration:
-            return
+            return None
 
     @property
-    def family(self) -> typing.Union['Languoid', None]:
+    def family(self) -> Optional['Languoid']:
         """
         Top-level family the languoid belongs to or `None`.
 
@@ -360,7 +390,7 @@ class Languoid(object):
         return self.ancestors[0] if self.lineage else None
 
     @property
-    def names(self) -> typing.Dict[str, list]:
+    def names(self) -> dict[str, list]:
         """
         A `dict` mapping alternative name providers to `list` s of alternative names for the
         languoid by the given provider.
@@ -369,12 +399,14 @@ class Languoid(object):
             return {k: self.cfg.getlist('altnames', k) for k in self.cfg['altnames']}
         return {}
 
-    def add_name(self, name, type_='glottolog'):
+    def add_name(self, name: str, type_: str = 'glottolog'):
+        """Add an alternative name."""
         names = self.cfg.getlist('altnames', type_)
         if name not in names:
             self.cfg.set('altnames', type_, sorted(names + [name]))
 
-    def update_names(self, names, type_='glottolog'):
+    def update_names(self, names: Iterable[str], type_: str = 'glottolog') -> bool:
+        """Update alternative names of a specific type."""
         new = set(names)
         if new != set(self.cfg.getlist('altnames', type_)):
             self.cfg.set('altnames', type_, sorted(new))
@@ -382,13 +414,14 @@ class Languoid(object):
         return False
 
     @property
-    def identifier(self) -> typing.Union[dict, configparser.SectionProxy]:
+    def identifier(self) -> Union[dict, configparser.SectionProxy]:
+        """Alternative identifiers of the languoid."""
         if 'identifier' in self.cfg:
             return self.cfg['identifier']
         return {}
 
     @property
-    def sources(self) -> typing.List[Reference]:
+    def sources(self) -> list[Reference]:
         """
         List of Glottolog references linked to the languoid
 
@@ -401,17 +434,17 @@ class Languoid(object):
     @sources.setter
     def sources(self, refs):
         assert all(isinstance(r, Reference) for r in refs)
-        self.cfg.set('sources', 'glottolog', ['{0}'.format(ref) for ref in refs])
+        self.cfg.set('sources', 'glottolog', [f'{ref}' for ref in refs])
 
     @property
-    def endangerment(self) -> typing.Union[None, Endangerment]:
+    def endangerment(self) -> Optional[Endangerment]:
         """
         Endangerment information about the languoid.
 
         :rtype: :class:`Endangerment`
         """
         if ('endangerment' in self.cfg) and self._api:
-            kw = {k: v for k, v in self.cfg['endangerment'].items()}
+            kw: dict[str, Any] = dict(self.cfg['endangerment'].items())
             kw['status'] = self._api.aes_status.get(kw['status'])
             if kw['source'] in self._api.aes_sources:
                 kw['source'] = self._api.aes_sources[kw['source']]
@@ -424,9 +457,10 @@ class Languoid(object):
                     reference_id=ref.key,
                     pages=ref.pages)
             return Endangerment(**kw)
+        return None  # pragma: no cover
 
     @property
-    def classification_comment(self) -> typing.Union[None, ClassificationComment]:
+    def classification_comment(self) -> Optional[ClassificationComment]:
         """
         Classification information about the languoid.
 
@@ -439,9 +473,10 @@ class Languoid(object):
                 familyrefs=self.cfg.getlist('classification', 'familyrefs'),
                 sub=cfg.get('sub'),
                 subrefs=self.cfg.getlist('classification', 'subrefs'))
+        return None  # pragma: no cover
 
     @property
-    def ethnologue_comment(self) -> typing.Union[None, EthnologueComment]:
+    def ethnologue_comment(self) -> Optional[EthnologueComment]:
         """
         Commentary about the classification of the languoid in Ethnologue.
 
@@ -450,9 +485,10 @@ class Languoid(object):
         section = 'hh_ethnologue_comment'
         if section in self.cfg:
             return EthnologueComment(**self.cfg[section])
+        return None  # pragma: no cover
 
     @property
-    def macroareas(self) -> typing.List[config.Macroarea]:
+    def macroareas(self) -> list[config.Macroarea]:
         """
         :rtype: `list` of :class:`config.Macroarea`
         """
@@ -470,9 +506,9 @@ class Languoid(object):
             self._set('macroareas', [ma.name for ma in value])
 
     @property
-    def timespan(self, _date_format='%Y-%m-%d'):
-        value = self.cfg.get(self.section_core, 'timespan',
-                             fallback=None)
+    def timespan(self) -> Optional[tuple[int, int]]:
+        """Extinct languages are associated with a timespan"""
+        value = self.cfg.get(self.section_core, 'timespan', fallback=None)
         if not value:
             return None
         value = value.strip()
@@ -486,13 +522,13 @@ class Languoid(object):
             year, sep, rest = d.partition('-')
             assert year and sep and rest
             year = year_tmpl.format(int(year))
-            return '{}{}{}'.format(year, sep, rest)
+            return f'{year}{sep}{rest}'
 
         dates = map(fix_date, dates)
-        dates = [datetime.datetime.strptime(d, _date_format).date() for d in dates]
+        dates = [datetime.datetime.strptime(d, '%Y-%m-%d').date() for d in dates]
 
         if any((d.month, d.day) != (1, 1) for d in dates):  # pragma: no cover
-            warnings.warn('ignoring non -1-1 date(s) month/day: {!r}'.format(dates))
+            warnings.warn(f'ignoring non -1-1 date(s) month/day: {dates!r}')
 
         start, end = dates
         return (
@@ -500,22 +536,23 @@ class Languoid(object):
             -end.year if ma.group('end_sign') == '-' else end.year)
 
     @timespan.setter
-    def timespan(self, value):
+    def timespan(self, value: Union[tuple[int, int], list[int]]):
         if not (isinstance(value, (list, tuple)) and len(value) == 2):
             raise ValueError(value)
 
         # https://en.wikipedia.org/wiki/ISO_8601#Years
         if not all(-9999 <= v <= 9999 for v in value):
-            warnings.warn('serializing year(s) outside the four-digit-range: {!r}'.format(value))
+            warnings.warn(f'serializing year(s) outside the four-digit-range: {value!r}')
 
         def fmt(v):
             sign = '-' if v < 0 else ''
-            return '{}{:04d}'.format(sign, abs(v))
+            return f'{sign}{abs(v):04d}'
 
-        self._set('timespan', '{}-01-01/{}-01-01'.format(*map(fmt, value)))
+        self._set('timespan',
+                  '{}-01-01/{}-01-01'.format(*map(fmt, value)))  # pylint: disable=C0209
 
     @property
-    def links(self) -> typing.List[Link]:
+    def links(self) -> list[Link]:
         """
         Links to web resources related to the languoid
         """
@@ -530,7 +567,8 @@ class Languoid(object):
              sorted(
                  [Link.from_(v) for v in value], key=lambda l_: (l_.label or 'zzzz', l_.domain))])
 
-    def update_links(self, domain, urls):
+    def update_links(self, domain: str, urls: Iterable[str]) -> bool:
+        """Update the links section of the languoid for a particular domain."""
         new = [li for li in self.links if li.domain != domain] + [Link.from_(u) for u in urls]
         if set(new) != set(self.links):
             self.links = new
@@ -538,21 +576,19 @@ class Languoid(object):
         return False
 
     @property
-    def countries(self) -> typing.List[Country]:
-        """
-        Countries a language is spoken in.
-        """
+    def countries(self) -> list[Country]:
+        """Countries a language is spoken in."""
         return [Country.from_text(n)
                 for n in self.cfg.getlist(self.section_core, 'countries')]
 
     @countries.setter
-    def countries(self, value):
+    def countries(self, value: Sequence[Country]):
         assert isinstance(value, (list, tuple)) \
             and all(isinstance(o, Country) for o in value)
-        self._set('countries', ['{0}'.format(c) for c in value])
+        self._set('countries', [f'{c}' for c in value])
 
     @property
-    def name(self):
+    def name(self) -> str:
         """
         The Glottolog mame of the languoid
         """
@@ -563,7 +599,7 @@ class Languoid(object):
         self._set('name', value)
 
     @property
-    def latitude(self) -> typing.Union[None, float]:
+    def latitude(self) -> Optional[float]:
         """
         The geographic latitude of the point chosen as representative coordinate of the languoid
         """
@@ -574,7 +610,7 @@ class Languoid(object):
         self._set('latitude', round(float(value), 5))
 
     @property
-    def longitude(self) -> typing.Union[None, float]:
+    def longitude(self) -> Optional[float]:
         """
         The geographic longitude of the point chosen as representative coordinate of the languoid
         """
@@ -585,7 +621,8 @@ class Languoid(object):
         self._set('longitude', round(float(value), 5))
 
     @property
-    def hid(self):
+    def hid(self) -> Optional[str]:
+        """The languoid's "H(arald)ID", aka a "NOCODE" code."""
         return self._get('hid')
 
     @hid.setter
@@ -593,7 +630,7 @@ class Languoid(object):
         self._set('hid', value)
 
     @property
-    def level(self):
+    def level(self) -> Optional[config.LanguoidLevel]:  # pylint: disable=C0116
         if self._api:
             return self._get('level', self._api.languoid_levels.get)
         return self._get('level', lambda s: s)
@@ -604,7 +641,7 @@ class Languoid(object):
             self._set('level', self._api.languoid_levels.get(value).id)
 
     @property
-    def iso(self):
+    def iso(self) -> Optional[str]:  # pylint: disable=C0116
         return self._get('iso639-3')
 
     @iso.setter
@@ -612,14 +649,18 @@ class Languoid(object):
         self._set('iso639-3', value)
 
     @property
-    def iso_code(self):
+    def iso_code(self) -> Optional[str]:  # pylint: disable=C0116
         return self._get('iso639-3')
 
     @iso_code.setter
     def iso_code(self, value):
         self._set('iso639-3', value)
 
-    def closest_iso(self, api=None, nodes=None) -> typing.Union[str, None]:
+    def closest_iso(
+            self,
+            api: Optional['Glottolog'] = None,
+            nodes: Optional['LanguoidMapType'] = None,
+    ) -> Optional[str]:
         """
         ISO 639-3 code assigned to the languoid or one of its ancestors in the classification
         (in case of dialects) or `None`.
@@ -634,9 +675,11 @@ class Languoid(object):
             lg = nodes[gc] if nodes else api.languoid(gc)
             if lg.iso:
                 return lg.iso
+        return None  # pragma: no cover
 
     @property
-    def iso_retirement(self):
+    def iso_retirement(self) -> Optional[ISORetirement]:
+        """Information about a retired ISO code related to the languoid."""
         if 'iso_retirement' in self.cfg:
             kw = dict(self.cfg['iso_retirement'])
             if 'change_to' in kw:
@@ -644,7 +687,12 @@ class Languoid(object):
             if 'comment' in kw:
                 kw['comment'] = self.cfg.gettext('iso_retirement', 'comment')
             return ISORetirement(**kw)
+        return None  # pragma: no cover
 
     @property
-    def fname(self):
+    def fname(self) -> pathlib.Path:
+        """The location of the languoid's info file in the Glottolog tree directory."""
         return self.dir.joinpath(INFO_FILENAME)
+
+
+LanguoidMapType = dict[str, Languoid]

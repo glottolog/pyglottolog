@@ -5,7 +5,7 @@ Most of the Glottolog's data can be accessed through an instance of :class:`pygl
 
 
 .. autoclass:: pyglottolog.Glottolog
-    :members: repos, tree, ftsindex, references_path, languoids_path, iso
+    :members: repos, tree, references_path, languoids_path, iso
 
 
 Accessing configuration data

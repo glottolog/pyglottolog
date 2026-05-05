@@ -1,5 +1,7 @@
 # pyglottolog
-
+"""
+API to curate Glottolog data.
+"""
 from .api import Glottolog
 
 __all__ = ['Glottolog']

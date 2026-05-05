@@ -1,4 +1,8 @@
+"""
+Managing metadata for Glottolog editions.
+"""
 from html import entities as html_entities
+from typing import TYPE_CHECKING, TypedDict, Optional
 
 from packaging import version
 from nameparser import HumanName
@@ -6,16 +10,33 @@ from markdown import markdown
 from clldutils.markup import iter_markdown_tables
 from clldutils.jsonlib import dump
 
+from pyglottolog import config
 
-def to_html(text, url):
+if TYPE_CHECKING:  # pragma: no cover
+    from pyglottolog import Glottolog
+
+
+class Edition(TypedDict):
+    """Info about a Glottolog edition, as given in CONTRIBUTORS.md"""
+    version: str
+    year: str
+    editors: list[str]
+
+
+def to_html(text: str, url: str) -> str:
+    """
+    >>> to_html('See http://example.com', 'http://example.com')
+    '<p>See <a href="http://example.com">http://example.com</a></p>'
+    """
     c2n = html_entities.codepoint2name
     text = text.replace('&', '&amp;')
-    text = ''.join('&{0};'.format(
+    text = ''.join('&{0};'.format(  # pylint: disable=C0209
         c2n[ord(c)]) if ord(c) > 128 and ord(c) in c2n else c for c in text)
-    return markdown(text.replace(url, '[{0}]({0})'.format(url)))
+    return markdown(text.replace(url, f'[{url}]({url})'))
 
 
-def read_editions(repos):
+def read_editions(repos: 'Glottolog') -> list[Edition]:
+    """Get list o editions, current first."""
     head, rows = next(iter_markdown_tables(
         repos.path('CONTRIBUTORS.md').read_text(encoding='utf8')))
     res = []
@@ -27,11 +48,12 @@ def read_editions(repos):
     return sorted(res, key=lambda d: version.parse(d['version']), reverse=True)
 
 
-def editor_to_dict(n, editors):
-    res = {'name': n}
+def editor_to_dict(name: str, editors: config.Editors) -> dict[str, str]:
+    """Info about a current Glottolog editor identified by name."""
+    res = {'name': name}
     for e in editors.values():
-        if e.name == n:
-            assert e.current, '{} is not marked as current editor'.format(n)
+        if e.name == name:
+            assert e.current, f'{name} is not marked as current editor'
             if e.affiliation:
                 res['affiliation'] = e.affiliation
             if e.orcid:
@@ -40,28 +62,29 @@ def editor_to_dict(n, editors):
     return res
 
 
-def get_edition(repos, version=None):
+def get_edition(  # pylint: disable=W0621
+        repos: 'Glottolog',
+        version: Optional[str] = None) -> Edition:
+    """Get the edition matching version - or implicitly the version in the config."""
     version = version or getattr(repos.publication.zenodo, 'version', '0.0.1.dev0')
     for edition in read_editions(repos):
         if edition['version'] == version:
             return edition
-    raise ValueError('Add version {} to CONTRIBUTORS.md first!'.format(version))  # pragma: no cover
+    raise ValueError(f'Add version {version} to CONTRIBUTORS.md first!')  # pragma: no cover
 
 
-def citation(repos, edition=None, version=None):
+def citation(repos, edition=None, version=None) -> str:  # pylint: disable=W0621
+    """A formatted citation for an edition."""
     edition = edition or get_edition(repos, version=version)
-    return "{0}. {1}. {2} {3}. {4}: {5}. (Available online at {6})".format(
-        ' & '.join('{0.last}, {0.first}'.format(HumanName(e)) for e in edition['editors']),
-        edition['year'],
-        repos.publication.web.name,
-        edition['version'],
-        repos.publication.publisher.place,
-        repos.publication.publisher.name,
-        repos.publication.web.url,
-    )
+    editors = [f'{n.last}, {n.first}' for n in [HumanName(e) for e in edition['editors']]]
+    return (f"{' & '.join(editors)}. {edition['year']}. "
+            f"{repos.publication.web.name} {edition['version']}. "
+            f"{repos.publication.publisher.place}: {repos.publication.publisher.name}. "
+            f"(Available online at {repos.publication.web.url})")
 
 
-def prepare_release(repos, version=None):
+def prepare_release(repos, version=None) -> str:  # pylint: disable=W0621
+    """Write metadata for Zenodo and return a citation."""
     edition = get_edition(repos, version=version)
     cit = citation(repos, edition=edition, version=version)
     dump(

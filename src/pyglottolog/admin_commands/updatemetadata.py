@@ -7,7 +7,7 @@ import configparser
 from clldutils.metadata import Metadata
 
 
-def run(args):  # pragma: no cover
+def run(args):  # pragma: no cover  # pylint: disable=C0116
     cfg = configparser.ConfigParser()
     cfg.read(str(args.repos.path('config', 'publication.ini')))
     md = {'title' if k == 'name' else k: v for k, v in cfg['web'].items()}

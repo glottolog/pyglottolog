@@ -11,6 +11,10 @@ Releasing pyglottolog
   ```shell
   flake8 src
   ```
+- Make sure pylint passes with a score of >=9.99:
+  ```shell
+  pylint src/pyglottolog
+  ```
 
 - Make sure API docs can be built:
   ```shell

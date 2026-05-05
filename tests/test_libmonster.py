@@ -3,7 +3,7 @@ import operator
 import pytest
 
 from pyglottolog.references.libmonster import (markconservative, markall,
-    add_inlg_e, INLG, keyid, pyear, pagecount, lgcode, grp2fd, bibord_iteritems)
+                                               add_inlg_e, INLG_FIELD, keyid, pyear, pagecount, lgcode, grp2fd, bibord_iteritems)
 
 
 def test_bibord_iteritems():
@@ -75,9 +75,9 @@ def test_markall_lgcode(api):
 def test_add_inlg_e(api):
     res = add_inlg_e(
         {1: ('article', {'title': 'Grammar of language'})},
-        api.triggers[INLG],
+        api.triggers[INLG_FIELD],
         verbose=False)
-    assert res[1][1][INLG] == 'language [abc]'
+    assert res[1][1][INLG_FIELD] == 'language [abc]'
 
 
 @pytest.mark.parametrize('fields, expected', [
@@ -108,12 +108,12 @@ def test_pyear(year, expected):
 
 
 @pytest.mark.parametrize('pages, expected', [
-    ('', ''),
-    ('1', '1'),
-    ('10-20', '11'),
-    ('10-20,v-viii', '4+11'),
-    ('20,viii', '8+20'),
-    ('10-2', '3'),  # interpreted as 10-12
+    ('', 0),
+    ('1', 1),
+    ('10-20', 11),
+    ('10-20,v-viii', 15),
+    ('20,viii', 28),
+    ('10-2', 3),  # interpreted as 10-12
 ])
 def test_pagecount(pages, expected):
     assert pagecount(pages) == expected

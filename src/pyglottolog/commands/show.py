@@ -6,20 +6,20 @@ from pyglottolog.cli_util import get_languoid
 from pyglottolog.util import sprint
 
 
-def register(parser):
+def register(parser):  # pylint: disable=C0116
     parser.add_argument(
         'object',
         metavar='<GLOTTOCODE>|<ISO-CODE>|<BIBTEXKEY>',
     )
 
 
-def run(args):
+def run(args):  # pylint: disable=C0116
     if ':' in args.object:
         if args.object.startswith('**'):
             ref = Reference.from_string(args.object)
         else:
             ref = Reference(key=args.object)
-        sprint('Glottolog reference {0}'.format(ref), attrs=['bold', 'underline'])
+        sprint(f'Glottolog reference {ref}', attrs=['bold', 'underline'])
         print()
         src = ref.get_source(args.repos)
         sprint(src.text())
@@ -29,13 +29,13 @@ def run(args):
 
     lang = get_languoid(args, args.object)
     print()
-    sprint('Glottolog languoid {0}'.format(lang.id), attrs=['bold', 'underline'])
+    sprint(f'Glottolog languoid {lang.id}', attrs=['bold', 'underline'])
     print()
     sprint('Classification:', attrs=['bold', 'underline'])
     args.repos.ascii_tree(lang, maxlevel=1)
     print()
     sprint('Info:', attrs=['bold', 'underline'])
-    sprint('Path: {0}'.format(lang.fname), 'green', attrs=['bold'])
+    sprint(f'Path: {lang.fname}', 'green', attrs=['bold'])
     sources = lang.sources
     if sources:
         del lang.cfg['sources']['glottolog']

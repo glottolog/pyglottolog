@@ -7,56 +7,94 @@ since Sapir 1916. This module provides implementations of some of the simpler al
 import gzip
 import json
 import random
-import typing
+from typing import Callable, Union
 import decimal
 import pathlib
 import collections
+import dataclasses
 
 try:
     from shapely.geometry import shape, GeometryCollection, MultiPoint, Point
     from shapely.ops import nearest_points
     import pyproj
-    geo = True
+    GEO = True
 except ImportError:  # pragma: no cover
-    geo = False
+    GEO = False
 
 import pyglottolog
 from pyglottolog.languoids import Languoid
 
 __all__ = ['compute', 'md', 'recursive_centroids']
+
+Lat = Union[decimal.Decimal, float]
+Lon = Union[decimal.Decimal, float]
+PointType = tuple[Lat, Lon]
+PointDictType = dict[str, PointType]
 random.seed(12345)
 
 
-def _worlds_land_masses_dict():
-    res = {}
-    for p in pathlib.Path(pyglottolog.__file__).parent.joinpath('data').glob('*.geojson.gz'):
-        with gzip.open(p, mode='rt', encoding='utf8') as fp:
-            res[p.stem] = GeometryCollection([
-                shape(f["geometry"]).buffer(0) for f in json.loads(fp.read())['features']])
-    return res
+def geodist(geod: pyproj.Geod, p1: PointType, p2: PointType) -> float:
+    """
+    Shortest great-circle distance between to points in metres.
+
+    >>> geod = Geod(ellps='WGS84')
+    >>> geodist(geod, (0, 179), (0, -179))
+    222638.98158654713
+    >>> geodist(geod, (0, 179), (0, 0))
+    19926188.85199597
+    """
+    return geod.inv(p1[1], p1[0], p2[1], p2[0])[2]
 
 
-def compute(api: pyglottolog.Glottolog,
-            method: typing.Callable[
-                [typing.List[Languoid]],
-                typing.Dict[str, typing.Tuple[decimal.Decimal, decimal.Decimal]]])\
-        -> typing.Dict[str, typing.Tuple[decimal.Decimal, decimal.Decimal]]:
+@dataclasses.dataclass
+class Landmasses:
+    """Landmasses of the Earth."""
+    shapes: dict[str, GeometryCollection]
+    geod: pyproj.Geod = dataclasses.field(default_factory=lambda: pyproj.Geod(ellps='WGS84'))
+
+    @classmethod
+    def from_geojson(cls) -> 'Landmasses':
+        """Read shape data from GeoJSON files."""
+        shapes = {}
+        for p in pathlib.Path(pyglottolog.__file__).parent.joinpath('data').glob('*.geojson.gz'):
+            with gzip.open(p, mode='rt', encoding='utf8') as fp:
+                shapes[p.stem] = GeometryCollection([
+                    shape(f["geometry"]).buffer(0) for f in json.loads(fp.read())['features']])
+        return cls(shapes)
+
+    def contain(self, homeland: Point, pref_continents: list[str]) -> bool:
+        """Whether homeland is contained in any landmass."""
+        for _, l in sorted(
+            self.shapes.items(),
+            key=lambda i: i[0] in pref_continents,
+            reverse=True
+        ):
+            if l.contains(homeland):
+                return True
+        return False
+
+    def nearest_point(self, homeland: Point) -> Point:
+        """Compute the nearest point on land for homeland."""
+        nps = [nearest_points(c, homeland)[0] for c in self.shapes.values()]
+        nps = [(p, geodist(self.geod, (p.y, p.x), (homeland.y, homeland.x))) for p in nps]
+        return sorted(nps, key=lambda n: n[1])[0][0]
+
+
+def compute(
+        api: pyglottolog.Glottolog,
+        method: Callable[[list[Languoid]], PointDictType],
+) -> PointDictType:
     """
     Compute homelands for applicable Glottolog subgroups using a method implemented in this module
     or any callable with appropriate signature.
     """
-    if not geo:  # pragma: no cover
+    if not GEO:  # pragma: no cover
         raise ValueError('Computing homelands requires the "geo" extra, installed via '
                          '"pip install pyglottolog[geo]"')
     return method(_l1_languages_with_coordinates(api))
 
 
-def geodist(geod, p1, p2):
-    return geod.inv(p1[1], p1[0], p2[1], p2[0])[2]
-
-
-def md(langs: typing.List[Languoid])\
-        -> typing.Dict[str, typing.Tuple[decimal.Decimal, decimal.Decimal]]:
+def md(langs: list[Languoid]) -> PointDictType:
     """
     Compute homeland coordinates for a language group (and its subgroups) as described as
     "md" method in "Testing methods of linguistic homeland detection using synthetic data"
@@ -82,7 +120,7 @@ def md(langs: typing.List[Languoid])\
         for _, gc, _ in lang.lineage:
             grouped_languages[gc].append(lang)
 
-    homelands = {}
+    homelands: PointDictType = {}
     for group, lgs in grouped_languages.items():
         if len(lgs) == 1:  # pragma: no cover
             homelands[group] = (lgs[0].latitude, lgs[0].longitude)
@@ -101,8 +139,7 @@ def md(langs: typing.List[Languoid])\
     return homelands
 
 
-def recursive_centroids(langs: typing.List[Languoid])\
-        -> typing.Dict[str, typing.Tuple[decimal.Decimal, decimal.Decimal]]:
+def recursive_centroids(langs: list[Languoid]) -> PointDictType:
     """
     Recursively compute homelands of subgroups from the homelands of their immediate children in
     the classification.
@@ -125,25 +162,23 @@ def recursive_centroids(langs: typing.List[Languoid])\
     for lang in langs:
         if not pref_continents:
             pref_continents = {
-                'South America': ['southamerica', 'northaerica'],
+                'South America': ['southamerica', 'northamerica'],
                 'North America': ['northamerica', 'southamerica'],
                 'Eurasia': ['asia', 'europe'],
                 'Africa': ['africa'],
                 'Papunesia': ['oceania'],
                 'Australia': ['oceania'],
             }[lang.macroareas[0].name]
-        tlgc = lang.lineage[0][1]
         prev = None
         for i, (_, gc, _) in enumerate(reversed(lang.lineage)):
             if i == 0:  # For the immediate parent, we append the coordinate.
-                subgroups[(tlgc, gc)].append((lang.latitude, lang.longitude))
+                subgroups[(lang.lineage[0][1], gc)].append((lang.latitude, lang.longitude))
             else:  # Otherwise we append the Glottocode of the immediate child.
-                subgroups[(tlgc, gc)].append(prev)
+                subgroups[(lang.lineage[0][1], gc)].append(prev)
             prev = gc
 
-    geod = pyproj.Geod(ellps='WGS84')
-    continents = _worlds_land_masses_dict()
-    homelands = {}
+    landmasses = Landmasses.from_geojson()
+    homelands: PointDictType = {}
     while subgroups:
         for (tlgc, gc), coords in list(subgroups.items()):
             # coords is a list of immediate children of the group specified by `gc`, either
@@ -157,20 +192,15 @@ def recursive_centroids(langs: typing.List[Languoid])\
             homeland = MultiPoint(
                 [(pos_lon(p[1], tlgc), p[0]) for p in coords]).convex_hull.centroid
             homeland = Point(norm_lon(homeland.x, tlgc), homeland.y)
-            for _, l in sorted(
-                    continents.items(), key=lambda i: i[0] in pref_continents, reverse=True):
-                if l.contains(homeland):
-                    break  # pragma: no cover
-            else:
-                nps = [nearest_points(c, homeland)[0] for c in continents.values()]
-                nps = [(p, geodist(geod, (p.y, p.x), (homeland.y, homeland.x))) for p in nps]
-                homeland = sorted(nps, key=lambda n: n[1])[0][0]
+            # Make sure we don't pick a location in the ocean.
+            if not landmasses.contain(homeland, pref_continents):
+                homeland = landmasses.nearest_point(homeland)
             homelands[gc] = (homeland.y, homeland.x)
             del subgroups[(tlgc, gc)]
     return homelands
 
 
-def _l1_languages_with_coordinates(api):
+def _l1_languages_with_coordinates(api: pyglottolog.Glottolog) -> list[Languoid]:
     invalid_macroareas = {
         'atla1278': {api.macroareas.northamerica.name},
         'aust1307': {api.macroareas.southamerica.name},
@@ -182,17 +212,17 @@ def _l1_languages_with_coordinates(api):
             api.macroareas.pacific.name,
         },
     }
-    return [
-        lg for lg in api.languoids()
-        if lg.latitude is not None
-        and lg.lineage  # noqa: W503
-        and lg.level == api.languoid_levels.language  # noqa: W503
-        and lg.category == api.language_types.spoken_l1.category  # noqa: W503
-        and (  # noqa: W503
+
+    def condition(lg, api):
+        return all((
+            lg.latitude is not None,
+            lg.level == api.languoid_levels.language,
+            lg.category == api.language_types.spoken_l1.category,
+            # We try to filter out the disruptions of the colonial era.
             (lg.lineage[0][1] not in invalid_macroareas) or  # noqa: W504
             (not invalid_macroareas[lg.lineage[0][1]].intersection(ma.name for ma in lg.macroareas))
-        )
-    ]
+        ))
+    return [lg for lg in api.languoids() if lg.lineage and condition(lg, api)]
 
 
 if __name__ == '__main__':  # pragma: no cover
