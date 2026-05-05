@@ -50,8 +50,6 @@ class Wikidata(LinkProvider):  # pylint: disable=R0903
     Update wikipedia/wikidata links from data in build/glottocode2wikidata.csv.
     """
     def iterupdated(self, languoids):  # pragma: no cover
-        if confirm('Query Wikidata?'):
-            query(self.repos.path('build', 'glottocode2wikidata.csv'))
         res = {}
         if self.repos:
             res = {d['glottocode']: d for d in reader(
