@@ -19,7 +19,7 @@ def run(args):  # pylint: disable=C0116
 
     ops.pop('DEFAULT', None)
 
-    with Table('section', 'option', 'count') as table:
+    with Table(args, 'section', 'option', 'count') as table:
         for section, options in ops.items():
             table.append([section, '', float(sum(options.values()))])
             for k, n in options.most_common():

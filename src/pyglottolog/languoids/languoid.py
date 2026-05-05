@@ -36,7 +36,6 @@ ISO_8601_INTERVAL = re.compile(
     flags=re.ASCII)
 
 NameIdLevelType = tuple[str, Glottocode, config.LanguoidLevel]
-LanguoidMapType = dict[str, 'Languoid']
 
 
 @functools.total_ordering
@@ -203,7 +202,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
 
     def newick_node(
             self,
-            nodes: Optional[LanguoidMapType] = None,
+            nodes: Optional['LanguoidMapType'] = None,
             template=None,
             maxlevel=None,
             level=0,
@@ -293,14 +292,14 @@ class Languoid:  # pylint: disable=too-many-public-methods
         """
         return getattr(self.level, 'id', self.level) == 'language' and not self.lineage
 
-    def children_from_nodemap(self, nodes: LanguoidMapType) -> list['Languoid']:
+    def children_from_nodemap(self, nodes: 'LanguoidMapType') -> list['Languoid']:
         """
         A faster alternative to `children` when the relevant languoids have already been
         read from disc.
         """
         return [nodes[d.name] for d in self.dir.iterdir() if d.is_dir()]
 
-    def descendants_from_nodemap(self, nodes: LanguoidMapType, level=None) -> list['Languoid']:
+    def descendants_from_nodemap(self, nodes: 'LanguoidMapType', level=None) -> list['Languoid']:
         """
         A faster alternative to `descendants` when the relevant languoids have already
         been read from disc.
@@ -325,7 +324,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         """
         return [Languoid.from_dir(d, _api=self._api) for d in self.dir.iterdir() if d.is_dir()]
 
-    def ancestors_from_nodemap(self, nodes: LanguoidMapType) -> list['Languoid']:
+    def ancestors_from_nodemap(self, nodes: 'LanguoidMapType') -> list['Languoid']:
         """
         A faster alternative to `ancestors` when the relevant languoids have already
         been read from disc.
@@ -623,7 +622,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
 
     @property
     def hid(self) -> Optional[str]:
-        """The languoid's "H(arald)ID", aka a "NOCODE_" code."""
+        """The languoid's "H(arald)ID", aka a "NOCODE" code."""
         return self._get('hid')
 
     @hid.setter
@@ -660,7 +659,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
     def closest_iso(
             self,
             api: Optional['Glottolog'] = None,
-            nodes: Optional[LanguoidMapType] = None,
+            nodes: Optional['LanguoidMapType'] = None,
     ) -> Optional[str]:
         """
         ISO 639-3 code assigned to the languoid or one of its ancestors in the classification
@@ -694,3 +693,6 @@ class Languoid:  # pylint: disable=too-many-public-methods
     def fname(self) -> pathlib.Path:
         """The location of the languoid's info file in the Glottolog tree directory."""
         return self.dir.joinpath(INFO_FILENAME)
+
+
+LanguoidMapType = dict[str, Languoid]

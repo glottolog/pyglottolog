@@ -13,7 +13,7 @@ from pyglottolog.languoids import Languoid
 
 def read_grouped_cldf_languages(doi):
     """Read language information from CLDF datasets."""
-    rec = cldfzenodo.Record.from_concept_doi(doi)
+    rec = cldfzenodo.API.get_record(conceptdoi=doi)
     with TemporaryDirectory() as tmp:
         ds = rec.download_dataset(tmp)
         langs = sorted(

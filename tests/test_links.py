@@ -49,15 +49,14 @@ def test_wikidata(mocker, api_copy):
 
 
 def test_LinkProvider(mocker, api):
-    class Rec(mocker.Mock):
-        @classmethod
-        def from_concept_doi(cls, _):
-            return cls()
+    def download_dataset(d):
+        d.joinpath('cldf.json').write_text(CLDF_MD, encoding='utf8')
+        d.joinpath('languages.csv').write_text("ID,Name,Glottocode\na,Alanguage,abcd1234")
+        return Dataset.from_metadata(d.joinpath('cldf.json'))
 
-        def download_dataset(self, d):
-            d.joinpath('cldf.json').write_text(CLDF_MD, encoding='utf8')
-            d.joinpath('languages.csv').write_text("ID,Name,Glottocode\na,Alanguage,abcd1234")
-            return Dataset.from_metadata(d.joinpath('cldf.json'))
+    class Api(mocker.Mock):
+        def get_record(self, *_, **kw):
+            return mocker.Mock(download_dataset=download_dataset)
 
     class TestLinks(LinkProvider):
         __doi__ = 'x'
@@ -65,7 +64,7 @@ def test_LinkProvider(mocker, api):
         __url_template__ = "{0[ID]}"
         __label_template__ = "{0[Name]}"
 
-    mocker.patch('pyglottolog.links.util.cldfzenodo', mocker.Mock(Record=Rec))
+    mocker.patch('pyglottolog.links.util.cldfzenodo', mocker.Mock(API=Api()))
 
     l = TestLinks()
     res = list(l.iterupdated(api.languoids()))
