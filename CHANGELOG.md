@@ -1,6 +1,11 @@
 # Changes
 
 
+## unreleased
+
+- Fixed computation of page numbers to also handle cases like "3+5+6".
+
+
 ## [4.0.0] - 2026-05-05
 
 - Drop py3.8 compat

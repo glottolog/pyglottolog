@@ -8,7 +8,7 @@ from .roman import romanint
 
 ROMAN = r'[ivxlcdmIVXLCDM]+'
 ROMANPATTERN = re.compile(ROMAN + '$')
-ARABIC = r'[0-9]+'
+ARABIC = r'[AESaes]?[0-9]+'
 ARABICPATTERN = re.compile(ARABIC + '$')
 SEPPAGESPATTERN = re.compile(
     r'(?P<n1>{0}|{1})\s*([,;.+/])\s*(?P<n2>{0}|{1})'.format(  # pylint: disable=C0209
@@ -32,10 +32,15 @@ def get_int(s: str) -> Optional[int]:
     except ValueError:
         if ROMANPATTERN.match(s):
             return romanint(s.lower())
+    m = ARABICPATTERN.match(s)
+    if m:
+        if not s[0].isnumeric():
+            return int(s[1:])
+        # The case int(s) has already been handled above.
     return None
 
 
-def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], int]]:
+def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], Optional[int]]]:
     """
 
     >>> compute_pages('x+23')
@@ -81,12 +86,27 @@ def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], in
         return (start, number, number)
 
     # next case: ,|.|+ separated numbers:
-    m = SEPPAGESPATTERN.match(pages)
-    if m:
-        number = sum(map(get_int, [m.group('n1'), m.group('n2')]))
+    parts = re.split(r'\s*[,;.+/]\s*', pages)
+    if all(ARABICPATTERN.match(p) or ROMANPATTERN.match(p) for p in parts):
+        number = sum(map(get_int, parts))
         return (None, None, number if number <= MAX_PAGE else None)
+    if len(parts) > 1:
+        s = None
+        e = None
+        n = None
 
-    # next case: ranges:
+        # Now parts may include ranges.
+        for p in parts:
+            res = compute_pages(p)
+            if res[0] is not None:
+                # More than range: We cannot turn this into a single range.
+                s = res[0] if s is None else None
+            if res[1] is not None:
+                e = res[1] if e is None else None
+            if res[2]:
+                n = (n or 0) + res[2]
+        return (s, e, n)
+
     start = None
     end = None
     number = None
