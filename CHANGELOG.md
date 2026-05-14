@@ -1,7 +1,7 @@
 # Changes
 
 
-## unreleased
+## [4.0.1] - 2026-05-14
 
 - Fixed computation of page numbers to also handle cases like "3+5+6".
 
