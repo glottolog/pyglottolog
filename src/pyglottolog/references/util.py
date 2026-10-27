@@ -114,11 +114,13 @@ def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], Op
     for match in PAGES_PATTERN.finditer(pages):
         s_start, s_end = match.group('start'), match.group('end')
         s, e = get_int(s_start), get_int(s_end)
-        if ARABICPATTERN.match(s_end) and ARABICPATTERN.match(s_start) \
-                and len(s_end) < len(s_start):
-            # the case 516-32:
-            s_end = s_start[:-len(s_end)] + s_end
-            e = get_int(s_end)
+        if ARABICPATTERN.match(s_end) and ARABICPATTERN.match(s_start):
+            # Expand abbreviated digits, excluding optional page prefixes.
+            start_digits = s_start.lstrip('AESaes')
+            end_digits = s_end.lstrip('AESaes')
+            if len(end_digits) < len(start_digits):
+                # the case 516-32 (or E516-E32):
+                e = int(start_digits[:-len(end_digits)] + end_digits)
         if s > e:
             # the case 532-516:
             e, s = s, e

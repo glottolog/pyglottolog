@@ -148,6 +148,8 @@ def test_Entry_med(fields, expected, mocker, api):
         (dict(pages='x+23'), 33),
         (dict(pages='125-9pp.'), 5),
         (dict(pages='125-100'), 26),
+        (dict(pages='S100-S8'), 9),
+        (dict(pages='x + E516-E32'), 27),
         (dict(pages='123456'), None),
         (dict(pages='x+123456'), None),
         (dict(pages='123456-423457'), None),
