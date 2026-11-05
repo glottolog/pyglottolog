@@ -104,3 +104,9 @@ def test_load_triggers(api):
 
 def test_macroarea_map(api):
     assert api.macroarea_map['abc'] == 'Eurasia'
+
+
+def test_sortable_config(api):
+    assert sorted(api.language_types.values())
+    assert sorted(api.aes_status.values())
+    assert sorted(api.med_types.values())

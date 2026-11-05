@@ -144,6 +144,7 @@ class DocumentType(ConfigObject):  # pylint: disable=R0902
         return self.rank == other.rank
 
 
+@functools.total_ordering
 @dataclasses.dataclass
 class MEDType(ConfigObject):
     """
@@ -160,7 +161,14 @@ class MEDType(ConfigObject):
     def __post_init__(self):
         self.rank = int(self.rank)
 
+    def __lt__(self, other):
+        return self.rank < other.rank
 
+    def __eq__(self, other):
+        return self.rank == other.rank
+
+
+@functools.total_ordering
 @dataclasses.dataclass
 class LanguageType(ConfigObject):
     """
@@ -171,6 +179,12 @@ class LanguageType(ConfigObject):
     pseudo_family_id: str
     category: str  #: category name for languages of this type
     description: str
+
+    def __lt__(self, other):
+        return self.id < other.id
+
+    def __eq__(self, other):
+        return self.id == other.id
 
 
 @functools.total_ordering

@@ -38,7 +38,7 @@ def query(p):  # pragma: no cover
     res = requests.post(
         'https://query.wikidata.org/sparql',
         data={'query': SPARQL},
-        headers={'Accept': 'text/csv'},
+        headers={'Accept': 'text/csv', 'User-Agent': 'pyglottolog'},
         timeout=20,
     )
     p.write_text(res.text)

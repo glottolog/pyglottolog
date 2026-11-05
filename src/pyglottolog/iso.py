@@ -186,6 +186,7 @@ class ChangeRequest:  # pylint: disable=R0902
                "field_change_request_region_grp_tid=All&field_change_request_lf_group_tid=All&" \
                "field_change_instance_chnge_type_tid=All&field_change_request_act_status_tid=All&" \
                "items_per_page=100&page={1}"
+        #code_changes/change_request_index/data/2025?field_change_request_region_grp_tid=All&field_change_request_lf_group_tid=All&field_change_instance_chnge_type_tid=All&field_change_instance_act_status_tid=All&items_per_page=100&page=1
         year, page = 2006, 0
         while year < (max_year or datetime.date.today().year):
             while True:
@@ -269,8 +270,10 @@ def _read_table(table):
     def _text(e):
         if e.find('span') is not None:
             return _text(e.find('span'))
-        if e.find('a') is not None:
-            return _text(e.find('a'))
+        for a in e.findall('a'):
+            t = _text(a)
+            if t:
+                return t
         return e.text or ''
 
     d = ElementTree.fromstring(table)
