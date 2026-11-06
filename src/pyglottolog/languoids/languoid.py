@@ -567,7 +567,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
              sorted(
                  [Link.from_(v) for v in value], key=lambda l_: (l_.label or 'zzzz', l_.domain))])
 
-    def update_links(self, domain: str, urls: Iterable[str]) -> bool:
+    def update_links(self, domain: str, urls: Iterable[Union[str, tuple[str, str]]]) -> bool:
         """Update the links section of the languoid for a particular domain."""
         new = [li for li in self.links if li.domain != domain] + [Link.from_(u) for u in urls]
         if set(new) != set(self.links):

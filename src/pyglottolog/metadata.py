@@ -5,7 +5,7 @@ from html import entities as html_entities
 from typing import TYPE_CHECKING, TypedDict, Optional
 
 from packaging import version
-from nameparser import HumanName
+import nameparser
 from markdown import markdown
 from clldutils.markup import iter_markdown_tables
 from clldutils.jsonlib import dump
@@ -76,7 +76,7 @@ def get_edition(  # pylint: disable=W0621
 def citation(repos, edition=None, version=None) -> str:  # pylint: disable=W0621
     """A formatted citation for an edition."""
     edition = edition or get_edition(repos, version=version)
-    editors = [f'{n.last}, {n.first}' for n in [HumanName(e) for e in edition['editors']]]
+    editors = [f'{n.family}, {n.given}' for n in [nameparser.parse(e) for e in edition['editors']]]
     return (f"{' & '.join(editors)}. {edition['year']}. "
             f"{repos.publication.web.name} {edition['version']}. "
             f"{repos.publication.publisher.place}: {repos.publication.publisher.name}. "
