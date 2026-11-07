@@ -362,7 +362,9 @@ class Entry:
                 pass
 
         if self.fields.get('pages'):
-            return util.compute_pages(self.fields['pages'])[2]
+            res = util.compute_pages(self.fields['pages'])[2]
+            if res > 0:
+                return res
         return None
 
     @functools.cached_property

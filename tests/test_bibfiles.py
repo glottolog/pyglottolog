@@ -142,6 +142,7 @@ def test_Entry_med(fields, expected, mocker, api):
 @pytest.mark.parametrize(
     'fields,expected',
     [
+        (dict(pages='Bd.3,S.-226'), None),  # Cannot handle this yet.
         (dict(numberofpages='123'), 123),
         (dict(numberofpages='x123'), None),
         (dict(pages='xvii'), 17),

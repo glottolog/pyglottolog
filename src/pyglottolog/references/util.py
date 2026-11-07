@@ -83,6 +83,8 @@ def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], Op
         start = 1
         if number > MAX_PAGE:
             number, start = None, None
+        if number < 0:
+            number, start = None, None
         return (start, number, number)
 
     # next case: ,|.|+ separated numbers:
