@@ -363,7 +363,7 @@ class Entry:
 
         if self.fields.get('pages'):
             res = util.compute_pages(self.fields['pages'])[2]
-            if res > 0:
+            if res and (res > 0):
                 return res
         return None
 
