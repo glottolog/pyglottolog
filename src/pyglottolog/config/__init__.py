@@ -35,6 +35,7 @@ class ConfigObject:
         return res
 
 
+@functools.total_ordering
 @dataclasses.dataclass
 class Editors(ConfigObject):
     """Glottolog editors."""
@@ -48,6 +49,12 @@ class Editors(ConfigObject):
 
     def __post_init__(self):
         self.current = eval(self.current)  # pylint: disable=W0123
+
+    def __lt__(self, other):
+        return self.ord < other.ord
+
+    def __eq__(self, other):
+        return self.ord == other.ord
 
 
 @functools.total_ordering
@@ -86,7 +93,7 @@ class AES(ConfigObject):  # pylint: disable=R0902
         return self.ordinal == other.ordinal
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(order=True)
 class AESSource(ConfigObject):
     """
     Reference information for AES sources
@@ -99,7 +106,7 @@ class AESSource(ConfigObject):
     pages: str = None
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(order=True)
 class Macroarea(ConfigObject):
     """
     Glottolog macroareas (see `<https://glottolog.org/meta/glossary#macroarea>`_)
