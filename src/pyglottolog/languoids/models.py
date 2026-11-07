@@ -206,7 +206,7 @@ class Reference:
         return res
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(order=True)
 class Country:
     """
     Glottolog languoids can be related to the countries they are spoken in. These
