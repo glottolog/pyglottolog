@@ -7,13 +7,13 @@ import operator
 import textwrap
 import itertools
 import functools
-from typing import Any, Union, Callable, TypeVar
+from typing import Any, Callable, TypeVar
 from collections.abc import Sequence, Iterable, Generator
 
 from termcolor import colored
 
 T = TypeVar('T')
-PathType = Union[str, pathlib.Path]
+PathType = str | pathlib.Path
 
 
 def sprint(text: Any, *args, **kw) -> None:
@@ -86,11 +86,7 @@ class Trigger:
     def cls(self) -> tuple[str, str]:  # pylint: disable=C0116
         return self.field, self.type
 
-    def __call__(
-            self,
-            allkeys: Union[Sequence[T], set[T]],
-            keys_by_word: dict[str, set[T]],
-    ) -> set[T]:
+    def __call__(self, allkeys: Sequence[T] | set[T], keys_by_word: dict[str, set[T]]) -> set[T]:
         """
         Evaluate a trigger, passing in all keys associated with some object, and dict mapping word
         to sets of keys triggered by the word.
@@ -105,7 +101,7 @@ class Trigger:
         return matching
 
     @staticmethod
-    def format(label, triggers: Sequence[Union['Trigger', str]]) -> str:
+    def format(label, triggers: Sequence['Trigger | str']) -> str:
         """Human-readable info about the triggers."""
         trigs = [triggers] if isinstance(triggers, Trigger) else reversed(triggers)
         from_ = ';'.join(

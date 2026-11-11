@@ -19,5 +19,5 @@ def test_doctype(api_copy):
 
 
 def test_editors(api_copy):
-    assert len([e for e in api_copy.editors.values() if not e.current]) == 2
+    assert len([e for e in sorted(api_copy.editors.values()) if not e.current]) == 2
     assert len([e for e in api_copy.editors.values() if e.current]) == 3

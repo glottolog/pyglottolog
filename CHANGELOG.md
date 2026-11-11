@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- Drop py3.9 and py3.10 compat
+
 
 ## [4.0.1] - 2026-05-14
 

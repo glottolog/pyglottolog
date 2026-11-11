@@ -1,15 +1,16 @@
 """
 Functionality to integrate ISO 639-3 data.
 """
-import logging
 import re
+import enum
 import hashlib
+import logging
 import pathlib
 import datetime
 import itertools
 import dataclasses
 from xml.etree import ElementTree
-from typing import Optional, TYPE_CHECKING, Union, Literal, get_args
+from typing import Optional, TYPE_CHECKING, Literal, get_args
 from collections.abc import Generator, Iterator
 
 from clldutils import iso_639_3
@@ -17,7 +18,6 @@ from csvw import dsv
 
 from .references.bibtex import save, EntryType
 from .util import PathType, message
-from ._compat import StrEnum
 
 if TYPE_CHECKING:  # pragma: no cover
     from pyglottolog import Glottolog
@@ -26,7 +26,7 @@ if TYPE_CHECKING:  # pragma: no cover
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 CACHE_DIR = 'iso_639_3_cache'
 # log-level, languoid, msg:
-LogMessageType = tuple[str, Union['Languoid', str], str]
+LogMessageType = tuple[str, 'Languoid | str', str]
 
 
 def read_url(
@@ -59,7 +59,7 @@ def normalize_whitespace(s: str) -> str:
     return re.sub(r'\s+', ' ', s).strip()
 
 
-class RetReason(StrEnum):
+class RetReason(enum.StrEnum):
     """
     Reasons for retirement of an ISO code.
 
@@ -78,10 +78,10 @@ class Retirement:
     Id: str  # pylint: disable=invalid-name
     Ref_Name: str  # pylint: disable=invalid-name
     Ret_Reason: Optional[RetReason]  # pylint: disable=invalid-name
-    Change_To: Union[str, list[str]]  # pylint: disable=invalid-name
+    Change_To: str | list[str] | None  # pylint: disable=invalid-name
     Ret_Remedy: str  # pylint: disable=invalid-name
     Effective: datetime.date  # pylint: disable=invalid-name
-    cr: Union[str, 'ChangeRequest'] = None
+    cr: Optional['str | ChangeRequest'] = None
 
     def __post_init__(self):
         def _validate_iso_code(attr, value):

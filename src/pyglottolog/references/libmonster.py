@@ -11,7 +11,7 @@ from collections.abc import Sequence, Generator, Iterable, Iterator
 import dataclasses
 from itertools import groupby
 from operator import itemgetter
-from typing import TypeVar, Callable, Any, Literal, Optional, Union, TypedDict
+from typing import TypeVar, Callable, Any, Literal, Optional, TypedDict, Concatenate, ParamSpec
 
 from csvw.dsv import UnicodeWriter
 
@@ -23,6 +23,7 @@ from .roman import roman, romanint
 from .hhtypes import HHTypes
 
 T = TypeVar('T')
+P = ParamSpec('P')
 INF = float('inf')
 log = logging.getLogger('pyglottolog')
 LgcodeType = str
@@ -34,8 +35,9 @@ LGCODE_FIELD = 'lgcode'
 
 
 def map_values(
-        d: Union[dict[str, T], Iterator[tuple[str, T]]],
-        func: Callable[[T, ...], Any], *args) -> Generator[tuple[str, Any]]:
+        d: dict[str, T] | Iterator[tuple[str, T]],
+        func: Callable[Concatenate[T, P], Any], *args,
+) -> Generator[tuple[str, Any]]:
     """
     Apply func to all values of key-value tuples in d.
 

@@ -7,7 +7,7 @@ since Sapir 1916. This module provides implementations of some of the simpler al
 import gzip
 import json
 import random
-from typing import Callable, Union
+from typing import Callable
 import decimal
 import pathlib
 import collections
@@ -26,8 +26,8 @@ from pyglottolog.languoids import Languoid
 
 __all__ = ['compute', 'md', 'recursive_centroids']
 
-Lat = Union[decimal.Decimal, float]
-Lon = Union[decimal.Decimal, float]
+Lat = decimal.Decimal | float
+Lon = decimal.Decimal | float
 PointType = tuple[Lat, Lon]
 PointDictType = dict[str, PointType]
 random.seed(12345)

@@ -5,7 +5,7 @@ Functionality to manipulate bibfiles and their entries.
 import logging
 import re
 import math
-from typing import Union, TYPE_CHECKING, Optional, Any, Callable
+from typing import TYPE_CHECKING, Optional, Any, Callable
 import pathlib
 import datetime
 import functools
@@ -79,7 +79,7 @@ class BibFiles(list):
         super().__init__(bibfiles)
         self._map = {b.fname.name: b for b in self}
 
-    def __getitem__(self, index_or_filename: Union[int, str]) -> Union['BibFile', 'Entry']:
+    def __getitem__(self, index_or_filename: int | str) -> 'BibFile | Entry':
         """Retrieve a bibfile by index or filename or an entry by qualified key.
 
         :param index_or_filename: Either an `int` index, or a bibfile name, or a \

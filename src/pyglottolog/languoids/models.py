@@ -4,7 +4,7 @@ OO wrappers for various Glottolog data objects.
 import datetime
 import logging
 import re
-from typing import Optional, Literal, get_args, TYPE_CHECKING, Union
+from typing import Optional, Literal, get_args, TYPE_CHECKING, Self
 import collections
 from collections.abc import Iterable
 import dataclasses
@@ -40,7 +40,7 @@ __all__ = [
 class Link:
     """Links appear in multiple places in languoid ini files."""
     url: str
-    label: str = None
+    label: str | None = None
 
     @property
     def domain(self) -> str:
@@ -48,7 +48,7 @@ class Link:
         return urllib.parse.urlparse(self.url).netloc
 
     @classmethod
-    def from_string(cls, s: str) -> 'Link':
+    def from_string(cls, s: str) -> Self:
         """Simplistic parsing of links from markdown formatting."""
         s = s.strip()
         if s.startswith('['):
@@ -57,7 +57,7 @@ class Link:
         return cls(s)
 
     @classmethod
-    def from_(cls, obj: Union['Link', str, list, tuple, dict]) -> 'Link':
+    def from_(cls, obj: Self | str | list | tuple | dict) -> Self:
         """Instantiate link from various input types."""
         if isinstance(obj, cls):
             return obj
@@ -79,6 +79,21 @@ class Link:
         return dataclasses.asdict(self)
 
 
+class Glottocode(str):
+    """Glottocodes are special string."""
+    regex = r'[a-z0-9]{4}[0-9]{4}'
+    pattern = re.compile(regex + r'$')
+
+    def __new__(cls, content):
+        if not cls.pattern.match(content):
+            raise ValueError(content)
+        return str.__new__(cls, content)
+
+    def split(self) -> tuple[str, int]:
+        """Split the Glottocode into alpha-numeric and numeric part."""
+        return self[:4], int(self[4:])
+
+
 class Glottocodes:
     """
     Registry keeping track of glottocodes that have been dealt out.
@@ -96,7 +111,7 @@ class Glottocodes:
             for n in range(1234, num + 1):
                 yield f'{alpha}{n}'
 
-    def new(self, name, dry_run=False) -> 'Glottocode':
+    def new(self, name, dry_run=False) -> Glottocode:
         """Mint a new Glottocode"""
         alpha = slug(str(name))[:4]
         assert alpha
@@ -111,21 +126,6 @@ class Glottocodes:
                 ordered[k] = self._store[k]
             jsonlib.dump(ordered, self._fname, indent=4)
         return Glottocode(f'{alpha}{num}')
-
-
-class Glottocode(str):
-    """Glottocodes are special string."""
-    regex = r'[a-z0-9]{4}[0-9]{4}'
-    pattern = re.compile(regex + r'$')
-
-    def __new__(cls, content):
-        if not cls.pattern.match(content):
-            raise ValueError(content)
-        return str.__new__(cls, content)
-
-    def split(self) -> tuple[str, int]:
-        """Split the Glottocode into alpha-numeric and numeric part."""
-        return self[:4], int(self[4:])
 
 
 @dataclasses.dataclass
@@ -173,13 +173,13 @@ class Reference:
         return self.key.split(':', 1)[1]
 
     @classmethod
-    def from_match(cls, match: re.Match) -> 'Reference':
+    def from_match(cls, match: re.Match) -> Self:
         """Instantiate a reference from a regex match."""
         assert match
         return cls(**match.groupdict())
 
     @classmethod
-    def from_string(cls, string: str, pattern: Optional[re.Pattern] = None) -> 'Reference':
+    def from_string(cls, string: str, pattern: Optional[re.Pattern] = None) -> Self:
         """Parse a reference from a string."""
         try:
             return cls.from_match((pattern or cls.pattern).match(string.strip()))
@@ -188,10 +188,7 @@ class Reference:
 
     @classmethod
     def from_list(
-            cls,
-            list_: Iterable[Union['Reference', str]],
-            pattern: Optional[re.Pattern] = None,
-    ) -> list['Reference']:
+            cls, list_: Iterable[Self | str], pattern: re.Pattern | None = None) -> list[Self]:
         """Turn list of strings into list of Reference instances."""
         res = []
         for s in list_:

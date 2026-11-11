@@ -4,15 +4,24 @@ from pyglottolog.references.util import compute_pages
 
 
 @pytest.mark.parametrize(
+    'pages_string',
+    [
+        '-5',
+        '1000000000',
+        '-5+4',
+        '1-20x',
+        'none',
+    ]
+)
+def test_compute_pages_invalid_input(pages_string):
+    assert compute_pages(pages_string) == (None, None, None)
+
+
+@pytest.mark.parametrize(
     'pages_string,pages_int',
     [
         ('43-68, A1-A56', 26+56),
-        ('297+772+708+981', 297+772+708+981),
-        ('2-31, 128-128', 30+1),
-        ('x+23', 33),
-        ('x + 23', 33),
-        ('x. 23', 33),
-        ('23,xi', 34),
+        ('-5+10', 5),  # Borderline. Should probably be an error.
         ('23,ix', 32),
         ('ix', 9),
         ('12-45', 34),

@@ -1,10 +1,21 @@
 import shutil
 
-from pyglottolog.homelands import *
+from pyglottolog import homelands
+from pyglottolog.homelands import compute, Landmasses, md, recursive_centroids
+
+try:
+    from shapely.geometry import Point
+except ImportError:  # pragma: no cover
+    Point = None
+
+
+def test_Landmasses():
+    if homelands.GEO:  # pragma: no cover
+        lm = Landmasses.from_geojson()
+        assert lm.contain(Point(0.0, 33.0), ['europe.geojson'])
 
 
 def test_compute(api_copy):
-    from pyglottolog import homelands
     if homelands.GEO:  # pragma: no cover
         assert compute(api_copy, md)
         assert compute(api_copy, recursive_centroids)

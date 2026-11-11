@@ -2,7 +2,6 @@
 Utilities for the handling of pages fields.
 """
 import re
-from typing import Optional
 
 from .roman import romanint
 
@@ -21,7 +20,7 @@ ART_NO_PATTERN = re.compile(r'\(art\.\s*[0-9]+\)')
 MAX_PAGE = 10_000
 
 
-def get_int(s: str) -> Optional[int]:
+def get_int(s: str) -> int | None:
     """
     >>> get_int('X')
     10
@@ -30,9 +29,9 @@ def get_int(s: str) -> Optional[int]:
     try:
         return int(s)
     except ValueError:
-        if ROMANPATTERN.match(s):
+        if ROMANPATTERN.fullmatch(s):
             return romanint(s.lower())
-    m = ARABICPATTERN.match(s)
+    m = ARABICPATTERN.fullmatch(s)
     if m:
         if not s[0].isnumeric():
             return int(s[1:])
@@ -40,7 +39,25 @@ def get_int(s: str) -> Optional[int]:
     return None
 
 
-def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], Optional[int]]]:
+def _in_range(number):
+    return 0 < number < MAX_PAGE
+
+
+def _accumulate(page_specs):
+    s, e, n = None, None, None
+
+    # Now parts may include ranges.
+    for res in page_specs:
+        if res[0] is not None:  # A range!
+            s = res[0] if s is None else None
+        if res[1] is not None:
+            e = res[1] if e is None else None
+        if res[2]:
+            n = (n or 0) + res[2]
+    return (s, e, n)
+
+
+def compute_pages(pages: str) -> tuple[int | None, int | None, int | None]:
     """
 
     >>> compute_pages('x+23')
@@ -78,64 +95,36 @@ def compute_pages(pages: str) -> Optional[tuple[Optional[int], Optional[int], Op
         pages = pages[:-2]
 
     # trivial case: just one number:
-    number = get_int(pages)
-    if number:
-        start = 1
-        if number > MAX_PAGE:
-            number, start = None, None
-        elif number < 0:
-            number, start = None, None
-        return (start, number, number)
+    res = get_int(pages)
+    if res:
+        return (1, res, res) if _in_range(res) else (None, None, None)
 
     # next case: ,|.|+ separated numbers:
     parts = re.split(r'\s*[,;.+/]\s*', pages)
-    if all(ARABICPATTERN.match(p) or ROMANPATTERN.match(p) for p in parts):
-        number = sum(map(get_int, parts))
-        return (None, None, number if number <= MAX_PAGE else None)
-    if len(parts) > 1:
-        s = None
-        e = None
-        n = None
+    ints = list(map(get_int, parts))
+    if ints and all(ints):
+        number = sum(ints)
+        return (None, None, number if _in_range(number) else None)
 
-        # Now parts may include ranges.
-        for p in parts:
-            res = compute_pages(p)
-            if res[0] is not None:
-                # More than range: We cannot turn this into a single range.
-                s = res[0] if s is None else None
-            if res[1] is not None:
-                e = res[1] if e is None else None
-            if res[2]:
-                n = (n or 0) + res[2]
-        return (s, e, n)
+    if len(parts) > 1:  # Recurse.
+        return _accumulate([compute_pages(p) for p in parts])
 
-    start = None
-    end = None
-    number = None
+    assert len(parts) == 1
+    match = PAGES_PATTERN.fullmatch(pages)
+    if not match:
+        return (None, None, None)
 
-    for match in PAGES_PATTERN.finditer(pages):
-        s_start, s_end = match.group('start'), match.group('end')
-        s, e = get_int(s_start), get_int(s_end)
-        if ARABICPATTERN.match(s_end) and ARABICPATTERN.match(s_start):
-            # Expand abbreviated digits, excluding optional page prefixes.
-            start_digits = s_start.lstrip('AESaes')
-            end_digits = s_end.lstrip('AESaes')
-            if len(end_digits) < len(start_digits):
-                # the case 516-32 (or E516-E32):
-                e = int(start_digits[:-len(end_digits)] + end_digits)
-        if s > e:
-            # the case 532-516:
-            e, s = s, e
-        if start is None:
-            start = s
-        end = e
-        number = (number or 0) + (end - s + 1)
-
-    if start and start > MAX_PAGE:
-        start = None
-    if end and end > MAX_PAGE:
-        end = None
-    if number and number > MAX_PAGE:
-        number = None
-
-    return (start, end, number if (number is not None and number > 0) else None)
+    s_start, s_end = match.group('start'), match.group('end')
+    s, e = get_int(s_start), get_int(s_end)
+    assert (s is not None) and (e is not None)
+    if ARABICPATTERN.match(s_end) and ARABICPATTERN.match(s_start):
+        # Expand abbreviated digits, excluding optional page prefixes.
+        start_digits = s_start.lstrip('AESaes')
+        end_digits = s_end.lstrip('AESaes')
+        if len(end_digits) < len(start_digits):
+            # the case 516-32 (or E516-E32):
+            e = int(start_digits[:-len(end_digits)] + end_digits)
+    if s > e:  # the case 532-516:
+        e, s = s, e
+    n = e - s + 1
+    return (s if _in_range(s) else None, e if _in_range(e) else None, n if _in_range(n) else None)

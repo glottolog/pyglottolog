@@ -3,7 +3,7 @@ An OO wrapper for languoid data access and manipulation.
 """
 import os
 import re
-from typing import Union, Optional, TYPE_CHECKING, Any
+from typing import Optional, TYPE_CHECKING, Any
 import pathlib
 import datetime
 import warnings
@@ -414,7 +414,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         return False
 
     @property
-    def identifier(self) -> Union[dict, configparser.SectionProxy]:
+    def identifier(self) -> dict | configparser.SectionProxy:
         """Alternative identifiers of the languoid."""
         if 'identifier' in self.cfg:
             return self.cfg['identifier']
@@ -536,7 +536,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
             -end.year if ma.group('end_sign') == '-' else end.year)
 
     @timespan.setter
-    def timespan(self, value: Union[tuple[int, int], list[int]]):
+    def timespan(self, value: tuple[int, int] | list[int]):
         if not (isinstance(value, (list, tuple)) and len(value) == 2):
             raise ValueError(value)
 
@@ -567,7 +567,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
              sorted(
                  [Link.from_(v) for v in value], key=lambda l_: (l_.label or 'zzzz', l_.domain))])
 
-    def update_links(self, domain: str, urls: Iterable[Union[str, tuple[str, str]]]) -> bool:
+    def update_links(self, domain: str, urls: Iterable[str | tuple[str, str]]) -> bool:
         """Update the links section of the languoid for a particular domain."""
         new = [li for li in self.links if li.domain != domain] + [Link.from_(u) for u in urls]
         if set(new) != set(self.links):

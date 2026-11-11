@@ -7,7 +7,7 @@ import itertools
 import logging
 import operator
 import pathlib
-from typing import Optional, Union
+from typing import Optional
 import collections
 from collections.abc import Generator
 
@@ -193,7 +193,7 @@ class BaseDatabase(Connectable):
 class Indexable:  # pylint: disable=R0903
     """Retrieve entry from individual .bib file, or merged entry from old or new grouping."""
 
-    def __getitem__(self, key: Union[tuple[str, str], int, str]):
+    def __getitem__(self, key: tuple[str, str] | int | str):
         """
         Entry by ``(filename, bibkey)`` or merged entry by ``refid`` (old grouping)
         or ``hash`` (current grouping).
@@ -229,7 +229,7 @@ class Indexable:  # pylint: disable=R0903
         return fields.pop(ENTRYTYPE), fields
 
     @classmethod
-    def _get_merged_entry(cls, conn, *, key: Union[int, str],
+    def _get_merged_entry(cls, conn, *, key: int | str,
                           raw: bool = True,
                           _get_field=operator.attrgetter('field')):
         """Return merged entry from old or new grouping."""

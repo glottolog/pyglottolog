@@ -6,7 +6,7 @@ import pathlib
 import functools
 import collections
 import dataclasses
-from typing import Optional, Union, Any
+from typing import Optional, Any
 
 from clldutils.misc import nfilter
 from clldutils.inifile import INI
@@ -54,7 +54,7 @@ class Editors(ConfigObject):
         return self.ord < other.ord
 
     def __eq__(self, other):
-        return self.ord == other.ord
+        return self.ord == other.ord  # pragma: no cover
 
 
 @functools.total_ordering
@@ -191,7 +191,7 @@ class LanguageType(ConfigObject):
         return self.id < other.id
 
     def __eq__(self, other):
-        return self.id == other.id
+        return self.id == other.id  # pragma: no cover
 
 
 @functools.total_ordering
@@ -269,7 +269,7 @@ class Config(collections.OrderedDict):
             return self[item]
         return dict.__getattribute__(self, item)
 
-    def get(self, item: Union[str, ConfigObject], default=None) -> Any:
+    def get(self, item: str | ConfigObject, default=None) -> Any:
         """Flexible getter for config data."""
         if isinstance(item, str) and item in self:
             return self[item]

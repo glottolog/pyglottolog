@@ -8,7 +8,7 @@ BibTeX parsing functionality.
 import functools
 import collections
 import unicodedata
-from typing import Union, Optional, Literal, Protocol
+from typing import Optional, Literal, Protocol
 from collections.abc import Iterable, Generator
 
 from simplepybtex.database.input.bibtex import LowLevelParser, Parser, UndefinedMacro
@@ -76,7 +76,7 @@ def debug_pybtex(source, e):  # pragma: no cover  # pylint: disable=C0116
 
 
 def save(
-        entries: Union[dict[str, BibtexTypeAndFields], Iterable[EntryType]],
+        entries: dict[str, BibtexTypeAndFields] | Iterable[EntryType],
         filename: PathType,
         sortkey: Optional[Literal['bibkey']],
         encoding='utf-8',
@@ -93,7 +93,7 @@ class SupportsWrite(Protocol):  # pylint: disable=C0115,R0903
 
 
 def dump(
-        entries: Union[dict[str, BibtexTypeAndFields], Iterable[EntryType]],
+        entries: dict[str, BibtexTypeAndFields] | Iterable[EntryType],
         fd: SupportsWrite,
         sortkey: Optional[Literal['bibkey']] = None,
         normalize: Optional[Literal['', 'NFC', 'NFKC', 'NFD', 'NFKD']] = 'NFC',

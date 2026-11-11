@@ -3,7 +3,7 @@ Programmatic access to Glottolog data.
 """
 import re
 import types
-from typing import Union, Optional, TypedDict
+from typing import Optional, TypedDict
 import pathlib
 import functools
 import contextlib
@@ -25,7 +25,7 @@ from .iso import get_iso, CheckingISO
 
 __all__ = ['Glottolog']
 
-LanguoidOrCode = Union[str, lls.Languoid]
+LanguoidOrCode = str | lls.Languoid
 ISO_CODE_PATTERN = re.compile('[a-z]{3}$')
 
 
@@ -240,8 +240,8 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
 
     def languoids(
             self,
-            ids: set = None,
-            maxlevel: Union[int, config.LanguoidLevel, str] = None,
+            ids: set | None = None,
+            maxlevel: int | config.LanguoidLevel | str | None = None,
             exclude_pseudo_families: bool = False
     ) -> Generator[lls.Languoid, None, None]:
         """
@@ -301,9 +301,9 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
     def newick_tree(
             self,
             start: Optional[LanguoidOrCode] = None,
-            template: str = None,
+            template: str | None = None,
             nodes: Optional[lls.LanguoidMapType] = None,
-            maxlevel: Union[int, config.LanguoidLevel] = None
+            maxlevel: int | config.LanguoidLevel | None = None
     ) -> str:
         """
         Returns the Newick representation of a (set of) Glottolog classification tree(s).
@@ -342,7 +342,7 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
 
     def refs_by_languoid(
             self,
-            *bibfiles: Union[references.BibFile, str],
+            *bibfiles: references.BibFile | str,
             nodes: Optional[lls.LanguoidMapType] = None,
     ) -> tuple[dict[lls.Glottocode, list[references.Entry]], dict[str, references.Entry]]:
         """
