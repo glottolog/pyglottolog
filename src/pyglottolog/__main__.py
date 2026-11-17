@@ -26,7 +26,7 @@ def admin_main(**kw):
     return _main(pyglottolog.admin_commands, **kw)
 
 
-def _main(  # pylint: disable=R0913,R0917
+def _main(  # noqa: PLR0913,PLR0917
         commands, args=None, catch_all=False, parsed_args=None, log=None, test=False):
     try:
         repos = Config.from_file().get_clone('glottolog')

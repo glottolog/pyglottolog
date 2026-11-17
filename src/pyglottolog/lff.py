@@ -16,7 +16,7 @@ import operator
 import collections
 from collections.abc import Sequence, Generator
 import dataclasses
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from clldutils.path import readlines
 
@@ -64,7 +64,7 @@ class Registry:
 @dataclasses.dataclass
 class OldTree:
     """We store the old Languoids from the tree, to be updated with new data read from lff."""
-    tree: dict[str, Languoid]
+    tree: dict[Glottocode, Languoid]
 
     def updated_language(self, lg: Languoid, log: logging.Logger) -> Languoid:
         """Update a Languoid object from the old tree with new data and return it."""
@@ -117,7 +117,7 @@ def rmtree(d: PathType):
     os.rmdir(d)
 
 
-def _iter_lineage(  # pylint: disable=R0913,R0917
+def _iter_lineage(  # noqa: PLR0913,PLR0917
         path,
         level,
         llevels,
@@ -143,7 +143,7 @@ def _iter_lineage(  # pylint: disable=R0913,R0917
         yield (name, id_, _level, hid)
 
 
-def languoid(  # pylint: disable=R0913,R0917
+def languoid(  # noqa: PLR0913,PLR0917
         api: 'Glottolog',
         log: logging.Logger,
         registry: Registry,
@@ -182,7 +182,7 @@ def read_lff(
         log: logging.Logger,
         new: Registry,
         level: LanguoidLevel,
-        fname: Optional[PathType] = None,
+        fname: PathType | None = None,
 ) -> Generator[LffLanguoid, None, None]:
     """Yield languoids as read from a lff file."""
     assert level in [api.languoid_levels.language, api.languoid_levels.dialect]
@@ -269,7 +269,19 @@ class ConsistencyChecker:
         return lg
 
 
-def lff2tree(api, log=logging.getLogger(__name__)):
+def _move_tree_to_build(api):
+    if api.build_path('tree').exists():
+        try:
+            rmtree(api.build_path('tree'))
+        except Exception:  # pragma: no cover  # pylint: disable=W0718
+            pass
+        if api.build_path('tree').exists():  # pragma: no cover
+            raise ValueError(f'please remove {api.build_path("tree")} before proceeding')
+    # move the old tree out of the way
+    shutil.move(api.tree, api.build_path('tree'))
+
+
+def lff2tree(api: 'Glottolog', log: logging.Logger = logging.getLogger(__name__)):
     """
     - get mapping glottocode -> Languoid from old tree
     - assemble new directory tree
@@ -287,15 +299,7 @@ def lff2tree(api, log=logging.getLogger(__name__)):
     old_tree: OldTree = OldTree({lang.id: lang for lang in api.languoids()})
 
     if api.tree.exists():
-        if api.build_path('tree').exists():
-            try:
-                rmtree(api.build_path('tree'))
-            except Exception:  # pragma: no cover  # pylint: disable=W0718
-                pass
-            if api.build_path('tree').exists():  # pragma: no cover
-                raise ValueError(f'please remove {api.build_path("tree")} before proceeding')
-        # move the old tree out of the way
-        shutil.move(api.tree, api.build_path('tree'))
+        _move_tree_to_build(api)
     api.tree.mkdir()
 
     checker = ConsistencyChecker()

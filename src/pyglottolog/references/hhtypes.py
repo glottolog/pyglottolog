@@ -26,6 +26,9 @@ class HHType:
             Trigger('hhtype', self.id, t)
             for t in p.get(s, 'triggers').strip().splitlines() or []]
 
+    def __hash__(self) -> int:
+        return self.rank  # pragma: no cover
+
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.id} rank={self.rank}>'
 

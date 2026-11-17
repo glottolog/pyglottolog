@@ -8,7 +8,7 @@ BibTeX parsing functionality.
 import functools
 import collections
 import unicodedata
-from typing import Optional, Literal, Protocol
+from typing import Literal, Protocol
 from collections.abc import Iterable, Generator
 
 from simplepybtex.database.input.bibtex import LowLevelParser, Parser, UndefinedMacro
@@ -31,7 +31,7 @@ FIELDORDER = ['author', 'editor', 'title', 'booktitle', 'journal',
 def load(
         filename: PathType,
         preserve_order: bool = False,
-        encoding: Optional[str] = None,
+        encoding: str | None = None,
 ) -> EntryDictType:
     """Read entries from a file into a dict."""
     cls = collections.OrderedDict if preserve_order else dict
@@ -56,9 +56,7 @@ def iterentries_from_text(text, encoding='utf-8') -> Generator[EntryType, None, 
 
 
 def iterentries(
-        filename: PathType,
-        encoding: Optional[str] = None,
-) -> Generator[EntryType, None, None]:
+        filename: PathType, encoding: str | None = None) -> Generator[EntryType, None, None]:
     """Read entries from a file."""
     encoding = encoding or 'utf8'
     with memorymapped(str(filename)) as source:
@@ -78,9 +76,9 @@ def debug_pybtex(source, e):  # pragma: no cover  # pylint: disable=C0116
 def save(
         entries: dict[str, BibtexTypeAndFields] | Iterable[EntryType],
         filename: PathType,
-        sortkey: Optional[Literal['bibkey']],
+        sortkey: Literal['bibkey'] | None,
         encoding='utf-8',
-        normalize: Optional[Literal['', 'NFC', 'NFKC', 'NFD', 'NFKD']] = 'NFC',
+        normalize: Literal['', 'NFC', 'NFKC', 'NFD', 'NFKD'] | None = 'NFC',
 ):
     """Write entries as BibTeX to disk."""
     with open(str(filename), 'w', encoding=encoding, errors='strict') as fd:
@@ -95,8 +93,8 @@ class SupportsWrite(Protocol):  # pylint: disable=C0115,R0903
 def dump(
         entries: dict[str, BibtexTypeAndFields] | Iterable[EntryType],
         fd: SupportsWrite,
-        sortkey: Optional[Literal['bibkey']] = None,
-        normalize: Optional[Literal['', 'NFC', 'NFKC', 'NFD', 'NFKD']] = 'NFC',
+        sortkey: Literal['bibkey'] | None = None,
+        normalize: Literal['', 'NFC', 'NFKC', 'NFD', 'NFKD'] | None = 'NFC',
 ):
     """Write entries in BibTeX format to fd."""
     assert sortkey in [None, 'bibkey']
@@ -163,7 +161,7 @@ class Ordering(dict):
 fieldorder = Ordering.fromlist(FIELDORDER)
 
 
-def check(filename: PathType, encoding: Optional[str] = None) -> int:
+def check(filename: PathType, encoding: str | None = None) -> int:
     """Parse a bibtex file and report error count."""
     parser = CheckParser(encoding=encoding)
     parser.parse_file(str(filename))

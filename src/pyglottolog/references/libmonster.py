@@ -7,11 +7,11 @@ import re
 import logging
 from heapq import nsmallest
 from collections import defaultdict
-from collections.abc import Sequence, Generator, Iterable, Iterator
+from collections.abc import Sequence, Generator, Iterable, Iterator, Callable
 import dataclasses
 from itertools import groupby
 from operator import itemgetter
-from typing import TypeVar, Callable, Any, Literal, Optional, TypedDict, Concatenate, ParamSpec
+from typing import TypeVar, Any, Literal, TypedDict, Concatenate, ParamSpec
 
 from csvw.dsv import UnicodeWriter
 
@@ -76,8 +76,8 @@ def grp2fd(seq: Sequence[Sequence[Any]]) -> dict[Any, dict[Any, Literal[1]]]:
 class Author(TypedDict):
     """Author name components."""
     lastname: str
-    firstname: Optional[str]
-    jr: Optional[str]
+    firstname: str | None
+    jr: str | None
 
 
 reauthor = [re.compile(pattern) for pattern in [
@@ -96,7 +96,7 @@ reauthor = [re.compile(pattern) for pattern in [
 ]]
 
 
-def psingleauthor(n: str) -> Optional[Author]:
+def psingleauthor(n: str) -> Author | None:
     """Try to parse an author name from a string."""
     if not n:
         return None
@@ -356,7 +356,7 @@ def sdlgs(e: EntryDictType, hht: HHTypes) -> dict[LgcodeType, list[list[Descript
     return dict(map_values(fes, description_status, hht))
 
 
-def lstat(e: EntryDictType, hht: HHTypes) -> dict[LgcodeType, Optional[HHType]]:
+def lstat(e: EntryDictType, hht: HHTypes) -> dict[LgcodeType, HHType | None]:
     """Map language codes to best HHType."""
     return dict(map_values(sdlgs(e, hht), lambda xs, *_: (xs + [[[None]]])[0][0][-1]))
 
@@ -407,7 +407,7 @@ def _revise_computerized_assignment(ls, lsafter, mafter, hht, report):
     return mafter
 
 
-def markconservative(  # pylint: disable=R0913,R0917
+def markconservative(  # noqa: PLR0913,PLR0917
         m: EntryDictType,
         trigs: list[Trigger],
         ref: EntryDictType,
@@ -429,7 +429,7 @@ def markconservative(  # pylint: disable=R0913,R0917
     """
     mafter: EntryDictType = markall(m, trigs, verbose=verbose, rank=rank)
     # HHType assignment in the ref bib - the gold standard.
-    ls: dict[LgcodeType, Optional[HHType]] = lstat(ref, hht)
+    ls: dict[LgcodeType, HHType | None] = lstat(ref, hht)
     # HHType assignment to the whole db after applying triggers:
     lsafter: dict[LgcodeType, tuple[HHType, list[KeyType]]] = lstat_witness(mafter, hht)
 
@@ -438,7 +438,7 @@ def markconservative(  # pylint: disable=R0913,R0917
     for lg in report.no_status:
         print(f'{lg} lacks status')
     with UnicodeWriter(outfn, dialect='excel-tab') as writer:
-        writer.writerows(((lg, was) + mis for (lg, miss, was) in report.log for mis in miss))
+        writer.writerows((lg, was) + mis for (lg, miss, was) in report.log for mis in miss)
     return mafter
 
 

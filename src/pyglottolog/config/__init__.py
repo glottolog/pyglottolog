@@ -6,7 +6,7 @@ import pathlib
 import functools
 import collections
 import dataclasses
-from typing import Optional, Any
+from typing import Any
 
 from clldutils.misc import nfilter
 from clldutils.inifile import INI
@@ -50,6 +50,9 @@ class Editors(ConfigObject):
     def __post_init__(self):
         self.current = eval(self.current)  # pylint: disable=W0123
 
+    def __hash__(self) -> int:
+        return hash(self.id)  # pragma: no cover
+
     def __lt__(self, other):
         return self.ord < other.ord
 
@@ -86,6 +89,9 @@ class AES(ConfigObject):  # pylint: disable=R0902
     def __post_init__(self):
         self.ordinal = int(self.ordinal)
 
+    def __hash__(self) -> int:
+        return hash(self.id)  # pragma: no cover
+
     def __lt__(self, other):
         return self.ordinal < other.ordinal
 
@@ -99,11 +105,11 @@ class AESSource(ConfigObject):
     Reference information for AES sources
     """
     id: str
-    name: Optional[str]
-    url: Optional[str]
+    name: str | None
+    url: str | None
     #: Glottolog reference ID linking to further information
     reference_id: str
-    pages: str = None
+    pages: str | None = None
 
 
 @dataclasses.dataclass(order=True)
@@ -118,7 +124,7 @@ class Macroarea(ConfigObject):
     reference_id: str
 
     @property
-    def geojson(self) -> Optional[dict[str, Any]]:
+    def geojson(self) -> dict[str, Any] | None:
         """Get the GeoJSON representation of the geographic extent of the macroarea."""
         fname = self._fname.parent.joinpath(
             'macroareas', 'voronoi', f"{self.name.lower().replace(' ', '_')}.geojson")
@@ -144,6 +150,9 @@ class DocumentType(ConfigObject):  # pylint: disable=R0902
         self.rank = int(self.rank)
         self.triggers = nfilter(self.triggers.split('\n'))  # pylint: disable=E1101
 
+    def __hash__(self) -> int:
+        return hash(self.id)  # pragma: no cover
+
     def __lt__(self, other):
         return self.rank < other.rank
 
@@ -168,6 +177,9 @@ class MEDType(ConfigObject):
     def __post_init__(self):
         self.rank = int(self.rank)
 
+    def __hash__(self) -> int:
+        return hash(self.id)  # pragma: no cover
+
     def __lt__(self, other):
         return self.rank < other.rank
 
@@ -186,6 +198,9 @@ class LanguageType(ConfigObject):
     pseudo_family_id: str
     category: str  #: category name for languages of this type
     description: str
+
+    def __hash__(self) -> int:
+        return hash(self.id)  # pragma: no cover
 
     def __lt__(self, other):
         return self.id < other.id

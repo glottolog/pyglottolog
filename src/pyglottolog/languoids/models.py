@@ -4,7 +4,7 @@ OO wrappers for various Glottolog data objects.
 import datetime
 import logging
 import re
-from typing import Optional, Literal, get_args, TYPE_CHECKING, Self
+from typing import Literal, get_args, TYPE_CHECKING, Self
 import collections
 from collections.abc import Iterable
 import dataclasses
@@ -134,8 +134,8 @@ class Reference:
     A reference of a bibliographical record in Glottolog.
     """
     key: str
-    pages: Optional[str] = None
-    trigger: Optional[str] = None
+    pages: str | None = None
+    trigger: str | None = None
     endtag: str = '**'
     pattern: re.Pattern = re.compile(
         r"\*\*(?P<key>[a-z0-9\-_]+:[a-zA-Z.?\-;*'/()\[\]!_:0-9\u2014]+?)(?P<endtag>\*\*|\(\*\*\))"
@@ -179,7 +179,7 @@ class Reference:
         return cls(**match.groupdict())
 
     @classmethod
-    def from_string(cls, string: str, pattern: Optional[re.Pattern] = None) -> Self:
+    def from_string(cls, string: str, pattern: re.Pattern | None = None) -> Self:
         """Parse a reference from a string."""
         try:
             return cls.from_match((pattern or cls.pattern).match(string.strip()))
@@ -221,21 +221,21 @@ class Country:
         return f'{self.name} ({self.id})' if not minimal else f'{self.id}'
 
     @classmethod
-    def from_name(cls, name) -> Optional['Country']:  # pylint: disable=C0116
+    def from_name(cls, name) -> Self | None:  # pylint: disable=C0116
         res = pycountry.countries.get(name=name)
         if res:
             return cls(id=res.alpha_2, name=res.name)
         return None  # pragma: no cover
 
     @classmethod
-    def from_id(cls, id_) -> Optional['Country']:  # pylint: disable=C0116
+    def from_id(cls, id_) -> Self | None:  # pylint: disable=C0116
         res = pycountry.countries.get(alpha_2=id_)
         if res:
             return cls(id=res.alpha_2, name=res.name)
         return None  # pragma: no cover
 
     @classmethod
-    def from_text(cls, text: str) -> Optional['Country']:
+    def from_text(cls, text: str) -> Self | None:
         """Instantiate country based on alpha_2 code or name."""
         match = re.search(r'(?P<code_only>^[A-Z]{2}$)|\(?(?P<code>[A-Z]{2})\)?', text)
         if match:
@@ -250,11 +250,11 @@ class ClassificationComment:
     Commentary on the classification of the languoid
     """
     #: Commentary on the internal classification of the descendants of the languoid
-    sub: Optional[str] = None
+    sub: str | None = None
     #: References for the internal classification
     subrefs: list[Reference] = dataclasses.field(default_factory=list)
     #: Commentary on the classification of the languoid within its family
-    family: Optional[str] = None
+    family: str | None = None
     #: References for the family classification
     familyrefs: list[Reference] = dataclasses.field(default_factory=list)
 
@@ -299,15 +299,15 @@ class ISORetirement:  # pylint: disable=R0902
     Information extracted from accepted ISO 639-3 change requests about retired ISO codes
     associated with the languoid.
     """
-    code: Optional[str] = None  #: Retired ISO 639-3 code
-    name: Optional[str] = None  #: Name of the retired ISO language
-    change_request: Optional[str] = None  #: Number of the ISO change request
-    effective: Optional[str] = None  #: Date of acceptance of the change request
-    reason: Optional[str] = None  #: Reason to retire the ISO code
+    code: str | None = None  #: Retired ISO 639-3 code
+    name: str | None = None  #: Name of the retired ISO language
+    change_request: str | None = None  #: Number of the ISO change request
+    effective: str | None = None  #: Date of acceptance of the change request
+    reason: str | None = None  #: Reason to retire the ISO code
     #: List of ISO codes replacing the retired code
     change_to: list[str] = dataclasses.field(default_factory=list)
-    remedy: Optional[str] = None  #: What to do about the retired code
-    comment: Optional[str] = None
+    remedy: str | None = None  #: What to do about the retired code
+    comment: str | None = None
 
     def __post_init__(self):
         self.comment = self.comment.replace('\n.', '\n') if self.comment else None

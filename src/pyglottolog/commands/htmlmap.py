@@ -7,14 +7,22 @@ Languoids to plot can be specified as glottocodes or comma-separated
 import sys
 import json
 import string
+import pathlib
+import argparse
+import functools
 import webbrowser
 import collections
+import dataclasses
+from typing import Self
 
 from clldutils.color import qualitative_colors
 from clldutils.path import git_describe
 from clldutils.clilib import PathType
 
 from pyglottolog.cli_util import add_output_dir
+from pyglottolog.languoids import Languoid, LanguoidMapType
+
+CoordinatesMap = dict[str, tuple[float | None, float | None]]
 
 
 def register(parser):  # pylint: disable=C0116
@@ -39,12 +47,12 @@ def register(parser):  # pylint: disable=C0116
     )
 
 
-def get_glottocodes(args):
+def _get_glottocodes(spec: pathlib.Path | None, test: bool = False) -> CoordinatesMap:
     """Glottocodes for languoids to display on the map can be specified in various ways."""
     glottocodes = []
-    if args.glottocodes:
-        glottocodes = args.glottocodes.read_text(encoding='utf8').split()
-    elif not args.test:  # pragma: no cover
+    if spec:
+        glottocodes = spec.read_text(encoding='utf8').split()
+    elif not test:  # pragma: no cover
         glottocodes = [line.strip() for line in sys.stdin.readlines()]
     res = {}
     for gc in glottocodes:
@@ -56,7 +64,7 @@ def get_glottocodes(args):
     return res
 
 
-def _include_node(n, glottocodes, languoid_levels):
+def _include_node(n, glottocodes: CoordinatesMap, languoid_levels):
     if any((not glottocodes and n.level == languoid_levels.language,
             glottocodes and n.id in glottocodes)):
         if n.latitude is not None or glottocodes.get(n.id, (None,))[0] is not None:
@@ -64,21 +72,34 @@ def _include_node(n, glottocodes, languoid_levels):
     return False
 
 
-def run(args):  # pylint: disable=C0116
-    legend = collections.Counter()
-    glottocodes = get_glottocodes(args)
+@dataclasses.dataclass(frozen=True)
+class MapData:
+    langs: list[tuple[Languoid, str]]
+    legend: collections.Counter
 
+    @classmethod
+    def from_nodemap(cls, nodes: LanguoidMapType, glottocodes: CoordinatesMap, llevels) -> Self:
+        langs = []
+        legend = collections.Counter()
+        for n in nodes.values():
+            if _include_node(n, glottocodes, llevels):
+                fid = n.lineage[0][1] if n.lineage else n.id
+                if (not nodes[fid].category.startswith('Pseudo')) or fid == n.id:
+                    langs.append((n, fid))
+                    legend.update([fid])
+        return cls(langs, legend)
+
+    @functools.cached_property
+    def color_map(self):
+        cm = [fid for fid, _ in self.legend.most_common()]
+        return dict(zip(cm, qualitative_colors(len(cm))))
+
+
+def run(args: argparse.Namespace):  # pylint: disable=C0116
+    glottocodes = _get_glottocodes(args.glottocodes, args.test)
     nodes = {n.id: n for n in args.repos.languoids()}
-    langs = []
-    for n in nodes.values():
-        if _include_node(n, glottocodes, args.repos.languoid_levels):
-            fid = n.lineage[0][1] if n.lineage else n.id
-            if (not nodes[fid].category.startswith('Pseudo')) or fid == n.id:
-                langs.append((n, fid))
-                legend.update([fid])
 
-    color_map = [fid for fid, _ in legend.most_common()]
-    color_map = dict(zip(color_map, qualitative_colors(len(color_map))))
+    mdata = MapData.from_nodemap(nodes, glottocodes, args.repos.languoid_levels)
 
     def l2f(t):
         n, fid = t
@@ -95,7 +116,7 @@ def run(args):  # pylint: disable=C0116
             "id": n.id,
             "properties": {
                 "name": n.name,
-                "color": color_map[fid],
+                "color": mdata.color_map[fid],
                 "family": nodes[fid].name,
                 "family_id": fid,
             },
@@ -103,16 +124,16 @@ def run(args):  # pylint: disable=C0116
         }
 
     def legend_item(fid, c) -> str:
-        return (f'<span style="background-color: {color_map[fid]}; border: 1px solid black;">'
+        return (f'<span style="background-color: {mdata.color_map[fid]}; border: 1px solid black;">'
                 f'&nbsp;&nbsp;&nbsp;</span> '
                 f'<a href="https://glottolog.org/resource/languoid/id/{fid}">{nodes[fid].name}</a> '
                 f'({c})')
 
     geojson = {
-        "features": list(map(l2f, langs)),
+        "features": [l2f(lg) for lg in mdata.langs],
         "properties": {
             "legend": {
-                fid: legend_item(fid, c) for fid, c in legend.most_common() if
+                fid: legend_item(fid, c) for fid, c in mdata.legend.most_common() if
                 c >= args.min_langs_for_legend},
         },
         "type": "FeatureCollection"
@@ -132,7 +153,7 @@ def run(args):  # pylint: disable=C0116
             'htmlmap.html',
             version=git_describe(args.repos.repos),
             jsname=jsname,
-            nlangs=len(langs)),
+            nlangs=len(mdata.langs)),
         encoding='utf8')
     print(html.resolve().as_uri())
     if args.open:

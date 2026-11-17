@@ -10,10 +10,10 @@ ROMANPATTERN = re.compile(ROMAN + '$')
 ARABIC = r'[AESaes]?[0-9]+'
 ARABICPATTERN = re.compile(ARABIC + '$')
 SEPPAGESPATTERN = re.compile(
-    r'(?P<n1>{0}|{1})\s*([,;.+/])\s*(?P<n2>{0}|{1})'.format(  # pylint: disable=C0209
+    r'(?P<n1>{0}|{1})\s*([,;.+/])\s*(?P<n2>{0}|{1})'.format(  # noqa: UP032
         ROMAN, ARABIC))
 PAGES_PATTERN = re.compile(
-    r'(?P<start>{0}|{1})\s*--?\s*(?P<end>{0}|{1})'.format(  # pylint: disable=C0209
+    r'(?P<start>{0}|{1})\s*--?\s*(?P<end>{0}|{1})'.format(  # noqa: UP032
         ROMAN, ARABIC))
 ART_NO_PATTERN = re.compile(r'\(art\.\s*[0-9]+\)')
 

@@ -30,10 +30,7 @@ LogMessageType = tuple[str, 'Languoid | str', str]
 
 
 def read_url(
-        path: str,
-        cache_dir: Optional[PathType] = None,
-        log: Optional[logging.Logger] = None,
-) -> str:
+        path: str, cache_dir: PathType | None = None, log: logging.Logger | None = None) -> str:
     """
     Delegate scraping to clldutils, since nowadays this requires tweaking the user agent as well.
     """
@@ -45,9 +42,8 @@ def read_url(
         if not fpath.exists():
             with iso_639_3._open(path) as fp:  # pylint: disable=W0212
                 fpath.write_text(fp.read().decode('utf8'), encoding='utf8')
-        else:  # pragma: no cover
-            if log:
-                log.debug('... from cache %s', fpath)
+        elif log:  # pragma: no cover
+            log.debug('... from cache %s', fpath)
         return fpath.read_text(encoding='utf8')
 
     with iso_639_3._open(path) as fp:  # pylint: disable=W0212
@@ -77,11 +73,11 @@ class Retirement:
     """A row in the retirements table."""
     Id: str  # pylint: disable=invalid-name
     Ref_Name: str  # pylint: disable=invalid-name
-    Ret_Reason: Optional[RetReason]  # pylint: disable=invalid-name
+    Ret_Reason: RetReason | None  # pylint: disable=invalid-name
     Change_To: str | list[str] | None  # pylint: disable=invalid-name
     Ret_Remedy: str  # pylint: disable=invalid-name
     Effective: datetime.date  # pylint: disable=invalid-name
-    cr: Optional['str | ChangeRequest'] = None
+    cr: 'str | ChangeRequest | None' = None
 
     def __post_init__(self):
         def _validate_iso_code(attr, value):
@@ -105,9 +101,9 @@ class Retirement:
     @classmethod
     def iter(
             cls,
-            table: Optional[Iterator[dict[str, str]]] = None,
-            cache_dir: Optional[PathType] = None,
-            log: Optional[logging.Logger] = None,
+            table: Iterator[dict[str, str]] | None = None,
+            cache_dir: PathType | None = None,
+            log: logging.Logger | None = None,
     ) -> Generator['Retirement', None, None]:
         """Read retirements from a table."""
         content = ''
@@ -177,9 +173,9 @@ class ChangeRequest:  # pylint: disable=R0902
     @classmethod
     def iter(
             cls,
-            max_year: Optional[int] = None,
-            cache_dir: Optional[PathType] = None,
-            log: Optional[logging.Logger] = None,
+            max_year: int | None = None,
+            cache_dir: PathType | None = None,
+            log: logging.Logger | None = None,
     ) -> Generator['ChangeRequest', None, None]:
         """Read change requests from the website (or possibly from cached copies)."""
         path = "code_changes/change_request_index/data/{0}?" \
@@ -242,7 +238,7 @@ def change_request_as_source(id_, rows, ref_ids) -> EntryType:
     return id_, ('misc', fields)
 
 
-def bibtex(api: 'Glottolog', log: logging.Logger, max_year: Optional[int] = None):
+def bibtex(api: 'Glottolog', log: logging.Logger, max_year: int | None = None):
     """Create a BibTeX file listing records for each past ISO 639-3 change request.
 
     http://www-01.sil.org/iso639-3/chg_requests.asp?order=CR_Number&chg_status=past
@@ -291,8 +287,8 @@ def _iter_tables(html):
 
 def code_details(
         code: str,
-        cache_dir: Optional[pathlib.Path] = None,
-        log: Optional[logging.Logger] = None,
+        cache_dir: pathlib.Path | None = None,
+        log: logging.Logger | None = None,
 ) -> dict[str, str]:
     """Read additional code information from the SIL/ISO website."""
     res = {}
@@ -308,10 +304,10 @@ def code_details(
 
 
 def get_retirements(
-        table: Optional[Iterator[dict[str, str]]] = None,
-        max_year: Optional[int] = None,
-        cache_dir: Optional[pathlib.Path] = None,
-        log: Optional[logging.Logger] = None,
+        table: Iterator[dict[str, str]] | None = None,
+        max_year: int | None = None,
+        cache_dir: pathlib.Path | None = None,
+        log: logging.Logger | None = None,
 ) -> list[Retirement]:
     """
     Get retirements augmented with change request info.
@@ -354,7 +350,7 @@ def get_retirements(
     return rets
 
 
-def retirements(api: 'Glottolog', log: logging.Logger, max_year: Optional[int] = None):
+def retirements(api: 'Glottolog', log: logging.Logger, max_year: int | None = None):
     """
     Add info about ISO retirements to languoids.
     """

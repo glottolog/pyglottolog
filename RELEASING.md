@@ -7,13 +7,9 @@ Releasing pyglottolog
   tox -r
   ```
 
-- Make sure flake8 passes:
+- Run ruff:
   ```shell
-  flake8 src
-  ```
-- Make sure pylint passes with a score of >=9.99:
-  ```shell
-  pylint src/pyglottolog
+  ruff check src/pyglottolog
   ```
 
 - Make sure API docs can be built:
@@ -24,7 +20,7 @@ Releasing pyglottolog
   ```
 
 - Update the version number, by removing the trailing `.dev0` in:
-  - `setup.cfg`
+  - `pyproject.toml`
   - `src/pyglottolog/__init__.py`
   - `docs.conf.py`
 
@@ -40,7 +36,6 @@ Releasing pyglottolog
 
 - Release to PyPI:
   ```shell
-  python setup.py clean --all
   rm dist/*
   python -m build -n
   twine upload dist/*
@@ -54,7 +49,7 @@ Releasing pyglottolog
 
 - Increment version number and append `.dev0` to the version number for the new development cycle:
   - `src/pyglottolog/__init__.py`
-  - `setup.cfg`
+  - `pyproject.toml`
   - `docs/conf.py`
 
 - Commit/push the version change:

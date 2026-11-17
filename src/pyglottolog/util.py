@@ -7,8 +7,9 @@ import operator
 import textwrap
 import itertools
 import functools
-from typing import Any, Callable, TypeVar
-from collections.abc import Sequence, Iterable, Generator
+import dataclasses
+from typing import Any, TypeVar
+from collections.abc import Sequence, Iterable, Generator, Callable
 
 from termcolor import colored
 
@@ -60,19 +61,25 @@ TriggerGroupType = tuple[list[TriggerClauseType], list['Trigger']]
 
 
 @functools.total_ordering
+@dataclasses.dataclass(frozen=True)
 class Trigger:
     """
     >>> t = Trigger('f', 't', 'NOT a AND b')
     >>> t([1, 2, 3], {'a': {1, 2}, 'b': {2, 3}})
     {3}
     """
-    def __init__(self, field, type_, string):
-        self.field = field  #: The bibtex field triggers relate to.
-        self.type = type_
-        self._string = string
-        self.clauses: Sequence[TriggerClauseType] = tuple(sorted([
+    field: str  #: The bibtex field triggers relate to.
+    type: str
+    _string: str
+
+    @functools.cached_property
+    def clauses(self) -> Sequence[TriggerClauseType]:
+        return tuple(sorted([
             (False, w[4:].strip()) if w.startswith('NOT ') else (True, w.strip())
-            for w in string.split(' AND ')]))
+            for w in self._string.split(' AND ')]))
+
+    def __hash__(self) -> int:
+        return hash((self.clauses, self.cls))  # pragma: no cover
 
     def __eq__(self, other):
         # make triggers sortable so that we can easily group them by clauses.

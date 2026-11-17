@@ -5,12 +5,12 @@ Functionality to manipulate bibfiles and their entries.
 import logging
 import re
 import math
-from typing import TYPE_CHECKING, Optional, Any, Callable
+from typing import TYPE_CHECKING, Any, Optional, Self
 import pathlib
 import datetime
 import functools
 import collections
-from collections.abc import Generator
+from collections.abc import Generator, Callable
 import dataclasses
 import unicodedata
 
@@ -56,7 +56,7 @@ class BibFiles(list):
     """Ordered collection of `BibFile` objects accessible by filname or index."""
 
     @classmethod
-    def from_path(cls, path: PathType, api: Optional['Glottolog'] = None) -> 'BibFiles':
+    def from_path(cls, path: PathType, api: Optional['Glottolog'] = None) -> Self:
         """BibTeX files from `<path>/bibtex/*.bib` if listed in `<path>/BIBFILES.ini`."""
         path = pathlib.Path(path)
         ini = INI.from_file(path / 'BIBFILES.ini', interpolation=None)
@@ -154,7 +154,7 @@ class BibFile:  # pylint: disable=R0902
                 return Entry(k, t, f, self, self.api)
         raise KeyError(item)
 
-    def visit(self, visitor: Optional[Callable[['Entry'], bool]] = None):
+    def visit(self, visitor: Callable[['Entry'], bool] | None = None):
         """Visit the entries of the bibfile, possibly manipulating them in place."""
         entries = collections.OrderedDict()
         for entry in self.iterentries():
@@ -187,7 +187,7 @@ class BibFile:  # pylint: disable=R0902
             e.key: e.fields['glottolog_ref_id'] for e in self.iterentries()
             if 'glottolog_ref_id' in e.fields}
 
-    def update(self, fname: PathType, log: Optional[logging.Logger] = None, keep_old=False):
+    def update(self, fname: PathType, log: logging.Logger | None = None, keep_old=False):
         """Update the bibfile with the data from fname."""
         entries, new = collections.OrderedDict(), 0
         if keep_old:
@@ -283,6 +283,9 @@ class Entry:
     recomma = re.compile(r"[,/]\s?")
     lgcode_pattern = re.compile(lgcode_regex + "$")
 
+    def __hash__(self) -> int:
+        return hash(self.id)  # pragma: no cover
+
     def __eq__(self, other):
         return self.weight == other.weight
 
@@ -321,7 +324,7 @@ class Entry:
         return -index, pages, self.year_int or 0, self.id
 
     @functools.cached_property
-    def med_type(self) -> Optional[MEDType]:
+    def med_type(self) -> MEDType | None:
         """
         The entry's type on the MED scale.
         """
@@ -338,7 +341,7 @@ class Entry:
         return None  # pragma: no cover
 
     @functools.cached_property
-    def year_int(self) -> Optional[int]:
+    def year_int(self) -> int | None:
         """Year as number if possible."""
         if self.fields.get('year'):
             # prefer years in brackets over the first 4-digit number.
@@ -351,7 +354,7 @@ class Entry:
         return None
 
     @functools.cached_property
-    def pages_int(self) -> Optional[int]:
+    def pages_int(self) -> int | None:
         """Number of pages as int."""
         if self.fields.get('numberofpages'):
             try:
@@ -368,7 +371,7 @@ class Entry:
         return None
 
     @functools.cached_property
-    def publisher_and_address(self) -> tuple[Optional[str], Optional[str]]:
+    def publisher_and_address(self) -> tuple[str | None, str | None]:
         """Publisher and address values."""
         p = self.fields.get('publisher')
         if p and ':' in p:
@@ -411,7 +414,7 @@ class Entry:
         return codes
 
     @staticmethod
-    def parse_ca(s: str) -> Optional[str]:
+    def parse_ca(s: str) -> str | None:
         """Read a trigger expression form a field value."""
         if s:
             match = re.search('computerized assignment from "(?P<trigger>[^\"]+)"', s)
@@ -419,7 +422,7 @@ class Entry:
                 return match.group('trigger')
         return None
 
-    def languoids(self, langs_by_codes: dict) -> tuple[list, Optional[str]]:
+    def languoids(self, langs_by_codes: dict) -> tuple[list, str | None]:
         """
         Expand the language codes mentioned in a reference's "lgcode" field to `Languoid` objects.
         """

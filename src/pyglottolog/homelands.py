@@ -7,10 +7,11 @@ since Sapir 1916. This module provides implementations of some of the simpler al
 import gzip
 import json
 import random
-from typing import Callable
+from typing import Self
 import decimal
 import pathlib
 import collections
+from collections.abc import Iterable, Callable
 import dataclasses
 
 try:
@@ -46,6 +47,31 @@ def geodist(geod: pyproj.Geod, p1: PointType, p2: PointType) -> float:
     return geod.inv(p1[1], p1[0], p2[1], p2[0])[2]
 
 
+def _get_subgroups(
+        langs: Iterable[Languoid]
+) -> tuple[dict[tuple[str, str], list[tuple[float, float] | str]], None | list[str]]:
+    subgroups = collections.defaultdict(list)
+    pref_continents = None
+    for lang in langs:
+        if not pref_continents:
+            pref_continents = {
+                'South America': ['southamerica', 'northamerica'],
+                'North America': ['northamerica', 'southamerica'],
+                'Eurasia': ['asia', 'europe'],
+                'Africa': ['africa'],
+                'Papunesia': ['oceania'],
+                'Australia': ['oceania'],
+            }[lang.macroareas[0].name]
+        prev = None
+        for i, (_, gc, _) in enumerate(reversed(lang.lineage)):
+            if i == 0:  # For the immediate parent, we append the coordinate.
+                subgroups[(lang.lineage[0][1], gc)].append((lang.latitude, lang.longitude))
+            else:  # Otherwise we append the Glottocode of the immediate child.
+                subgroups[(lang.lineage[0][1], gc)].append(prev)
+            prev = gc
+    return subgroups, pref_continents
+
+
 @dataclasses.dataclass
 class Landmasses:
     """Landmasses of the Earth."""
@@ -53,7 +79,7 @@ class Landmasses:
     geod: pyproj.Geod = dataclasses.field(default_factory=lambda: pyproj.Geod(ellps='WGS84'))
 
     @classmethod
-    def from_geojson(cls) -> 'Landmasses':
+    def from_geojson(cls) -> Self:
         """Read shape data from GeoJSON files."""
         shapes = {}
         for p in pathlib.Path(pyglottolog.__file__).parent.joinpath('data').glob('*.geojson.gz'):
@@ -64,12 +90,12 @@ class Landmasses:
 
     def contain(self, homeland: Point, pref_continents: list[str]) -> bool:
         """Whether homeland is contained in any landmass."""
-        for _, l in sorted(
+        for _, lm in sorted(
             self.shapes.items(),
             key=lambda i: i[0] in pref_continents,
             reverse=True
         ):
-            if l.contains(homeland):
+            if lm.contains(homeland):
                 return True
         return False
 
@@ -157,28 +183,10 @@ def recursive_centroids(langs: list[Languoid]) -> PointDictType:
     def norm_lon(lon, tlgc):
         return lon - 360 if lon > 180 and tlgc == 'aust1307' else lon
 
-    subgroups = collections.defaultdict(list)
-    pref_continents = None
-    for lang in langs:
-        if not pref_continents:
-            pref_continents = {
-                'South America': ['southamerica', 'northamerica'],
-                'North America': ['northamerica', 'southamerica'],
-                'Eurasia': ['asia', 'europe'],
-                'Africa': ['africa'],
-                'Papunesia': ['oceania'],
-                'Australia': ['oceania'],
-            }[lang.macroareas[0].name]
-        prev = None
-        for i, (_, gc, _) in enumerate(reversed(lang.lineage)):
-            if i == 0:  # For the immediate parent, we append the coordinate.
-                subgroups[(lang.lineage[0][1], gc)].append((lang.latitude, lang.longitude))
-            else:  # Otherwise we append the Glottocode of the immediate child.
-                subgroups[(lang.lineage[0][1], gc)].append(prev)
-            prev = gc
-
+    subgroups, pref_continents = _get_subgroups(langs)
     landmasses = Landmasses.from_geojson()
     homelands: PointDictType = {}
+
     while subgroups:
         for (tlgc, gc), coords in list(subgroups.items()):
             # coords is a list of immediate children of the group specified by `gc`, either

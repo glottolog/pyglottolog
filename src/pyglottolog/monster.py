@@ -50,7 +50,7 @@ deduplication and annotation in the process.
 import time
 import logging
 import collections
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from .references import BibFile
 from .references.bibtex import EntryDictType
@@ -72,7 +72,7 @@ def macro_area_from_lgcode(m: EntryDictType, lgd: dict[str, str]) -> EntryDictTy
     return {k: inject_macro_area(tf) for k, tf in m.items()}
 
 
-def compile(api: 'Glottolog', log: Optional[logging.Logger] = None):  # pylint: disable=W0622
+def compile(api: 'Glottolog', log: logging.Logger | None = None):  # pylint: disable=W0622
     """Create the monster BibTeX file, merging all Glottolog refproviders."""
     log = log or logging.getLogger('pyglottolog')
     previous = api.references_path('monster.csv')

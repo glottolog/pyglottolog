@@ -24,8 +24,8 @@ def run(args):  # pylint: disable=C0116
         if (not getattr(args, 'provider', None)) or (name in args.provider):
             args.log.info(f'updating {name} links ...')
             i = 0
-            for i, l in enumerate(cls(args.repos).iterupdated(langs), start=1):
-                l.write_info()
-                updated.add(l.id)
+            for i, lg in enumerate(cls(args.repos).iterupdated(langs), start=1):
+                lg.write_info()
+                updated.add(lg.id)
             args.log.info(f'... {i} done')
     print(f'{len(updated)} languoids updated')

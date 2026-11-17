@@ -3,7 +3,7 @@ An OO wrapper for languoid data access and manipulation.
 """
 import os
 import re
-from typing import Optional, TYPE_CHECKING, Any
+from typing import Optional, TYPE_CHECKING, Any, Self
 import pathlib
 import datetime
 import warnings
@@ -36,6 +36,7 @@ ISO_8601_INTERVAL = re.compile(
     flags=re.ASCII)
 
 NameIdLevelType = tuple[str, Glottocode, config.LanguoidLevel]
+LanguoidMapType = dict[str, 'Languoid']
 
 
 @functools.total_ordering
@@ -65,10 +66,10 @@ class Languoid:  # pylint: disable=too-many-public-methods
     def __init__(  # pylint: disable=R0913,R0917
             self,
             cfg: INI,
-            lineage: Optional[list[tuple[str, str, str]]] = None,
-            id_: Optional[str] = None,
-            directory: Optional[pathlib.Path] = None,
-            tree: Optional[pathlib.Path] = None,
+            lineage: list[tuple[str, str, str]] | None = None,
+            id_: str | None = None,
+            directory: pathlib.Path | None = None,
+            tree: pathlib.Path | None = None,
             _api=None):
         """
         Refer to the factory methods for typical use cases of instantiating a `Languoid`:
@@ -99,7 +100,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
     def from_dir(
             cls,
             directory: pathlib.Path,
-            nodes: Optional[dict[str, NameIdLevelType]] = None,
+            nodes: dict[str, NameIdLevelType] | None = None,
             _api=None,
             **kw):
         """
@@ -202,7 +203,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
 
     def newick_node(
             self,
-            nodes: Optional['LanguoidMapType'] = None,
+            nodes: LanguoidMapType | None = None,
             template=None,
             maxlevel=None,
             level=0,
@@ -227,7 +228,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
                 nn.newick_node(nodes=nodes, template=template, maxlevel=maxlevel, level=level + 1))
         return n
 
-    def write_info(self, outdir: Optional[pathlib.Path] = None) -> pathlib.Path:
+    def write_info(self, outdir: pathlib.Path | None = None) -> pathlib.Path:
         """
         Write `Languoid` metadata as INI file to `outdir/<INFO_FILENAME>`.
         """
@@ -260,7 +261,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         return self._id
 
     @property
-    def category(self) -> Optional[str]:
+    def category(self) -> str | None:
         """
         Languoid category.
 
@@ -292,14 +293,14 @@ class Languoid:  # pylint: disable=too-many-public-methods
         """
         return getattr(self.level, 'id', self.level) == 'language' and not self.lineage
 
-    def children_from_nodemap(self, nodes: 'LanguoidMapType') -> list['Languoid']:
+    def children_from_nodemap(self, nodes: LanguoidMapType) -> list['Languoid']:
         """
         A faster alternative to `children` when the relevant languoids have already been
         read from disc.
         """
         return [nodes[d.name] for d in self.dir.iterdir() if d.is_dir()]
 
-    def descendants_from_nodemap(self, nodes: 'LanguoidMapType', level=None) -> list['Languoid']:
+    def descendants_from_nodemap(self, nodes: LanguoidMapType, level=None) -> list['Languoid']:
         """
         A faster alternative to `descendants` when the relevant languoids have already
         been read from disc.
@@ -324,7 +325,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         """
         return [Languoid.from_dir(d, _api=self._api) for d in self.dir.iterdir() if d.is_dir()]
 
-    def ancestors_from_nodemap(self, nodes: 'LanguoidMapType') -> list['Languoid']:
+    def ancestors_from_nodemap(self, nodes: LanguoidMapType) -> list[Self]:
         """
         A faster alternative to `ancestors` when the relevant languoids have already
         been read from disc.
@@ -361,7 +362,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         return list(reversed(list(self.iter_ancestors())))
 
     @property
-    def parent(self) -> Optional['Languoid']:
+    def parent(self) -> Self | None:
         """
         Parent languoid or `None`.
 
@@ -377,7 +378,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
             return None
 
     @property
-    def family(self) -> Optional['Languoid']:
+    def family(self) -> Self | None:
         """
         Top-level family the languoid belongs to or `None`.
 
@@ -437,7 +438,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         self.cfg.set('sources', 'glottolog', [f'{ref}' for ref in refs])
 
     @property
-    def endangerment(self) -> Optional[Endangerment]:
+    def endangerment(self) -> Endangerment | None:
         """
         Endangerment information about the languoid.
 
@@ -460,7 +461,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         return None  # pragma: no cover
 
     @property
-    def classification_comment(self) -> Optional[ClassificationComment]:
+    def classification_comment(self) -> ClassificationComment | None:
         """
         Classification information about the languoid.
 
@@ -476,7 +477,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         return None  # pragma: no cover
 
     @property
-    def ethnologue_comment(self) -> Optional[EthnologueComment]:
+    def ethnologue_comment(self) -> EthnologueComment | None:
         """
         Commentary about the classification of the languoid in Ethnologue.
 
@@ -506,7 +507,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
             self._set('macroareas', [ma.name for ma in value])
 
     @property
-    def timespan(self) -> Optional[tuple[int, int]]:
+    def timespan(self) -> tuple[int, int] | None:
         """Extinct languages are associated with a timespan"""
         value = self.cfg.get(self.section_core, 'timespan', fallback=None)
         if not value:
@@ -599,7 +600,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         self._set('name', value)
 
     @property
-    def latitude(self) -> Optional[float]:
+    def latitude(self) -> float | None:
         """
         The geographic latitude of the point chosen as representative coordinate of the languoid
         """
@@ -610,7 +611,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         self._set('latitude', round(float(value), 5))
 
     @property
-    def longitude(self) -> Optional[float]:
+    def longitude(self) -> float | None:
         """
         The geographic longitude of the point chosen as representative coordinate of the languoid
         """
@@ -621,7 +622,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         self._set('longitude', round(float(value), 5))
 
     @property
-    def hid(self) -> Optional[str]:
+    def hid(self) -> str | None:
         """The languoid's "H(arald)ID", aka a "NOCODE" code."""
         return self._get('hid')
 
@@ -630,7 +631,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         self._set('hid', value)
 
     @property
-    def level(self) -> Optional[config.LanguoidLevel]:  # pylint: disable=C0116
+    def level(self) -> config.LanguoidLevel | None:  # pylint: disable=C0116
         if self._api:
             return self._get('level', self._api.languoid_levels.get)
         return self._get('level', lambda s: s)
@@ -641,7 +642,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
             self._set('level', self._api.languoid_levels.get(value).id)
 
     @property
-    def iso(self) -> Optional[str]:  # pylint: disable=C0116
+    def iso(self) -> str | None:  # pylint: disable=C0116
         return self._get('iso639-3')
 
     @iso.setter
@@ -649,7 +650,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         self._set('iso639-3', value)
 
     @property
-    def iso_code(self) -> Optional[str]:  # pylint: disable=C0116
+    def iso_code(self) -> str | None:  # pylint: disable=C0116
         return self._get('iso639-3')
 
     @iso_code.setter
@@ -659,8 +660,8 @@ class Languoid:  # pylint: disable=too-many-public-methods
     def closest_iso(
             self,
             api: Optional['Glottolog'] = None,
-            nodes: Optional['LanguoidMapType'] = None,
-    ) -> Optional[str]:
+            nodes: LanguoidMapType | None = None,
+    ) -> str | None:
         """
         ISO 639-3 code assigned to the languoid or one of its ancestors in the classification
         (in case of dialects) or `None`.
@@ -678,7 +679,7 @@ class Languoid:  # pylint: disable=too-many-public-methods
         return None  # pragma: no cover
 
     @property
-    def iso_retirement(self) -> Optional[ISORetirement]:
+    def iso_retirement(self) -> ISORetirement | None:
         """Information about a retired ISO code related to the languoid."""
         if 'iso_retirement' in self.cfg:
             kw = dict(self.cfg['iso_retirement'])
@@ -693,6 +694,3 @@ class Languoid:  # pylint: disable=too-many-public-methods
     def fname(self) -> pathlib.Path:
         """The location of the languoid's info file in the Glottolog tree directory."""
         return self.dir.joinpath(INFO_FILENAME)
-
-
-LanguoidMapType = dict[str, Languoid]

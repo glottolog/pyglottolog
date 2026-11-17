@@ -3,7 +3,7 @@ Programmatic access to Glottolog data.
 """
 import re
 import types
-from typing import Optional, TypedDict
+from typing import TypedDict
 import pathlib
 import functools
 import contextlib
@@ -68,7 +68,7 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
     """
     countries = [models.Country(c.alpha_2, c.name) for c in pycountry.countries]
 
-    def __init__(self, repos='.', *, cache: bool = False):
+    def __init__(self, repos: str | pathlib.Path = '.', *, cache: bool = False):
         """
         :param repos: Path to a copy of `<https://github.com/glottolog/glottolog>`_
         :param cache: Indicate whether to cache `Languoid` objects or not. If `True`, the API must \
@@ -116,7 +116,7 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
             d.mkdir()
         yield d
 
-    def _cfg(self, name, cls=None):
+    def _cfg(self, name: str, cls=None) -> config.Config:
         return config.Config.from_ini(
             self.path('config', name + '.ini'), object_class=cls or types.SimpleNamespace)
 
@@ -206,7 +206,14 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
         """
         return models.Glottocodes(self.languoids_path('glottocodes.json'))
 
-    def languoid(self, id_: LanguoidOrCode) -> Optional[lls.Languoid]:
+    def _iter_tree_dirs(self) -> Generator[tuple[pathlib.Path, lls.Languoid | None], None, None]:
+        for d in self._tree_dirs if self.cache else walk(self.tree, mode='dirs'):
+            l_ = None
+            if self.cache:
+                l_ = self.cache.add(d, self)
+            yield (d, l_)
+
+    def languoid(self, id_: LanguoidOrCode) -> lls.Languoid | None:
         """
         Retrieve a languoid specified by language code.
 
@@ -218,24 +225,16 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
         if self.cache and id_ in self.cache:
             return self.cache[id_]
 
-        if ISO_CODE_PATTERN.match(id_):
-            for d in self._tree_dirs if self.cache else walk(self.tree, mode='dirs'):
-                if self.cache:
-                    l_ = self.cache.add(d, self)
-                else:
+        match_iso_code = ISO_CODE_PATTERN.match(id_)
+
+        for d, l_ in self._iter_tree_dirs():
+            if match_iso_code:
+                if l_ is None:
                     l_ = lls.Languoid.from_dir(d, _api=self)
                 if l_.iso_code == id_:
                     return l_
-        else:
-            for d in self._tree_dirs if self.cache else walk(self.tree, mode='dirs'):
-                l_ = None
-                if self.cache:
-                    # If we cache Languoids, we might as well instantiate the ones we traverse:
-                    l_ = self.cache.add(d, self)
-                if d.name == id_:
-                    if self.cache:
-                        return l_
-                    return lls.Languoid.from_dir(d, _api=self)
+            elif d.name == id_:
+                return l_ or lls.Languoid.from_dir(d, _api=self)
         return None
 
     def languoids(
@@ -272,7 +271,7 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
                     if (not exclude_pseudo_families) or not lang.category.startswith('Pseudo'):
                         yield lang
 
-    def languoids_by_code(self, nodes: Optional[lls.LanguoidMapType] = None) -> lls.LanguoidMapType:
+    def languoids_by_code(self, nodes: lls.LanguoidMapType | None = None) -> lls.LanguoidMapType:
         """
         Returns a `dict` mapping the three major language code schemes
         (Glottocode, ISO code, and Harald's NOCODE_s) to Languoid objects.
@@ -300,9 +299,9 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
 
     def newick_tree(
             self,
-            start: Optional[LanguoidOrCode] = None,
+            start: LanguoidOrCode | None = None,
             template: str | None = None,
-            nodes: Optional[lls.LanguoidMapType] = None,
+            nodes: lls.LanguoidMapType | None = None,
             maxlevel: int | config.LanguoidLevel | None = None
     ) -> str:
         """
@@ -343,7 +342,7 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
     def refs_by_languoid(
             self,
             *bibfiles: references.BibFile | str,
-            nodes: Optional[lls.LanguoidMapType] = None,
+            nodes: lls.LanguoidMapType | None = None,
     ) -> tuple[dict[lls.Glottocode, list[references.Entry]], dict[str, references.Entry]]:
         """
         Get references from bibfiles keyed by associated Glottocodes.
@@ -401,7 +400,7 @@ class Glottolog(API):  # pylint: disable=too-many-public-methods
         return sorted([e for e in self.editors.values() if e.current], key=lambda e: int(e.ord))
 
 
-def _ascii_node(n, level, last, maxlevel, prefix, levels):  # pylint: disable=R0913,R0917
+def _ascii_node(n: lls.Languoid, level, last, maxlevel, prefix, levels):  # noqa: PLR0913,PLR0917
     nlevel = levels.get(n.level)
     if maxlevel:
         if (isinstance(maxlevel, config.LanguoidLevel) and nlevel > maxlevel) or \

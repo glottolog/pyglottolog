@@ -6,7 +6,7 @@ import collections
 from pyglottolog.languoids import Reference
 
 
-def run(args):  # pylint: disable=C0116
+def run(args):  # noqa: C901
     langs = args.repos.languoids_by_code()
     updated = []
     sources = collections.defaultdict(set)

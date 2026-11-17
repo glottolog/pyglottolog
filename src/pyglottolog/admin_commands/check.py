@@ -64,8 +64,8 @@ class LanguoidLookup:
     def _log_counter(counter, name):
         msg = [name + ':']
         maxl = max(len(k) for k in counter.keys()) + 1
-        for k, l in counter.most_common():
-            msg.append(('{0:<%s} {1:>8,}' % maxl).format(k + ':', l))
+        for k, lg in counter.most_common():
+            msg.append(('{0:<%s} {1:>8,}' % maxl).format(k + ':', lg))
         msg.append(('{0:<%s} {1:>8,}' % maxl).format('', sum(list(counter.values()))))
         print('\n'.join(msg))
 
@@ -75,7 +75,7 @@ class LanguoidLookup:
         self._log_counter(self.by_category, 'Languages by category')
 
 
-def run(args):  # pylint: disable=C0116
+def run(args):  # noqa: C901
     def error(obj, msg):
         args.log.error(message(obj, msg))
 
@@ -132,8 +132,8 @@ def run(args):  # pylint: disable=C0116
             if len([1 for n in gcs if (not n.lineage) or (n.lineage[0][1] != bookkeeping_gc)]) <= 1:
                 # at most one of the languoids is not in bookkeping, just warn
                 method = warn  # pragma: no cover
-            method(name, 'duplicate name: {0}'.format(  # pylint: disable=C0209
-                ', '.join(sorted([f'{n.id} <{n.level.name[0]}>' for n in gcs]))))
+            lgs = ', '.join(sorted([f'{n.id} <{n.level.name[0]}>' for n in gcs]))
+            method(name, f'duplicate name: {lgs}')
 
     stats.log()
 
@@ -146,7 +146,7 @@ def _check_config(api, refkeys, log):
                 log.error(message(obj, f'missing reference: {ref_id}'))
 
 
-def _check_lang_attrs(lang, api, refkeys, log):
+def _check_lang_attrs(lang: Languoid, api, refkeys, log):  # noqa: C901
     if lang.latitude and not -90 <= lang.latitude <= 90:
         log.error(message(lang, f'invalid latitude: {lang.latitude}'))
     if lang.longitude and not -180 <= lang.longitude <= 180:

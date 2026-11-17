@@ -1,5 +1,0 @@
-include README.md faq.md LICENSE
-include requirements.txt
-graft src
-global-exclude *.py[co]
-

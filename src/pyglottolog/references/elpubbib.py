@@ -102,11 +102,10 @@ def scrape_article(metas, xml):  # pragma: no cover  # pylint: disable=C0116
             content = conv(content) if conv else content
             if not mult:
                 md[bname] = content
+            elif bname in md:
+                md[bname].append(content)
             else:
-                if bname in md:
-                    md[bname].append(content)
-                else:
-                    md[bname] = [content]
+                md[bname] = [content]
     md['author'] = ' and '.join(md['author'])
     md['url'] = f"https://doi.org/{md['doi']}"
     if xml is not None:

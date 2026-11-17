@@ -2,7 +2,7 @@
 Managing metadata for Glottolog editions.
 """
 from html import entities as html_entities
-from typing import TYPE_CHECKING, TypedDict, Optional
+from typing import TYPE_CHECKING, TypedDict
 
 from packaging import version
 import nameparser
@@ -30,8 +30,7 @@ def to_html(text: str, url: str) -> str:
     """
     c2n = html_entities.codepoint2name
     text = text.replace('&', '&amp;')
-    text = ''.join('&{0};'.format(  # pylint: disable=C0209
-        c2n[ord(c)]) if ord(c) > 128 and ord(c) in c2n else c for c in text)
+    text = ''.join(f'&{c2n[ord(c)]};' if ord(c) > 128 and ord(c) in c2n else c for c in text)
     return markdown(text.replace(url, f'[{url}]({url})'))
 
 
@@ -62,9 +61,7 @@ def editor_to_dict(name: str, editors: config.Editors) -> dict[str, str]:
     return res
 
 
-def get_edition(  # pylint: disable=W0621
-        repos: 'Glottolog',
-        version: Optional[str] = None) -> Edition:
+def get_edition(repos: 'Glottolog', version: str | None = None) -> Edition:
     """Get the edition matching version - or implicitly the version in the config."""
     version = version or getattr(repos.publication.zenodo, 'version', '0.0.1.dev0')
     for edition in read_editions(repos):
