@@ -1,8 +1,14 @@
 # Changes
 
-## Unreleased
+## [5.0.0] - 2026-11-17
 
 - Drop py3.9 and py3.10 compat
+- Migrate to pyproject.toml
+- SQLAlchemy 2.x compat
+
+While nothing really changed with regards to functionality, we still release this as new major
+version in order to make 4.x available for fixes in SQLAlchemy 1.4.x environments, while the 5.x
+line will support SQLAlchemy 2.x exclusively.
 
 
 ## [4.0.1] - 2026-05-14
